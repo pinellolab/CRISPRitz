@@ -1,0 +1,8 @@
+INDEX CREATION		 comand    gen_name        gen_path         pam
+python3 crispritz.py index-gen HG_19_indexed ../chroms_hg19/ ../pam/pamNGG.txt 
+
+INDEX SEARCH		  comand       gen_name     pam  guides               MM 
+python3 crispritz.py index-search HG_19_indexed NGG input/10guide4mm.txt -mm 4
+
+BRUTE FORCE SEARCH  comand    gen_path         pam               guides              #t  MM    write results
+python3 crispritz.py search ../chroms_hg19/ ../pam/pamNGG.txt ../guides/10guide4mm.txt 4 -mm 4 -r

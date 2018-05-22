@@ -1,0 +1,3 @@
+CC=g++
+crispritz: main.cpp profiling.cpp guide_searching.cpp pam_searching.cpp pre_computation.cpp reading.cpp analysis.cpp
+	$(CC) -std=c++11 -O3 -fopenmp main.cpp analysis.cpp profiling.cpp guide_searching.cpp pam_searching.cpp pre_computation.cpp reading.cpp -o ../exe/crispritz
