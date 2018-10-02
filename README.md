@@ -5,12 +5,13 @@ HOW TO:
 In this package we include two algorithms to perform analysis and CRISPR off-target searching on genome.
 The two algorithms are created to perform different types of analysis:
 
-1- CRISPRbulges, this algorithm is created to perform long-run analysis, so if you want to test a huge library of guides against your genome.
+1- CRISPRbulges, this algorithm is created to perform off-targets analysis with sequence bulges, on DNA sequences and also on RNA guides.
+
 To use use this algorithm, you first need to create a genome_library.
 
 Create the library:
 
-python3 crispritz.py index-gen HG_19_indexed ../chroms_hg19/ ../input/PAM.txt 
+python crispritz.py index-gen HG_19_indexed ../chroms_hg19/ ../input/PAM.txt 
 
 with this command you create your library, 
 
@@ -24,7 +25,7 @@ After that, you can start using the genome library.
 
 Perform Search:
 
-python3 crispritz.py index-search HG_19_indexed NGG input/10guide4mm.txt -mm 4 -bDNA 1 -bRNA 1
+python crispritz.py index-search HG_19_indexed NGG input/10guide4mm.txt -mm 4 -bDNA 1 -bRNA 1
 
 with this command you can search your indexed genome,
 
