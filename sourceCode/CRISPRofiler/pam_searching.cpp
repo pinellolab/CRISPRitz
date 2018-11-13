@@ -18,6 +18,13 @@
 
 using namespace std;
 
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+
+#define MAXS 10000
+#define MAXC 93
+#define MAXW 2000
+
 extern DIR *d;
 extern dirent *dir;
 extern ofstream results;
@@ -47,225 +54,188 @@ extern char* guideinterereverse;
 extern int* primenumbers;
 
 
-// Max number of states in the matching machine.
-// Should be equal to the sum of the length of all keywords.
-const int MAXS = 500;
+int g[MAXS][MAXC];
+int f[MAXS];
+bitset<MAXW> out[MAXS];
+   
+void buildMachine()
+{
+    memset(g,-1,sizeof g);
+    memset(f,0,sizeof f);
 
-// Maximum number of characters in input alphabet
-const int MAXC = 26;
-
-// OUTPUT FUNCTION IS IMPLEMENTED USING out[]
-// Bit i in this mask is one if the word with index i
-// appears when the machine enters this state.
-int out[MAXS];
-
-// FAILURE FUNCTION IS IMPLEMENTED USING f[]
-short int f[MAXS];
-
-// GOTO FUNCTION (OR TRIE) IS IMPLEMENTED USING g[][]
-short int g[MAXS][MAXC];
-
-// Builds the string matching machine.
-// arr -   array of words. The index of each keyword is important:
-//         "out[state] & (1 << i)" is > 0 if we just found word[i]
-//         in the text.
-// Returns the number of states that the built machine has.
-// States are numbered 0 up to the return value - 1, inclusive.
-
-    int buildMatchingMachine(string arr[], int k) 
+    int state = 0,currState = 0,index = 0;
+    string str;
+    ///Building a trie, each new node gets the next number as node-name.
+    for(i = 0; i<listPam.size(); i++)
     {
-    
-        // Initialize all values in output function as 0.
-        memset(out, 0, sizeof out);
+        str = listPam[i];
+        currState = 0;
 
-        // Initialize all values in goto function as -1.
-        memset(g, -1, sizeof g);
-
-        // Initially, we just have the 0 state
-        int states = 1;
-
-        // Construct values for goto function, i.e., fill g[][]
-        // This is same as building a Trie for arr[]
-        for (int i = 0; i < k; ++i) 
+        for(j = 0; j<str.size(); j++)
         {
-            const string &word = arr[i];
-            short int currentState = 0;
-
-            // Insert all characters of current word in arr[]
-            for (int j = 0; j < word.size(); ++j) 
+            index = str[j] - 33;
+            if(g[currState][index] == -1)
             {
-                short int ch = word[j] - 'A';
-
-                // Allocate a new node (create a new state) if a
-                // node for ch doesn't exist.
-                if (g[currentState][ch] == -1)
-                    g[currentState][ch] = states++;
-
-                currentState = g[currentState][ch];
+                g[currState][index] = ++state;
             }
-
-            // Add current word in output function
-            out[currentState] |= (1 << i);
+            currState = g[currState][index];
         }
-
-        // For all characters which don't have an edge from
-        // root (or state 0) in Trie, add a goto edge to state
-        // 0 itself
-        for (short int ch = 0; ch < MAXC; ++ch)
-        {
-            if (g[0][ch] == -1)
-            {
-                g[0][ch] = 0;
-            }
-        }
-
-        // Now, let's build the failure function
-
-        // Initialize values in fail function
-        memset(f, -1, sizeof f);
-
-        // Failure function is computed in breadth first order
-        // using a queue
-        queue<int> q;
-
-        // Iterate over every possible input
-        for (short int ch = 0; ch < MAXC; ++ch) 
-        {
-            // All nodes of depth 1 have failure function value
-            // as 0. For example, in above diagram we move to 0
-            // from states 1 and 3.
-            if (g[0][ch] != 0) 
-            {
-                f[g[0][ch]] = 0;
-                q.push(g[0][ch]);
-            }
-        }
-
-        // Now queue has states 1 and 3
-        while (q.size())
-        {
-            // Remove the front state from queue
-            int state = q.front();
-            q.pop();
-
-            // For the removed state, find failure function for
-            // all those characters for which goto function is
-            // not defined.
-            
-            bitset<5> y(MAXC);
-            for (short int ch = 0; ch <= MAXC; ch++) 
-            {
-                bitset<5> x(ch);
-                if (x==y) break;
-                
-                // If goto function is defined for character 'ch'
-                // and 'state'
-                if (g[state][ch] != -1)
-                {
-                    // Find failure state of removed state
-                    short int failure = f[state];
-
-                    // Find the deepest node labeled by proper
-                    // suffix of string from root to current
-                    // state.
-                    while (g[failure][ch] == -1)
-                            failure = f[failure];
-
-                    failure = g[failure][ch];
-                    f[g[state][ch]] = failure;
-
-                    // Merge output values
-                    out[g[state][ch]] |= out[failure];
-
-                    // Insert the next level node (of Trie) in Queue
-                    q.push(g[state][ch]);
-                }
-            }
-        }
-        return states;
+        out[currState].set(i);
+        ///stores whether i'th indexed string of arr, ends at state 'currState' or not. Thus adding the string to output by using 1 bit, hhh very memory efficient.
     }
-
-    //INPUT: indices, indices reverse, vector of pams, length of vector of pams, genome
-    void searchPam(string arr[], int k) 
+    ///Failure function
+    queue<int>q;
+    int s,fail;
+    for(i = 0; i<MAXC; i++)
     {
-        int l = genlen;
-        int mez_K = k/2;
-        
-        int currentState = 0;		// Initialize current state
-        int ch;	
-    
-        // Build machine with goto, failure and output functions
-        buildMatchingMachine(arr, k);
-    
-    
-        // Traverse the text through the nuilt machine to find all occurrences of words in arr[]
-        #pragma omp parallel for num_threads(threads) schedule(static) private(j, currentState, ch)
-        for (i = 0; i < l; i++) 
+        if(g[0][i] != -1)
         {
-            // If goto is not defined, use failure function
-            ch = genome[i] - 'A';
-            while (g[currentState][ch] == -1)
-                currentState = f[currentState];
-            currentState = g[currentState][genome[i] - 'A'];
-            
-            // If match not found, move to next state
-            if (out[currentState] == 0)
-                continue;
-            
-            // Match found, print all matching words of arr[] using output function.
-            for (j = 0; j < k; j++) 
+            f[g[0][i]] = 0; ///here, depth is 1
+            q.push(g[0][i]);
+        }
+        else
+        {
+            g[0][i] = 0; ///Necessary in failure alg below, non-existing char back to state 0. To stop infinite loop at line 68.
+        }
+    }
+    while(! q.empty())
+    {
+        s = q.front();
+        q.pop();
+        for(i= 0; i<MAXC; i++)
+        {
+            if(g[s][i] != -1)
             {
-                if (out[currentState] & (1 << j)) 
-                {	
-                    if (j < mez_K) 
+                q.push(g[s][i]);
+                fail = f[s]; ///here is the perfect place to calculate failure of g[s][i],cuz here 'state:s' is (depth-1) state of 'state:g[s][i]'.
+                while(g[fail][i] == -1)
+                {
+                    fail = f[fail];
+                }
+                fail = g[fail][i];
+                f[g[s][i]] = fail;
+                out[g[s][i]] |= out[fail]; ///merging output of the node & it's failure node.
+                ///Read the paper of aho-corasick,published in 1975.
+            }
+        }
+    }
+}
+
+void searchPam()
+{
+    int state;
+    int index;
+
+    int tid;
+    int chunk=genlen/threads;
+    int chunkfine;
+    int pamlistlen=listPam.size();
+    int mez_list=pamlistlen/2;
+
+    buildMachine();
+
+    #pragma omp parallel private(tid,j,state,index,i,chunkfine) num_threads(threads)
+    {
+        tid=omp_get_thread_num();
+        chunkfine=((tid+1)*chunk)+(pamlimit-1);
+
+        for(i = (tid*chunk); i < MIN(chunkfine,genlen); i++)
+        {
+            index = genome[i] - 33;
+            while(g[state][index] == -1)   ///If non-existing state, use failure function to support automaton.
+            {
+                state = f[state];
+            }
+
+            state = g[state][index]; /// traverse the trie state/node for the text
+
+            if(out[state]==0) /// if the state has 0 output
+            {
+                continue;
+            }
+
+            for(j = 0; j<pamlistlen; j++) ///For finding position of search strings.
+            {
+                if(out[state].test(j)) /// if j'th string is in the output of state, means a match is found.
+                {
+                    //cout<<arr[j]<<" IS MATCHED AT POSITION: "<<i-arr[j].size()+1<<endl;
+                    if (j < mez_list) 
                     {
                         pamindices[i]=((i-(pamlen-1))>0) ? (i-(pamlen-1)) : 0;
                         if((i-(pamlen-1))==0)
                         {
                             pamindices[i]=-1;
                         }
-                        break; 
+                        break;
                     }
-                    pamindicesreverse[i]=((i-(pamlimit-1))>0) ? (i-(pamlimit-1)) : 0;
-                    if((i-(pamlimit-1))==0)
+                    else
                     {
-                        pamindicesreverse[i]=-1;
+                        pamindicesreverse[i]=((i-(pamlimit-1))>0) ? (i-(pamlimit-1)) : 0;
+                        if((i-(pamlimit-1))==0)
+                        {
+                            pamindicesreverse[i]=-1;
+                        }
+                        if(pamindicesreverse[i]>(genlen-guidelen))
+                        {
+                            pamindicesreverse[i]=0;
+                        }
+                        break;
                     }
-                    if(pamindicesreverse[i]>(genome.size()-guidelen))
-                    {
-                        pamindicesreverse[i]=0;
-                    }
-                    break;
                 }
             }
         }
-        pamindices.erase(remove(pamindices.begin(), pamindices.end(), 0), pamindices.end());
-        pamindices.shrink_to_fit();
-        replace(pamindices.begin(),pamindices.end(),-1,0);
-        
-        pamindicesreverse.erase(remove(pamindicesreverse.begin(), pamindicesreverse.end(), 0), pamindicesreverse.end());
-        pamindicesreverse.shrink_to_fit();
-        replace(pamindicesreverse.begin(),pamindicesreverse.end(),-1,0);
     }
-        
-    // Given a symbol it return a corresponding nucleotides
+
+    pamindices.erase(remove(pamindices.begin(), pamindices.end(), 0), pamindices.end());
+    pamindices.shrink_to_fit();
+    replace(pamindices.begin(),pamindices.end(),-1,0);
+    
+    pamindicesreverse.erase(remove(pamindicesreverse.begin(), pamindicesreverse.end(), 0), pamindicesreverse.end());
+    pamindicesreverse.shrink_to_fit();
+    replace(pamindicesreverse.begin(),pamindicesreverse.end(),-1,0);
+}
+
+
+    //Given a symbol it return a corresponding nucleotides
     string switchSymbol(char sym)
     {
-        if (sym == 'R') return "AG";	//{'A', 'G'};
-        else if (sym == 'Y') return "CT";	//{'C', 'T'};
-        else if (sym == 'S') return "GC";	//{'G', 'C'};
-        else if (sym == 'W') return "AT";	//{'A', 'T'};
-        else if (sym == 'K') return "GT";	//{'G', 'T'};
-        else if (sym == 'M') return "AC";	//{'A', 'C'};
-        else if (sym == 'B') return "CGT";	//{'C', 'G', 'T'};
-        else if (sym == 'D') return "AGT";	//{'A', 'G', 'T'};
-        else if (sym == 'H') return "ACT";	//{'A', 'C', 'T'};
-        else if (sym == 'V') return "ACG";	//{'A', 'C', 'G'};
-        else if (sym == 'N') return "ACGT";	//{'A', 'C', 'G', 'T'};
+        if (sym == 'A') return "ARWMDHV";
+        else if (sym == 'C') return "CYSMBHV";
+        else if (sym == 'G') return "GRSKBDV";
+        else if (sym == 'T') return "TYWKBDH";
+        else if (sym == 'R') return "ARWMDHVSKBG";	//{'A', 'G'};
+        else if (sym == 'Y') return "CYSMBHVWKDT";	//{'C', 'T'};
+        else if (sym == 'S') return "CYSMBHVKDRG";	//{'G', 'C'};
+        else if (sym == 'W') return "ARWMDHVYKBT";	//{'A', 'T'};
+        else if (sym == 'K') return "GRSKBDVYWHT";	//{'G', 'T'};
+        else if (sym == 'M') return "ARWMDHVYSBC";	//{'A', 'C'};
+        else if (sym == 'B') return "CYSMBHVRKDGWT";	//{'C', 'G', 'T'};
+        else if (sym == 'D') return "ARWMDHVSKBGYT";	//{'A', 'G', 'T'};
+        else if (sym == 'H') return "ARWMDHVYSBCKT";	//{'A', 'C', 'T'};
+        else if (sym == 'V') return "ARWMDHVYSBCKG";	//{'A', 'C', 'G'};
+        else if (sym == 'N') return "ACGTRYSWKMBDHV";	//{'A', 'C', 'G', 'T'};
         string str(1, sym);
         return str;
     }
-        
+
+    // string switchSymbol(char sym)
+    // {
+    //     if (sym == 'R') return "AG";	//{'A', 'G'};
+    //     else if (sym == 'Y') return "CT";	//{'C', 'T'};
+    //     else if (sym == 'S') return "GC";	//{'G', 'C'};
+    //     else if (sym == 'W') return "AT";	//{'A', 'T'};
+    //     else if (sym == 'K') return "GT";	//{'G', 'T'};
+    //     else if (sym == 'M') return "AC";	//{'A', 'C'};
+    //     else if (sym == 'B') return "CGT";	//{'C', 'G', 'T'};
+    //     else if (sym == 'D') return "AGT";	//{'A', 'G', 'T'};
+    //     else if (sym == 'H') return "ACT";	//{'A', 'C', 'T'};
+    //     else if (sym == 'V') return "ACG";	//{'A', 'C', 'G'};
+    //     else if (sym == 'N') return "ACGT";	//{'A', 'C', 'G', 'T'};
+    //     string str(1, sym);
+    //     return str;
+    // }
+
+
     // Given a pam return its reverse
     string reverse(string pamInput) 
     {
@@ -276,7 +246,9 @@ short int g[MAXS][MAXC];
             else if (pamInput[nuc] == 'G') ret = 'C' + ret;
             else if (pamInput[nuc] == 'T') ret = 'A' + ret;
             else if (pamInput[nuc] == 'R') ret = 'Y' + ret;		
-            else if (pamInput[nuc] == 'Y') ret = 'R' + ret;		
+            else if (pamInput[nuc] == 'Y') ret = 'R' + ret;
+            else if (pamInput[nuc] == 'S') ret = 'W' + ret;		
+            else if (pamInput[nuc] == 'W') ret = 'S' + ret;		
             else if (pamInput[nuc] == 'M') ret = 'K' + ret;		
             else if (pamInput[nuc] == 'K') ret = 'M' + ret;
             else if (pamInput[nuc] == 'H') ret = 'D' + ret;
@@ -292,7 +264,7 @@ short int g[MAXS][MAXC];
     // Given a list of strings return the product between strings
     vector<string> getProducts(string s[], int s_size) 
     {
-        unsigned short int ch;
+        int ch;
         int combinations = 1;
         vector<string> res;
         for (i=0; i<s_size; i++)
@@ -329,12 +301,13 @@ short int g[MAXS][MAXC];
         vector<string> outPam;							// vector of pam
         string nucleotides_list[pamSup.length()];		// list of nucleotides of the pam
         for (int v=0; v<2; v++) {
-            for (j = 0; j<pamSup.length(); j++)			// switch the symbols to nucleotides
+            for (j = 0; j<pamSup.length(); j++)	// switch the symbols to nucleotides
+            {		
                 nucleotides_list[j] = switchSymbol(pamSup[j]);
+            }
             pam_vector = getProducts(nucleotides_list, pamSup.length());
             outPam.insert(outPam.end(), pam_vector.begin(), pam_vector.end());
             pamSup = reverse(pamSup);
         }
-        
         return outPam;
     }

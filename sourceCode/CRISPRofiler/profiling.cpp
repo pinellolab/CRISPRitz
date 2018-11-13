@@ -48,7 +48,7 @@ string writeprofile,writeextensiveprofile;
 
 void profiler()
 {
-    writeprofile="GUIDE\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\t\tONT\tOFFT\tOFFT/MM\t\t0MM\t1MM\t2MM\t3MM\t4MM\t5MM\t6MM\n";
+    writeprofile="GUIDE\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\t\tONT\tOFFT\tOFFT/MM\t\t0MM\t1MM\t2MM\t3MM\t4MM\t5MM\t6MM\t7MM\t8MM\t9MM\t10MM\n";
 
     for(i=0;i<totalguides;i++)
     {
@@ -76,7 +76,7 @@ void profiler()
         writeprofile+="\t";
         writeprofile+="\t";
 
-        for(j=23;j<(guidelen-pamlimit+10);j++)
+        for(j=23;j<(guidelen-pamlimit+14);j++)
         {
             writeprofile+=to_string(guideprofiling[i][j]);
             writeprofile+="\t";
@@ -88,7 +88,7 @@ void profiler()
         writeextensiveprofile+="\n";
         writeextensiveprofile+="\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tTARGETS\n";
 
-        for(int hh=0;hh<7;hh++)
+        for(int hh=0;hh<11;hh++)
         {
             writeextensiveprofile+=to_string(hh) + " MISSMATCH";
 

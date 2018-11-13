@@ -11,6 +11,8 @@ using namespace std;
 
 #include <bitset>
 
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
 
 // Max number of states in the matching machine.
 // Should be equal to the sum of the length of all keywords.
@@ -145,7 +147,7 @@ int buildMatchingMachine(string arr[], int k) {
 void searchWords(vector<int> &indices, string arr[], int k, string text) {
 
 	int l = text.size();
-	int nThr = omp_get_max_threads();
+	//int nThr = omp_get_max_threads();
 	indices.resize(l);
 	
 	int j, i = 0;
@@ -153,37 +155,48 @@ void searchWords(vector<int> &indices, string arr[], int k, string text) {
 	double start, end;
     int currentState = 0;		// Initialize current state
 	int ch;
+
+    int threads = omp_get_max_threads();
+    int tid;
+    int chunck = l/threads;
+    int chunckfine;
 	
 	// Build machine with goto, failure and output functions
     buildMatchingMachine(arr, k);
     
 	// Traverse the text through the nuilt machine to find all occurrences of words in arr[]
-	#pragma parallel omp for private(j, currentState, ch)
-	for (i = 0; i < l; i++) {
-		// If goto is not defined, use failure function
-		ch = text[i] - 'A';
-		while (g[currentState][ch] == -1)
-			currentState = f[currentState];
-		currentState = g[currentState][text[i] - 'A'];
-		
-		// If match not found, move to next state
-		if (out[currentState] == 0)
-			 continue;
-		
-		// Match found, print all matching words of arr[] using output function.
-		for (j = 0; j < k; j++) {
-			if (out[currentState] & (1 << j)) {	
-				if (j < mez_K) {
-					indices[i] = (i - arr[j].size() + 1) - 21;
-					indices[i] = (indices[i] > 0) ? indices[i] : 0; 	// check the if start position of the guide is <0
-					break;
-				}
-				if (i < l - 22)											// chek the end position of the rev guide 
-					indices[i] = -(i - arr[j].size() + 2);
-				break;
-			}
-		}
-	}
+	//#pragma parallel omp for private(j, currentState, ch)
+    #pragma omp parallel private(tid,j, currentState, ch,i,chunckfine)
+    {
+        tid=omp_get_thread_num();
+        chunckfine=((tid+1)*chunck)+((arr[0].size())-1);
+
+        for (i = (tid*chunck); i < MIN(chunckfine,l); i++) {
+            // If goto is not defined, use failure function
+            ch = text[i] - 'A';
+            while (g[currentState][ch] == -1)
+                currentState = f[currentState];
+            currentState = g[currentState][text[i] - 'A'];
+            
+            // If match not found, move to next state
+            if (out[currentState] == 0)
+                continue;
+            
+            // Match found, print all matching words of arr[] using output function.
+            for (j = 0; j < k; j++) {
+                if (out[currentState] & (1 << j)) {	
+                    if (j < mez_K) {
+                        indices[i] = (i - arr[j].size() + 1) - 21;
+                        indices[i] = (indices[i] > 0) ? indices[i] : 0; 	// check the if start position of the guide is <0
+                        break;
+                    }
+                    if (i < l - 22)											// chek the end position of the rev guide 
+                        indices[i] = -(i - arr[j].size() + 2);
+                    break;
+                }
+            }
+        }
+    }
 	
 	indices.erase(remove(indices.begin(), indices.end(), 0), indices.end());
 	indices.shrink_to_fit();

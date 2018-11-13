@@ -25,7 +25,11 @@ extern int i,j,genlen,pamlen,guidelen,currentmissmatch,space,pamlimit,guidecount
 extern double startime,endtime,starttotal,endtotal,writestart,writend,totalallocazione,totalpam,totalguide,totallettura,totalpostprocessing,totaltimepam,totaltimeguide,totaltimereading;
 extern vector<int> missmatchthrestotal,pamindices,pamindicesreverse,totalprimenumbers;
 extern vector<string> fileList,guides,reverseguides,writingresults,listPam;
-extern string fastaname,pamname,guidename,exoname,introname,resultname,profilename,chrnames,guide,pam,substring,reversesubstring,reverseguide,reversepam,line,genome,nullnucleotide,buf,totalbuf,subpos,subneg;
+extern string indel,fastaname,pamname,guidename,exoname,introname,resultname,profilename,chrnames,guide,pam,substring,reversesubstring,reverseguide,reversepam,line,genome,nullnucleotide,buf,totalbuf,subpos,subneg;
+int filenumber_special;
+vector<string> fileList_special;
+DIR *d_special;
+dirent *dir_special;
 
 //inizializzazione pos
 extern int* pamindicesgpupos;
@@ -68,9 +72,13 @@ void reading_guide()
     while(getline(guidefile,line))
     {
         transform(line.begin(), line.end(),line.begin(), ::toupper);
-        //space=line.find(" ");
-        //guides.push_back(line.substr(0,space));
-        guides.push_back(line);
+        space=line.find("\r");
+        string guida = line.substr(0,space);
+        if(guida.length()==pamlen)
+        {
+            guides.push_back(guida);
+        }
+        //guides.push_back(line);
         //reverseguides.push_back(line.substr(0,space));
         //missmatchthrestotal.push_back(stoi(line.substr(space,line.length()-1)));   
         missmatchthrestotal.push_back(inputmissmatch);
@@ -182,3 +190,76 @@ void reading_chromosomes(char **argv)
         }
     }
 }
+
+// void read_special(string path)
+// {
+//     //reading folder of chromosomes
+//     int ki=0;
+//     const char *c = path.c_str();
+//     d_special = opendir(c);
+//     if(d_special)
+//     {
+//         while ((dir_special = readdir(d_special)) != NULL)
+//         {
+//             if (!(strcmp(".", dir_special->d_name)))
+//             {
+//                 continue;
+//             }
+//             if (!(strcmp("..", dir_special->d_name)))
+//             {
+//                 continue;
+//             }
+//             ki++;
+//             fileList_special.push_back(dir_special->d_name);
+//         }
+//         filenumber_special = fileList_special.size();
+//         //reading every fasta file in the folder and call analysis for every fasta file
+//         for(int ji=0;ji<filenumber_special;ji++) 
+//         {
+//             double start;
+//             start=omp_get_wtime();
+
+//             if(fileList_special[ji].find(chrnames+".enriched")!=-1)
+//             {
+
+//                 path+=fileList_special[ji];
+//                 ifstream fasta_special(path);
+//                 genome.clear();
+                                        
+//                 while(getline(fasta_special,line).good())
+//                 {
+//                     if(line[0] == '>' )
+//                     {
+//                         //chrnames=(line.substr(1));
+//                     }
+//                     else
+//                     {
+//                         transform(line.begin(), line.end(),line.begin(), ::toupper);
+//                         genome+=line;
+//                     }
+//                 }
+                
+//             double end;
+//             end=omp_get_wtime();
+
+//             totaltimereading+=end-start;
+
+//             genlen=genome.length();
+
+//             //cout << "ANALYZING CHROMOSOME: " << chrnames << endl;
+
+//             //cout<<"reading file time "<<end-start<<endl;
+
+//             totaltimereading+=end-start;
+//             start=0;
+
+//             genomebitconversion();
+
+//             //analysis();
+
+//             break;
+//             }
+//         }
+//     closedir(d_special);
+//     }
+// }

@@ -27,7 +27,7 @@ double startime,endtime,starttotal,endtotal,writestart,writend,totalallocazione,
 vector<int> missmatchthrestotal,pamindices,pamindicesreverse,totalprimenumbers;
 vector<string> fileList,guides,reverseguides,writingresults,listPam;
 string fastaname,pamname,guidename,exoname,introname,resultname,profilename,extendedprofilename,annotationame,chrnames,guide,pam,substring,reversesubstring,reverseguide,reversepam,line,genome,nullnucleotide,buf,totalbuf,subpos,subneg; 
-char nowriting;
+char nowriting,noprofile;
 
 //inizializzazione pos
 int* pamindicesgpupos;
@@ -56,25 +56,55 @@ int main( int argc, char **argv )
     starttotal=omp_get_wtime();
 
     //assign argv variables to stream
-    string prova = "r";
+    string resultwriting = "r";
+    string profilewriting = "p";
+    string profileplusresult = "t";
     nullnucleotide = "N";
+    nowriting='n';
+    noprofile='n';
     fastaname=argv[1];
     pamname=argv[2];
     guidename=argv[3];
     inputmissmatch=atoi(argv[4]);
     resultname=argv[5];
-    resultname+=".targets";
+    resultname+=".targets.txt";
     profilename=argv[5];
-    profilename+=".profile";
+    profilename+=".profile.xls";
     extendedprofilename=argv[5];
-    extendedprofilename+=".extended_profile";
-    profile.open(profilename);
-    extentedprofile.open(extendedprofilename);
-    if(argc>7 && (argv[7] == prova))
+    extendedprofilename+=".extended_profile.xls";
+
+    //setting number threads used
+    threads=omp_get_max_threads();
+
+    if(argc>6)
     {
-        results.open(resultname);
-        nowriting='r';
+        threads=atoi(argv[6]);
+        if(threads>omp_get_max_threads() || threads==0)
+        {
+            threads=omp_get_max_threads();
+        }
     }
+    
+    if(argc>7 && (argv[7] == resultwriting))
+    {
+        nowriting='r';
+        results.open(resultname);
+    }
+    else if(argc>7 && (argv[7] == profilewriting))
+    {
+        noprofile='p';
+        profile.open(profilename);
+        extentedprofile.open(extendedprofilename);
+    }
+    else if(argc>7 && (argv[7] == profileplusresult))
+    {
+        nowriting='r';
+        noprofile='p';
+        results.open(resultname);
+        profile.open(profilename);
+        extentedprofile.open(extendedprofilename);
+    }
+
     cout << "SEARCH START" << endl;
     
     //reading pam
@@ -93,18 +123,10 @@ int main( int argc, char **argv )
 
     //profiler setting
     profilersetting();
-        
-    //setting number threads used
-    threads=omp_get_max_threads();
 
-    if(argc>6)
-    {
-        threads=atoi(argv[6]);
-        if(threads>omp_get_max_threads() || threads==0)
-        {
-            threads=omp_get_max_threads();
-        }
-    }
+    //generate all PAMs
+    listPam = generatePam(pam.substr(pamlen-pamlimit,pamlimit));
+    
 
     cout << "USED THREADS " << threads << endl;        
 
@@ -116,28 +138,37 @@ int main( int argc, char **argv )
     //profiling guides
     profiler();
 
-    double start;
-    start=omp_get_wtime();
-    //writing results on file
-    // if(argc>6 && (argv[6] == prova))
-    // {
-    //     results << totalbuf;
-    // }
-    profile << writeprofile;
-    extentedprofile << writeextensiveprofile;
-    double end;
-    end=omp_get_wtime();
-    cout<<"total time writing "<<end-start<<endl;
     //close the results file
-    if(argc>6 && (argv[6] == prova))
+    if(argc>7 && (argv[7] == resultwriting))
     {
         results.close();
-    }    
-    profile.close();
-    extentedprofile.close();
+    }   
+    else if(argc>7 && (argv[7] == profilewriting))
+    {
+        double start=omp_get_wtime();
+        profile << writeprofile;
+        extentedprofile << writeextensiveprofile;
+        double end=omp_get_wtime();
+        cout<<"total time writing "<<end-start<<endl;
+
+        profile.close();
+        extentedprofile.close();
+    }
+    else if(argc>7 && (argv[7] == profileplusresult))
+    {
+        results.close();
+
+        double start=omp_get_wtime();
+        profile << writeprofile;
+        extentedprofile << writeextensiveprofile;
+        double end=omp_get_wtime();
+        cout<<"total time writing "<<end-start<<endl;
+
+        profile.close();
+        extentedprofile.close();
+    }
     //end total execution time
     endtotal=omp_get_wtime();
-
 
     cout<<"total time reading "<<totaltimereading<<endl;
     cout<<"total time guide parallelo "<<totaltimeguidesearch<<endl;

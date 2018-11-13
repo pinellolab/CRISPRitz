@@ -27,6 +27,8 @@ extern vector<int> missmatchthrestotal,pamindices,pamindicesreverse,totalprimenu
 extern vector<string> fileList,guides,reverseguides,writingresults,listPam;
 extern string fastaname,pamname,guidename,chrnames,guide,pam,substring,reversesubstring,reverseguide,reversepam,line,genome,nullnucleotide,buf,totalbuf,subpos,subneg; 
 
+vector<string> guidestringlist;
+
 //inizializzazione pos
 extern int* pamindicesgpupos;
 extern int* respos;
@@ -60,6 +62,7 @@ int guidelencorrected;
 
 void genomebitconversion()
 {
+    genomebit.clear();
     genomebit.resize(genlen);
 
     #pragma omp parallel for num_threads(threads) schedule(static)
@@ -130,11 +133,13 @@ void genomebitconversion()
 
 void guidesbitconversion()
 {
+    guidestringlist.resize(totalguides);
     guidesbit.resize(totalguides);
     reverseguidesbit.resize(totalguides);
 
     for(i=0;i<totalguides;i++)
     {
+        guidestringlist[i]=to_string(i);
         guidelen=guides[i].size();
         guidelencorrected=guidelen-pamlimit;
 
@@ -230,10 +235,10 @@ void profilersetting()
 
     for(i=0;i<totalguides;i++)
     {
-        guideprofiling[i].resize(guidelen-pamlimit+10);
-        matrixprofiling[i].resize(7);
+        guideprofiling[i].resize(guidelen-pamlimit+14);
+        matrixprofiling[i].resize(11);
 
-        for(int kk = 0; kk < 7; kk++)
+        for(int kk = 0; kk < 11; kk++)
         {
             matrixprofiling[i][kk].resize(guidelen-pamlimit);
 
@@ -248,9 +253,9 @@ void profilersetting()
 void resetter(int inizio)
 {
     guidelegenda.clear();
-    guidelegenda.resize(100);
+    guidelegenda.resize(15);
 
-    for(i=0;i<100;i++)
+    for(i=0;i<15;i++)
     {
         guidelegenda[i]=inizio;
         inizio++;
@@ -259,7 +264,7 @@ void resetter(int inizio)
 
 void generateprimenumbers() 
 {
-    const int N = 100;    // number of primes
+    const int N = 15;    // number of primes
     primenumbers=new unsigned long long int[N];
 
     int n = 0;

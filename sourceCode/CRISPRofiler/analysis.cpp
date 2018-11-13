@@ -18,6 +18,11 @@
 
 using namespace std;
 
+
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+
+
 extern DIR *d;
 extern dirent *dir;
 extern ofstream results;
@@ -26,6 +31,8 @@ extern double startime,endtime,starttotal,endtotal,writestart,writend,totalalloc
 extern vector<int> missmatchthrestotal,pamindices,pamindicesreverse,totalprimenumbers;
 extern vector<string> fileList,guides,reverseguides,writingresults,listPam;
 extern string fastaname,pamname,guidename,exoname,introname,resultname,profilename,chrnames,guide,pam,substring,reversesubstring,reverseguide,reversepam,line,genome,nullnucleotide,buf,totalbuf,subpos,subneg;
+extern string snpcheck,indelcheck;
+extern string snppath,indelpath;
 
 //inizializzazione pos
 extern int* pamindicesgpupos;
@@ -55,40 +62,42 @@ void analysis()
     pamindicesreverse.clear();
     buf.clear();
     pamindices.resize(genlen);
-    pamindicesreverse.resize(genlen);		
-    
+    pamindicesreverse.resize(genlen);
+
     //setting pam and creating array
     double start;
 
     start=omp_get_wtime();
 
-    listPam = generatePam(pam.substr(pamlen-pamlimit,pamlimit)); 
-    string arrr[listPam.size()];  
-    
-    for(i=0;i<listPam.size();i++)
-    {
-        arrr[i]=listPam[i];
-    }
+    searchPam();
 
     //start pam searching
-    searchPam(arrr,listPam.size());
 
     double end;
-    
+
     end=omp_get_wtime();
 
     cout<<"pam search time "<<end-start<<endl;
     totaltimepam+=end-start;
+
+    // if(snpcheck!="no")
+    // {
+    //     read_special(snppath);
+    // }
+    // if(indelcheck!="no")
+    // {
+    //     read_special(indelpath);
+    // }
 
     start=omp_get_wtime();
     //start guides searching, executed number of guides times
     guide_searching();
 
     end=omp_get_wtime();
-    
+
     cout<<"guide search time "<<end-start<<endl;
     totaltimeguide+=end-start;
-    
+
     //clear the genome string for the next genome analysis
     genome.clear();
     genomebit.clear();
