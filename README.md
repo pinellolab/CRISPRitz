@@ -11,7 +11,8 @@ search: The main function of the package, created to help the user perform off-t
 annotate-results: Created to permit the user to annotate regions founded during search with functional annotations (promoter, chromatin accessibility, insulator, etc)
 generate-report: Created to permit the user to generate a graphical report with annotated and overall mismatch and bulge profile for a given guide, to help the assessment of guides and to have an easy view over guides and their behave.
 
-![Alt text](relative/path/to/img.jpg?raw=true "Title")
+![tool_overview](https://user-images.githubusercontent.com/32717860/52447053-faa3b200-2b2f-11e9-96fb-e3761a9232c5.png)
+
 
 SOFTWARE REQUIREMENTS:
 PYTHON 3
