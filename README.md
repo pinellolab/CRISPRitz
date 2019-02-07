@@ -16,5 +16,5 @@ With this aim in mind we create this package, containing the following tools:
 
 
 SOFTWARE REQUIREMENTS:
-PYTHON 3
-GCC 5.4
+- PYTHON 3.*
+- GCC 5.4 or later
