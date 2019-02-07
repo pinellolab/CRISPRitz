@@ -1,69 +1,17 @@
 # CRISPRITZ
 
-HOW TO:
+CRISPRitz is a software package containing 5 different tools dedicate to perform analysis on CRISPR/Cas off-target analysis.
+The aim of the software is to help the use performing tediuos and long tasks, such as, the search for off-targets on a genome, or the assessment of guides, in an easy and fast way.
 
-In this package we include two algorithms to perform analysis and CRISPR off-target searching on genome.
-The two algorithms are created to perform different types of analysis:
+With this aim in mind we create this package, containing the following tools:
 
-1- CRISPRbulges, this algorithm is created to perform off-targets analysis with sequence bulges, on DNA sequences and also on RNA guides.
-
-To use use this algorithm, you first need to create a genome_library.
-
-Create the library:
-
-python crispritz.py index-gen HG_19_indexed ../chroms_hg19/ ../input/PAM.txt 
-
-with this command you create your library, 
-
-in this case the genome name will be: HG_19_indexed
-
-the reference genome will be: ../chroms_hg19/
-
-and the PAM used to create the index will be: ../input/PAM.txt (a single line file containing your pam, for example 'NNNNNNNNNNNNNNNNNNNNNGG 3', 3 is the PAM length, so NGG)
-
-After that, you can start using the genome library.
-
-Perform Search:
-
-python crispritz.py index-search HG_19_indexed NGG input/10guide4mm.txt -mm 4 -bDNA 1 -bRNA 1
-
-with this command you can search your indexed genome,
-
-the genome searche will be: HG_19_indexed
-
-the pam will be: NGG
-
-the guides will be: input/10guide4mm.txt (for example, 'GCTCAGTTACGGGTAAAACTNNN')
-
-you can set the threshold for mm,in this case: -mm 4
-
-the number of DNA bulges: -bDNA 1
-
-and the number of RNA bulges: -bRNA 1
+add-variants: Created to permit the user to encode genomic variants using the IUPAC code, outputin a genome with added variant in IUPAC notation form.
+index-genome: Created to permit the user to find the potential targets in a genome based on the PAM and saving them in a set of .bin files, avoiding the necessity to perform this recursive task on every search with the same PAM
+search: The main function of the package, created to help the user perform off-target search on a genome(with variants) or genome index to help create safe and secure guides to use in a wet-lab CRISPR/Cas experiment.
+annotate-results: Created to permit the user to annotate regions founded during search with functional annotations (promoter, chromatin accessibility, insulator, etc)
+generate-report: Created to permit the user to generate a graphical report with annotated and overall mismatch and bulge profile for a given guide, to help the assessment of guides and to have an easy view over guides and their behave.
 
 
-Those are the two commands required to create the genome library and to start the search.
-
-2- CRISPRofiler, this algorithms is created to perform very fasta search with no pre-processed files, you only need a guides list, a pam, and chromosomes files in .fa format.
-This is the only command you need:
-
-crispritz search <path/genomeDirectory> <path/pamFile> <path/guideFile> <path/resultFile> -mm <mm_num> [-th <num_thread>] {-r,-p,-t} (write only off-targets results,write only profiles, write both)
-
-the genome used in this search will be: ../chroms_hg19/
-
-the pam will be: ../input/PAM.txt
-
-the guides: ../guides/10guide4mm.txt
-
-the number of used threads(in case of multi-thread machine) will be: -th <num_thread>
-
-the mismatch threshold will be: -mm <mm_num>
-
-and you can also choose if you want to print off-targets results, using, -r to print only off-targets results, in Cas-OFFinder style,
--p, to print only the profiles files and -t to print every file.
-
-
-Those are the simple commands required to start using those algorithms.
 
 SOFTWARE REQUIREMENTS:
 PYTHON 3
