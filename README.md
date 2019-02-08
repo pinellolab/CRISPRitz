@@ -14,6 +14,12 @@ With this aim in mind we create this package, containing the following tools:
 - annotate-results: Created to permit the user to annotate regions founded during search with functional annotations (promoter, chromatin accessibility, insulator, etc)
 - generate-report: Created to permit the user to generate a graphical report with annotated and overall mismatch and bulge profile for a given guide, to help the assessment of guides and to have an easy view over guides and their behave.
 
+# EXAMPLE OF USAGE
+
+```
+Call crispritz.py without input print the help
+- 'python3 crispritz.py'
+```
 
 SOFTWARE REQUIREMENTS:
 - PYTHON 3.*
