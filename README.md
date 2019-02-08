@@ -45,25 +45,63 @@ help:
 - python3 crispritz.py index-genome HG_19 chroms_hg19/ pam/pamNGG.txt
 
 **INPUT**
-- vcf_files directory, the directory of the folder containing vcf files to process (.vcf or .vcf.gz allowed)
+- name of index genome, the name of the folder that will contain the index-genome created by the tool
 - reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
+- PAM, text file containing the PAM (the PAM file must be written in this form NNNNNNNNNNNNNNNNNNNNNGG 3, the PAM must be long as future guides, in the example 20Ns, and the selected PAM, in the example NGG, the '3' means that the PAM sequence is represented by the last three letters.
 
 **OUTPUT**
 - index genome folder, folder containing the .bin files (one per input chromosome), every file contains all the candidate target founded on the chrosome for the selected PAM in input
 ```
 
-**SEARCH ON A GENOME INDEX**
+**SEARCH ON A GENOME INDEX (SEARCH WITH MISMATCHES AND BULGES)**
 ```
-- python3 crispritz.py search genome_library/NGG_HG_19/ pam/pamNGG.txt guides/10guides.txt result.ngg_hg19 -db -mm 4 -bDNA 1 -bRNA 1
+- python3 crispritz.py search genome_library/NGG_HG_19/ pam/pamNGG.txt guides/1guides.txt result.ngg_hg19 -db -mm 4 -bDNA 1 -bRNA 1
 
 **INPUT**
-- vcf_files directory, the directory of the folder containing vcf files to process (.vcf or .vcf.gz allowed)
-- reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
+- genome directory, the directory of the folder containing genome files (.bin allowed)
+- PAM, text file containing the PAM (the PAM file must be written in this form, NNNNNNNNNNNNNNNNNNNNNGG 3, the PAM must be long as future guides, in the example 20Ns, plus the selected PAM, in the example NGG, the '3' means that the PAM sequence is represented by the last three letters.
+- Guide/s, text file containing a list of guides (guides must be written in this form, TCACCCAGGCTGGAATACAGNNN, a sequence containing the actual guide you want to search, TCACCCAGGCTGGAATACAG, plus a number of Ns equal to the PAM length used to create the genome, in the exaple NNN. REMEMBER THAT LENGTH OF INPUTTED GUIDES AND PAM MUST BE THE SAME.
+- name of result file, the name selected to nominate the output files (in the example 'result.ngg_hg19')
+- db, flag set to use the search method constructed to search on index-genome
+- mm #, flag set to select the mismatch threshold, in the example 4
+- bDNA #, flag set to select the DNA bulge threshold, in the example 1
+- bRNA, flag set to select the RNA bulge threshold, in the example 1
 
 **OUTPUT**
+- list of targets and off-targets, a text file containing all the targets and off-targets found on genome with genomic coordinates
+- set of profile files, set of files containing detailed profile of every inputed guide, with count of bp/mismatches and a grouped representation of targets and off-targets founded per every mismatch count
 ```
 
+**SEARCH ON A GENOME WITHOUT INDEXING (SEARCH WITH MISMATCHES ONLY)**
+```
+- python3 crispritz.py search enriched_genome/ pam/pamNGG.txt guides/1guides.txt result.hg19 -bf -mm 4 -t
 
+**INPUT**
+- directory, the directory of the folder containing genome files (.fasta allowed)
+- PAM, text file containing the PAM (the PAM file must be written in this form, NNNNNNNNNNNNNNNNNNNNNGG 3, the PAM must be long as future guides, in the example 20Ns, plus the selected PAM, in the example NGG, the '3' means that the PAM sequence is represented by the last three letters.
+- guide/s, text file containing a list of guides (guides must be written in this form, TCACCCAGGCTGGAATACAGNNN, a sequence containing the actual guide you want to search, TCACCCAGGCTGGAATACAG, plus a number of Ns equal to the PAM length used to create the genome, in the exaple NNN. REMEMBER THAT LENGTH OF INPUTTED GUIDES AND PAM MUST BE THE SAME.
+- name of result file, the name selected to nominate the output files (in the example 'result.hg19')
+- bf, flag set to use the search method constructed to search on genome without index
+- mm #, flag set to select the mismatch threshold, in the example 4
+- r or -p or -t, select which type of output you want, -r output only file containing list of targets and off-targets, -p output only files containing the profile(overall mismatch profile), -t output the complete set of files, so targets list and profile files (in the example '-t' selected)
+
+**OUTPUT**
+- list of targets and off-targets, a text file containing all the targets and off-targets found on genome with genomic coordinates
+- set of profile files, set of files containing detailed profile of every inputed guide, with count of bp/mismatches and a grouped representation of targets and off-targets founded per every mismatch count
+```
+
+**ANNOTATE RESULTS**
+```
+- python3 crispritz.py index-genome HG_19 chroms_hg19/ pam/pamNGG.txt
+
+**INPUT**
+- name of index genome, the name of the folder that will contain the index-genome created by the tool
+- reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
+- PAM, text file containing the PAM (the PAM file must be written in this form NNNNNNNNNNNNNNNNNNNNNGG 3, the PAM must be long as future guides, in the example 20Ns, and the selected PAM, in the example NGG, the '3' means that the PAM sequence is represented by the last three letters.
+
+**OUTPUT**
+- index genome folder, folder containing the .bin files (one per input chromosome), every file contains all the candidate target founded on the chrosome for the selected PAM in input
+```
 
 
 
