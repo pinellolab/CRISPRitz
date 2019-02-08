@@ -16,7 +16,7 @@ With this aim in mind we create this package, containing the following tools:
 
 # EXAMPLE OF USAGE
 
-**Call crispritz.py without input print the help, with a list of the callable methods**
+**SHOW THE HELP**
 ```
 - python3 crispritz.py
 help:
