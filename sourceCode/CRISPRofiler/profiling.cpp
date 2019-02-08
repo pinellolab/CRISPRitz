@@ -18,32 +18,11 @@
 
 using namespace std;
 
-extern DIR *d;
-extern dirent *dir;
-extern ofstream results;
-extern int i,j,genlen,pamlen,guidelen,currentmissmatch,space,pamlimit,guidecount,totalguides,filenumber,threads,pampossize,pamnegsize,jk,inizio,fine;;
-extern double totaltimeguidesearch,startime,endtime,starttotal,endtotal,writestart,writend,totalallocazione,totalpam,totalguide,totallettura,totalpostprocessing,totaltimepam,totaltimeguide,totaltimereading;
-extern vector<int> missmatchthrestotal,pamindices,pamindicesreverse,totalprimenumbers;
-extern vector<string> fileList,guides,reverseguides,writingresults,listPam;
-extern string fastaname,pamname,guidename,chrnames,guide,pam,substring,reversesubstring,reverseguide,reversepam,line,genome,nullnucleotide,buf,totalbuf,subpos,subneg; 
-
-//inizializzazione pos
-extern int* respos;
-extern int* currentmissmatchpampos;
-extern int* guidefoundpos;
-
-//inizializzazione neg
-extern int* resneg;
-extern int* currentmissmatchpamneg;
-extern int* guidefoundneg;
-
-//inizializzazione generale
-extern unsigned long long int* primenumbers;
-
-extern vector<vector<int>>  guideprofiling;
+extern int i,j,guidelen,pamlimit,totalguides;
+extern vector<string> guides;
+extern vector<vector<int>> guideprofiling;
 extern vector<vector<vector<vector<int>>>> matrixprofiling;
-
-string writeprofile,writeextensiveprofile;
+extern string writeprofile,writeextensiveprofile;
 
 
 void profiler()
@@ -52,20 +31,20 @@ void profiler()
 
     for(i=0;i<totalguides;i++)
     {
-        writeprofile+=guides[i];
+        writeprofile+=guides[i]; //scrivo la guida iesima nel profilo
         writeprofile+="\t";
 
         for(j=0;j<(guidelen-pamlimit);j++)
         {
-            writeprofile+=to_string(guideprofiling[i][j]);
+            writeprofile+=to_string(guideprofiling[i][j]); //scrivo tutti i valori delle basi (mismatches generati da ogni base)
             writeprofile+="\t";
         }
 
         writeprofile+="\t";
-        writeprofile+=to_string(guideprofiling[i][20]);
+        writeprofile+=to_string(guideprofiling[i][20]); //on-target (off-target con 0 mismatch)
 
         writeprofile+="\t";
-        writeprofile+=to_string(guideprofiling[i][21]);
+        writeprofile+=to_string(guideprofiling[i][21]); //off-target
         writeprofile+="\t";
 
         double offtarget=guideprofiling[i][21]; // offtarget
@@ -78,7 +57,7 @@ void profiler()
 
         for(j=23;j<(guidelen-pamlimit+14);j++)
         {
-            writeprofile+=to_string(guideprofiling[i][j]);
+            writeprofile+=to_string(guideprofiling[i][j]); //scrivo tutti i risultati delle colonne con threshold di mismatches
             writeprofile+="\t";
         }
 
@@ -90,16 +69,16 @@ void profiler()
 
         for(int hh=0;hh<11;hh++)
         {
-            writeextensiveprofile+=to_string(hh) + " MISSMATCH";
+            writeextensiveprofile+=to_string(hh) + " MISMATCHES"; //scrivo le righe 0 MISMATCH, 1 MISMATCH, ECC
 
             for(int dd=0;dd<(guidelen-pamlimit);dd++)
             {                
                 writeextensiveprofile+="\t";
-                writeextensiveprofile+=to_string(matrixprofiling[i][hh][dd][4]);
+                writeextensiveprofile+=to_string(matrixprofiling[i][hh][dd][4]); // totale mismatches per base (in quella threshold di mismatches)
             }
 
             writeextensiveprofile+="\t";
-            writeextensiveprofile+=to_string(guideprofiling[i][23+hh]);
+            writeextensiveprofile+=to_string(guideprofiling[i][23+hh]); //totale off-targets in quella threshold di mismatches
 
             writeextensiveprofile+="\n";
 
@@ -108,7 +87,7 @@ void profiler()
             for(int ff=0;ff<(guidelen-pamlimit);ff++)
             {
                 writeextensiveprofile+="\t";
-                writeextensiveprofile+=to_string(matrixprofiling[i][hh][ff][0]);
+                writeextensiveprofile+=to_string(matrixprofiling[i][hh][ff][0]); //totale mismatches per BP con nucleotide indicato
             }
 
             writeextensiveprofile+="\n";
@@ -117,7 +96,7 @@ void profiler()
             for(int ff=0;ff<(guidelen-pamlimit);ff++)
             {
                 writeextensiveprofile+="\t";
-                writeextensiveprofile+=to_string(matrixprofiling[i][hh][ff][1]);
+                writeextensiveprofile+=to_string(matrixprofiling[i][hh][ff][1]); //totale mismatches per BP con nucleotide indicato
             }
 
             writeextensiveprofile+="\n";
@@ -126,7 +105,7 @@ void profiler()
             for(int ff=0;ff<(guidelen-pamlimit);ff++)
             {
                 writeextensiveprofile+="\t";
-                writeextensiveprofile+=to_string(matrixprofiling[i][hh][ff][2]);
+                writeextensiveprofile+=to_string(matrixprofiling[i][hh][ff][2]); //totale mismatches per BP con nucleotide indicato
             }
 
             writeextensiveprofile+="\n";
@@ -135,7 +114,7 @@ void profiler()
             for(int ff=0;ff<(guidelen-pamlimit);ff++)
             {
                 writeextensiveprofile+="\t";
-                writeextensiveprofile+=to_string(matrixprofiling[i][hh][ff][3]);
+                writeextensiveprofile+=to_string(matrixprofiling[i][hh][ff][3]); //totale mismatches per BP con nucleotide indicato
             }
 
             writeextensiveprofile+="\n";

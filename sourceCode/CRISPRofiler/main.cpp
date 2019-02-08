@@ -19,36 +19,34 @@
 
 using namespace std;
 
+#define MAXS 10000
+#define MAXC 93
+#define MAXW 2000
+
 DIR *d;
 dirent *dir;
 ofstream results,profile,extentedprofile;
-int i,j,genlen,pamlen,guidelen,currentmissmatch,space,pamlimit,guidecount,totalguides,filenumber,threads,pampossize,pamnegsize,jk,inizio,fine,inputmissmatch;
+int i,j,genlen,pamlen,guidelen,currentmissmatch,space,pamlimit,guidecount,totalguides,filenumber,threads,pampossize,pamnegsizeinputmissmatch,countmissmatchpos,guidelencorrected,inputmissmatch;
 double startime,endtime,starttotal,endtotal,writestart,writend,totalallocazione,totalpam,totalguide,totallettura,totalpostprocessing,totaltimepam,totaltimeguide,totaltimereading,totaltimeguidesearch;
 vector<int> missmatchthrestotal,pamindices,pamindicesreverse,totalprimenumbers;
 vector<string> fileList,guides,reverseguides,writingresults,listPam;
 string fastaname,pamname,guidename,exoname,introname,resultname,profilename,extendedprofilename,annotationame,chrnames,guide,pam,substring,reversesubstring,reverseguide,reversepam,line,genome,nullnucleotide,buf,totalbuf,subpos,subneg; 
 char nowriting,noprofile;
+string writeprofile,writeextensiveprofile;
+vector<bitset<4>> targetfoundbit;
 
-//inizializzazione pos
-int* pamindicesgpupos;
-int* respos;
-int* currentmissmatchpampos;
-unsigned long long int* guidefoundpos;
+//PAM automata dimensions
+int g[MAXS][MAXC];
+int f[MAXS];
+bitset<MAXW> out[MAXS];
 
-//inizializzazione neg
-int* pamindicesgpuneg;
-int* resneg;
-int* currentmissmatchpamneg;
-unsigned long long int* guidefoundneg;
-
-//inizializzazione generale
-char* missmatchthrespostotalgpu;
-char* genomeintero;
-char* guideintere;
-char* guideinterereverse;
-unsigned long long int* primenumbers;
-
-extern string writeprofile,writeextensiveprofile;
+//profiler
+vector<vector<int>>  guideprofiling; //vettore contenente il profilo
+vector<vector<vector<vector<int>>>> matrixprofiling; //vettore contenente il profilo extended
+//genome and guides bit
+vector<bitset<4>> genomebit; //genoma in bit
+vector<vector<bitset<4>>> guidesbit; //guide in bit
+vector<vector<bitset<4>>> reverseguidesbit; //reverse guide in bit
 
 int main( int argc, char **argv )
 {
@@ -76,7 +74,7 @@ int main( int argc, char **argv )
     //setting number threads used
     threads=omp_get_max_threads();
 
-    if(argc>6)
+    if(argc>6) //controllo che l'utente abbia inserito il valore thread altrimenti metto default tutto il disponibile 
     {
         threads=atoi(argv[6]);
         if(threads>omp_get_max_threads() || threads==0)
@@ -85,18 +83,18 @@ int main( int argc, char **argv )
         }
     }
     
-    if(argc>7 && (argv[7] == resultwriting))
+    if(argc>7 && (argv[7] == resultwriting)) //consenso a scrivere i result
     {
         nowriting='r';
         results.open(resultname);
     }
-    else if(argc>7 && (argv[7] == profilewriting))
+    else if(argc>7 && (argv[7] == profilewriting)) //consenso a scrivere i profili (profile+extended_profile)
     {
         noprofile='p';
         profile.open(profilename);
         extentedprofile.open(extendedprofilename);
     }
-    else if(argc>7 && (argv[7] == profileplusresult))
+    else if(argc>7 && (argv[7] == profileplusresult)) //consenso a scrivere profili e result
     {
         nowriting='r';
         noprofile='p';
@@ -108,10 +106,10 @@ int main( int argc, char **argv )
     cout << "SEARCH START" << endl;
     
     //reading pam
-    reading_pam();
+    reading_pam(); //leggo il file pam dall'input
                 
     //reading guides
-    reading_guide();
+    reading_guide(); //leggo il file guide dall'input
 
     //counting number guides
             
@@ -119,31 +117,30 @@ int main( int argc, char **argv )
     //reverse_guide();
 
     //generating prime numbers to avoid guides conflict
-    generateprimenumbers();
+    //generateprimenumbers();
 
     //profiler setting
-    profilersetting();
+    profilersetting(); //inizializzo le matrici dei profili
 
     //generate all PAMs
-    listPam = generatePam(pam.substr(pamlen-pamlimit,pamlimit));
+    listPam = generatePam(pam.substr(pamlen-pamlimit,pamlimit)); //genero lista comprensiva di PAM
     
-
     cout << "USED THREADS " << threads << endl;        
 
     //reading chromosomes and execute analysis
-    reading_chromosomes(argv);
+    reading_chromosomes(argv); //inizio la ricerca sui cromosomi
 
     cout<<"ANALYSIS COMPLETE"<<endl;
 
     //profiling guides
-    profiler();
+    profiler(); //scrivo la profilazione
 
     //close the results file
     if(argc>7 && (argv[7] == resultwriting))
     {
-        results.close();
+        results.close(); //chiudo il file result se era aperto
     }   
-    else if(argc>7 && (argv[7] == profilewriting))
+    else if(argc>7 && (argv[7] == profilewriting)) //chiudo i file di profili
     {
         double start=omp_get_wtime();
         profile << writeprofile;
@@ -154,7 +151,7 @@ int main( int argc, char **argv )
         profile.close();
         extentedprofile.close();
     }
-    else if(argc>7 && (argv[7] == profileplusresult))
+    else if(argc>7 && (argv[7] == profileplusresult)) //chiudo tutti i file aperti
     {
         results.close();
 

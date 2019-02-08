@@ -27,6 +27,31 @@ using namespace std;
 
 // Given a symbol it return a corresponding nucleotides
 string switchSymbol(char sym) {
+    switch (sym){
+		case 'A': return "ARWMDHV"; break;
+		case 'C': return "CYSMBHV"; break;
+		case 'G': return "GRSKBDV"; break;
+		case 'T': return "TYWKBDH"; break;
+		case 'R': return "ARWMDHVSKBG"; break;
+		case 'Y': return "CYSMBHVWKDT"; break;
+		case 'S': return "CYSMBHVKDRG"; break;
+		case 'W': return "ARWMDHVYKBT"; break;
+		case 'K': return "GRSKBDVYWHT"; break;
+		case 'M': return "ARWMDHVYSBC"; break;
+		case 'B': return "CYSMBHVRKDGWT"; break;
+		case 'D': return "ARWMDHVSKBGYT"; break;
+		case 'H': return "ARWMDHVYSBCKT"; break;
+		case 'V': return "ARWMDHVYSBCKG"; break;
+		case 'N': return "ACGTRYSWKMBDHV"; break;
+		default: cerr << "The symbol is not an IUPAC nucleotide" << endl; break;
+	}
+	string str(1, sym);
+    return str;
+}
+
+/*
+// Given a symbol it return a corresponding nucleotides //OLD
+string switchSymbol(char sym) {
     if (sym == 'R') return "AG";		//{'A', 'G'};
     else if (sym == 'Y') return "CT";	//{'C', 'T'};
     else if (sym == 'S') return "GC";	//{'G', 'C'};
@@ -41,7 +66,7 @@ string switchSymbol(char sym) {
 	string str(1, sym);
     return str;
 }
-
+*/
 // Given a pam return its reverse
 string reversenuc(string pam) {
     string ret = "";
