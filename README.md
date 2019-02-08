@@ -18,7 +18,7 @@ With this aim in mind we create this package, containing the following tools:
 
 **Call crispritz.py without input print the help, with a list of the callable methods**
 ```
-- 'python3 crispritz.py'
+- python3 crispritz.py
 help:
         crispritz add-variants <vcfFilesDirectory> <genomeDirectory>
         crispritz index-genome <name_genome> <genomeDirectory> <pamFile>
@@ -28,11 +28,11 @@ help:
 ```
 **To create a variant version of the genome, you need to call add-variants and input the directory with vcf_files (also vcf.gz are accepted) and the directory of the reference genome (in .fasta files), the output will be saved in a new created folder called variants_genome, containing two copies of the inputted chromosome files, one with SNPs only and one with INDELs only**
 ```
-- 'python3 crispritz.py add-variants vcf_files/ chroms_hg19/'
+- python3 crispritz.py add-variants vcf_files/ chroms_hg19/
 ```
 **To create a genome index, you need to call index-genome and input the name you choose for the directory of the result index genome (e.g, HG_19), the directory with the genome (in .fasta files) and a text file with the PAM you want to use (e.g.,NGG)**
 ```
-- 'python3 crispritz.py index-genome HG_19 chroms_hg19/ pam/pamNGG.txt'
+- python3 crispritz.py index-genome HG_19 chroms_hg19/ pam/pamNGG.txt
 ```
 
 SOFTWARE REQUIREMENTS:
