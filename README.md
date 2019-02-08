@@ -19,6 +19,12 @@ With this aim in mind we create this package, containing the following tools:
 ```
 Call crispritz.py without input print the help
 - 'python3 crispritz.py'
+help:
+        crispritz add-variants <vcfFilesDirectory> <genomeDirectory>
+        crispritz index-genome <name_genome> <genomeDirectory> <pamFile>
+        crispritz search <genomeDirectory> <pamFile> <guideFile> <resultFile> {-db,-bf} (choose the type of search, db with index-genome, bf with fasta files) -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread>] {-r,-p,-t} (write only off-targets results,write only profiles, write both)
+        crispritz annotate-results <guidesFile> <resultsFile> <outputFile> -exons <exonsbedFile> -introns <intronsbedFile> -ctcf <ctcfbedFile> -dnase <dnasebedFile> -promoters <promotersbedFile>
+        crispritz generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profile <guideProfile> -extprofile <guideExtendedProfile> -exons <exonsCountFile> -introns <intronsCountFile> -ctcf <CTCFCountFile> -dnase <DNAseCountFile> -promoters <promotersCountFile> [-gecko (to use gecko pre-computed profile)]
 ```
 
 SOFTWARE REQUIREMENTS:
