@@ -36,8 +36,8 @@ help:
 - reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
 
 **OUTPUT**
-- Set of chromosomes with SNPs, copy of original chromosomes with variants SNPs
-- Set of chromosomes with INDELs, copy of original chromosomes with variants INDELs
+- set of chromosomes with SNPs, copy of original chromosomes with variants SNPs
+- set of chromosomes with INDELs, copy of original chromosomes with variants INDELs
 ```
 
 **CREATE A GENOME INDEX**
