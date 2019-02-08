@@ -114,3 +114,4 @@ SOFTWARE REQUIREMENTS:
 - PYTHON 3.*
 - GCC 5.4 or later
 - bcftools 1.2 or later
+- intervaltree-3.0.2 or later
