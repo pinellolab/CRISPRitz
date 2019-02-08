@@ -32,6 +32,9 @@ The output will be saved in a new created folder called variants_genome, contain
 ```
 - python3 crispritz.py add-variants vcf_files/ chroms_hg19/
 ```
+**INPUT LIST**
+- vcf_files directory, the directory of the folder containing vcf files to process (.vcf or .vcf.gz allowed)
+- reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
 
 **To create a genome index, you need to call *index-genome* and input the name you choose for the directory of the result index genome (e.g, HG_19), the directory with the genome (in .fasta files) and a text file with the PAM you want to use (e.g.,NGG).
 The output will be saved in a new created folder called genome_library, containing the folder with the chosen name (e.g.,HG_19), with a number of files equal to the number of inputted chromosome files saved in .bin format, every file will contain the compressed strings extracted from the genome that can be candidate target for the chosen PAM (e.g.,NGG)**
