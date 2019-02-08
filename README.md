@@ -1,4 +1,4 @@
-# CRISPRITZ
+# CRISPRitz
 
 CRISPRitz is a software package containing 5 different tools dedicate to perform analysis on CRISPR/Cas off-target analysis.
 The aim of the software is to help the use performing tediuos and long tasks, such as, the search for off-targets on a genome, or the assessment of guides, in an easy and fast way.
@@ -26,10 +26,17 @@ help:
         crispritz annotate-results <guidesFile> <resultsFile> <outputFile> -exons <exonsbedFile> -introns <intronsbedFile> -ctcf <ctcfbedFile> -dnase <dnasebedFile> -promoters <promotersbedFile>
         crispritz generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profile <guideProfile> -extprofile <guideExtendedProfile> -exons <exonsCountFile> -introns <intronsCountFile> -ctcf <CTCFCountFile> -dnase <DNAseCountFile> -promoters <promotersCountFile> [-gecko (to use gecko pre-computed profile)]
 ```
+
 **To create a variant version of the genome, you need to call add-variants and input the directory with vcf_files (also vcf.gz are accepted) and the directory of the reference genome (in .fasta files), the output will be saved in a new created folder called variants_genome, containing two copies of the inputted chromosome files, one with SNPs only and one with INDELs only**
 ```
 - python3 crispritz.py add-variants vcf_files/ chroms_hg19/
 ```
+
+**To create a genome index, you need to call index-genome and input the name you choose for the directory of the result index genome (e.g, HG_19), the directory with the genome (in .fasta files) and a text file with the PAM you want to use (e.g.,NGG)**
+```
+- python3 crispritz.py index-genome HG_19 chroms_hg19/ pam/pamNGG.txt
+```
+
 **To create a genome index, you need to call index-genome and input the name you choose for the directory of the result index genome (e.g, HG_19), the directory with the genome (in .fasta files) and a text file with the PAM you want to use (e.g.,NGG)**
 ```
 - python3 crispritz.py index-genome HG_19 chroms_hg19/ pam/pamNGG.txt
