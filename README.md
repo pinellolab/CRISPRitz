@@ -27,8 +27,7 @@ help:
         crispritz generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profile <guideProfile> -extprofile <guideExtendedProfile> -exons <exonsCountFile> -introns <intronsCountFile> -ctcf <CTCFCountFile> -dnase <DNAseCountFile> -promoters <promotersCountFile> [-gecko (to use gecko pre-computed profile)]
 ```
 
-**To create a variant version of the genome, you need to call *add-variants* and input the directory with vcf_files (also vcf.gz are accepted) and the directory of the reference genome (in .fasta files).
-The output will be saved in a new created folder called variants_genome, containing two copies of the inputted chromosome files, one with SNPs only and one with INDELs only**
+**CREATE A VARIANT GENOME**
 ```
 - python3 crispritz.py add-variants vcf_files/ chroms_hg19/
 ```
@@ -36,17 +35,21 @@ The output will be saved in a new created folder called variants_genome, contain
 - vcf_files directory, the directory of the folder containing vcf files to process (.vcf or .vcf.gz allowed)
 - reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
 
-**To create a genome index, you need to call *index-genome* and input the name you choose for the directory of the result index genome (e.g, HG_19), the directory with the genome (in .fasta files) and a text file with the PAM you want to use (e.g.,NGG).
-The output will be saved in a new created folder called genome_library, containing the folder with the chosen name (e.g.,HG_19), with a number of files equal to the number of inputted chromosome files saved in .bin format, every file will contain the compressed strings extracted from the genome that can be candidate target for the chosen PAM (e.g.,NGG)**
+**CREATE A GENOME INDEX**
 ```
 - python3 crispritz.py index-genome HG_19 chroms_hg19/ pam/pamNGG.txt
 ```
+**INPUT LIST**
+- vcf_files directory, the directory of the folder containing vcf files to process (.vcf or .vcf.gz allowed)
+- reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
 
-**To search on a genome index, you need to call *search* and input the directory of the genome (.bin files) you want to use, the text file with the PAM you want to use (e.g.,NGG), the text file containing one or more guides, the name of result file (e.g.,result.ngg_hg19), the flag to set the search with genome index (-db) and the threshold for mismatches (e.g. ,-mm 4), DNA bulges (e.g., -bDNA 1) and RNA bulges (e.g., -bRNA 1).
-The output will be a set of files, the first one is a list of targets and off-targets with genomic coordinates, the other files are profile files containing detailed informations about behave of every inputted guide, such as, bp mismatches and targets grouped by number of mismatches** 
+**SEARCH ON A GENOME INDEX**
 ```
 - python3 crispritz.py search genome_library/NGG_HG_19/ pam/pamNGG.txt guides/10guides.txt result.ngg_hg19 -db -mm 4 -bDNA 1 -bRNA 1
 ```
+**INPUT LIST**
+- vcf_files directory, the directory of the folder containing vcf files to process (.vcf or .vcf.gz allowed)
+- reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
 
 SOFTWARE REQUIREMENTS:
 - PYTHON 3.*
