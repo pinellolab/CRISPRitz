@@ -59,7 +59,7 @@ help:
 
 **INPUT**
 - genome directory, the directory of the folder containing genome files (.bin allowed)
-- PAM, text file containing the PAM (the PAM file must be written in this form, NNNNNNNNNNNNNNNNNNNNNGG 3, the PAM must be long as future guides, in the example 20Ns, plus the selected PAM, in the example NGG, the '3' means that the PAM sequence is represented by the last three letters.
+- PAM, text file containing the PAM (the PAM file must be written in this form, NNNNNNNNNNNNNNNNNNNNNGG 3, the PAM must be long as future guides, in the example 20Ns, plus the selected PAM, in the example NGG, the '3' means that the PAM sequence is represented by the last three letters. REMEMBER THAT LENGTH OF INPUTTED GUIDES AND PAM MUST BE THE SAME.
 - Guide/s, text file containing a list of guides (guides must be written in this form, TCACCCAGGCTGGAATACAGNNN, a sequence containing the actual guide you want to search, TCACCCAGGCTGGAATACAG, plus a number of Ns equal to the PAM length used to create the genome, in the exaple NNN. REMEMBER THAT LENGTH OF INPUTTED GUIDES AND PAM MUST BE THE SAME.
 - name of result file, the name selected to nominate the output files (in the example 'result.ngg_hg19')
 - db, flag set to use the search method constructed to search on index-genome
