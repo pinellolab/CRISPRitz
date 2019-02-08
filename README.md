@@ -30,10 +30,11 @@ help:
 **CREATE A VARIANT GENOME**
 ```
 - python3 crispritz.py add-variants vcf_files/ chroms_hg19/
-```
+
 **INPUT LIST**
 - vcf_files directory, the directory of the folder containing vcf files to process (.vcf or .vcf.gz allowed)
 - reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
+```
 
 **CREATE A GENOME INDEX**
 ```
