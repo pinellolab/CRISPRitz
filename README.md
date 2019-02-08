@@ -31,26 +31,46 @@ help:
 ```
 - python3 crispritz.py add-variants vcf_files/ chroms_hg19/
 
-**INPUT LIST**
+**INPUT**
 - vcf_files directory, the directory of the folder containing vcf files to process (.vcf or .vcf.gz allowed)
 - reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
+
+**OUTPUT**
+- Set of chromosomes with SNPs, copy of original chromosomes with variants SNPs
+- Set of chromosomes with INDELs, copy of original chromosomes with variants INDELs
 ```
 
 **CREATE A GENOME INDEX**
 ```
 - python3 crispritz.py index-genome HG_19 chroms_hg19/ pam/pamNGG.txt
-```
-**INPUT LIST**
+
+**INPUT**
 - vcf_files directory, the directory of the folder containing vcf files to process (.vcf or .vcf.gz allowed)
 - reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
+
+**OUTPUT**
+- index genome folder, folder containing the .bin files (one per input chromosome), every file contains all the candidate target founded on the chrosome for the selected PAM in input
+```
 
 **SEARCH ON A GENOME INDEX**
 ```
 - python3 crispritz.py search genome_library/NGG_HG_19/ pam/pamNGG.txt guides/10guides.txt result.ngg_hg19 -db -mm 4 -bDNA 1 -bRNA 1
-```
-**INPUT LIST**
+
+**INPUT**
 - vcf_files directory, the directory of the folder containing vcf files to process (.vcf or .vcf.gz allowed)
 - reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
+
+**OUTPUT**
+```
+
+
+
+
+
+
+
+
+
 
 SOFTWARE REQUIREMENTS:
 - PYTHON 3.*
