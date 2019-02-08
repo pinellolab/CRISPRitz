@@ -92,15 +92,40 @@ help:
 
 **ANNOTATE RESULTS**
 ```
-- python3 crispritz.py index-genome HG_19 chroms_hg19/ pam/pamNGG.txt
+- python3 crispritz.py annotate-results guides/1guides.txt result.hg19.targets.txt result.hg19.annotated -exons chroms_bed/hg19_exon.bed -introns chroms_bed/hg19_intron.bed -dnase chroms_bed/hg19_dnase.bed -ctcf chroms_bed/hg19_ctcf.bed -promoter chroms_bed/hg19_promoter.bed
 
 **INPUT**
-- name of index genome, the name of the folder that will contain the index-genome created by the tool
-- reference_genome directory, the directory of the folder containing genome files (.fasta allowed)
-- PAM, text file containing the PAM (the PAM file must be written in this form NNNNNNNNNNNNNNNNNNNNNGG 3, the PAM must be long as future guides, in the example 20Ns, and the selected PAM, in the example NGG, the '3' means that the PAM sequence is represented by the last three letters.
+- guide/s, text file containing a list of guides used to create the result files
+- list of targets and off-targets, text file created after search containing the list of targets and off-targets
+- name of output file, chosen name of the output files (in the example result.hg19.annotated)
+- exons, flag to input a .BED file containing genomic intervals annotated as exons
+- introns, flag to input a .BED file containing genomic intervals annotated as introns
+- dnase, flag to input a .BED file containing genomic intervals annotated as dnase
+- ctcf, flag to input a .BED file containing genomic intervals annotated as ctcf
+- promoter, flag to input a .BED file containing genomic intervals annotated as promoters
 
 **OUTPUT**
-- index genome folder, folder containing the .bin files (one per input chromosome), every file contains all the candidate target founded on the chrosome for the selected PAM in input
+- annotated list of targets and off-targets, text file containing annotated rows present in the input file (if a row is not annotated, is not written in the file)
+- set of count files, set of files with counting information, one per genomic annotation, those files are formatted as a matrix, with guides as rows and mismatch as columns, every cell contain the number of annotated targets for the guide with that mismatch
+```
+
+**GENERATE REPORT**
+```
+- python3 crispritz.py annotate-results guides/1guides.txt result.hg19.targets.txt result.hg19.annotated -exons chroms_bed/hg19_exon.bed -introns chroms_bed/hg19_intron.bed -dnase chroms_bed/hg19_dnase.bed -ctcf chroms_bed/hg19_ctcf.bed -promoter chroms_bed/hg19_promoter.bed
+
+**INPUT**
+- guide/s, text file containing a list of guides used to create the result files
+- list of targets and off-targets, text file created after search containing the list of targets and off-targets
+- name of output file, chosen name of the output files (in the example result.hg19.annotated)
+- exons, flag to input a .BED file containing genomic intervals annotated as exons
+- introns, flag to input a .BED file containing genomic intervals annotated as introns
+- dnase, flag to input a .BED file containing genomic intervals annotated as dnase
+- ctcf, flag to input a .BED file containing genomic intervals annotated as ctcf
+- promoter, flag to input a .BED file containing genomic intervals annotated as promoters
+
+**OUTPUT**
+- annotated list of targets and off-targets, text file containing annotated rows present in the input file (if a row is not annotated, is not written in the file)
+- set of count files, set of files with counting information, one per genomic annotation, those files are formatted as a matrix, with guides as rows and mismatch as columns, every cell contain the number of annotated targets for the guide with that mismatch
 ```
 
 
