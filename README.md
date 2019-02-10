@@ -10,7 +10,7 @@ With this aim in mind we created this package, containing the following tools:
 
 - add-variants: Tool to encode genomic variants using the IUPAC code, the ouput is a genome with added variant in IUPAC notation form.
 - index-genome: Tool to find the potential targets in a genome based on the PAM and saving them in a set of .bin files, to avoid the need to perform this recursive task on every search with the same PAM.
-- search: Tool created to perform off-target search on a genome (with or without variants) or genome index (with or without variants), to help design safe and secure guides to use in a wet-lab CRISPR/Cas experiment.
+- search: Tool to perform off-target search on a genome (with or without variants) or genome index (with or without variants), to help design safe and secure guides to use in a wet-lab CRISPR/Cas experiment.
 - annotate-results: Tool to annotate results found during search, with functional annotations (promoter, chromatin accessibility, insulator, etc)
 - generate-report: Tool to generate a graphical report with annotated and overall mismatch and bulge profile for a given guide, to help the assessment of guides and to have an easy view over guides and their behave.
 
