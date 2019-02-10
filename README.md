@@ -1,6 +1,6 @@
 # CRISPRitz
 
-CRISPRitz is a software package containing 5 different tools dedicated to perform predictive analysis on CRISPR/Cas experiments.
+CRISPRitz is a software package containing 5 different tools dedicated to perform predictive analysis and results assessement on CRISPR/Cas experiments.
 The aim of the software is to help the user, to perform tasks, such as, the search for off-targets on a genome, or the assessment of guides, in an easy and fast way.
 
 ![tool_overview](https://user-images.githubusercontent.com/32717860/52447053-faa3b200-2b2f-11e9-96fb-e3761a9232c5.png)
