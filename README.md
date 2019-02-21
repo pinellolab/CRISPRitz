@@ -43,17 +43,17 @@ help:
 - python3 crispritz.py index-genome <name_genome> <genomeDirectory> <pamFile>
 
 **INPUT**
-- <name_genome>, name of the directory that will contain all the .bin files (.vcf or .vcf.gz).
+- <name_genome>, name of the directory that will contain all the .bin files
 - <genomeDirectory>, the directory containing the genome FASTA files (.fa).
 - <pamFile>, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNNNNNGG 3).
 
 **OUTPUT**
-- index genome directory, directory containing the .bin files (one per input chromosome). Each file contains all the candidate targets found on the chrosome for the selected input PAM.
+- index genome directory, directory containing the .bin files (one or more per input chromosome). Each file contains all the candidate targets found on the chrosome for the selected input PAM.
 ```
 
 **SEARCH ON A GENOME INDEX WITH MISMATCHES AND BULGES (*search*):**
 ```
-- python3 crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {-index} -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread>] {-r,-p,-t}
+- python3 crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {-index} -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread> (default: 1)] {-r,-p,-t}
 
 **INPUT**
 - <genomeDirectory>, the directory containing the genome FASTA files (.fa).
