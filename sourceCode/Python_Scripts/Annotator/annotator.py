@@ -16,7 +16,7 @@ annotatedFile = sys.argv[8]  # annotatedfile path
 # inExons = open(exonsFile, "r")          #exonsfile open
 # inIntrons = open(intronsFile, "r")      #intronsfile open
 inResult = open(resultFile, "r")  # resultfile open
-outFile = open(annotatedFile + '.txt', 'w')  # outfile open
+outFile = open(annotatedFile + '.targets.txt', 'w')  # outfile open
 inGuides = open(guidesFile, "r")
 
 
