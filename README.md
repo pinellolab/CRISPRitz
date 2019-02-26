@@ -74,7 +74,7 @@ help:
 
 **SEARCH ON A GENOME WITHOUT INDEXING WITH MISMATCHES ONLY (*search*):**
 ```
-- python3 crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> -mm <mm_num> [-th <num_thread>] {-r,-p,-t}
+- python3 crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> -mm <mm_num> [-th <num_thread> (default: ALL)] {-r,-p,-t}
 
 **INPUT**
 - <genomeDirectory>, the directory containing the genome FASTA files (.fa).
@@ -187,7 +187,7 @@ it will also download the chr22 vcf file from the 1000 genome project repository
 
 **SEARCH ON A GENOME INDEX WITH MISMATCHES AND BULGES (*search*):**
 ```
-- python3 crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt emx1_guide/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1
+- python3 crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt emx1_guide/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
 
 **INPUT**
 - genome_library/NGG_CHR22_HG19/, the directory containing the genome FASTA files (.fa).
@@ -198,8 +198,8 @@ it will also download the chr22 vcf file from the 1000 genome project repository
 - -mm 4, threshold of accepted mismatches (i.e., the number of mismatches accepted to save the target in result files).
 - -bRNA 1, threshold of accepted RNA bulges (i.e., the number of RNA bulges accepted to save the target in result files).
 - -bDNA 1, threshold of accepted DNA bulges (i.e., the number of DNA bulges accepted to save the target in result files).
-- -th <num_thread>, number of threads used by the tool (default uses all the available threads). //DA COMPLETARE
-- -r,-p,-t, select the output files (-r: write only off-targets results, -p: write only profiles, -t: write both). //DA COMPLETARE
+- -th 2, number of threads used by the tool (default uses all the available threads).
+- -r, select the output files (-r: write only off-targets results).
 
 **OUTPUT**
 - emx1.chr22.targets.txt, a text file containing all the targets and off-targets found on the genome with genomic coordinates.
