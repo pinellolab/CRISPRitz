@@ -245,7 +245,7 @@ python3 crispritz.py annotate-results emx1_guide/EMX1.txt emx1.chr22.targets.txt
 
 **GENERATE REPORT FROM ANNOTATED RESULTS (*generate-report*):**
 ```
-python3 crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 3-5 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko -sumone emx1.chr22.annotated.SummaryCount.txt -sumtwo emx1.chr22.enriched.SummaryCount.txt
+python3 crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 3-4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko -sumone emx1.chr22.annotated.SummaryCount.txt -sumtwo emx1.chr22.enriched.SummaryCount.txt
 
 **INPUT**
 - GAGTCCGAGCAGAAGAAGAANNN, a string representing a guide (e.g., GAGTCCGAGCAGAAGAAGAANNN). MUST BE PRESENT IN THE PROFILE AND EXTENDED PROFILE FILE.
