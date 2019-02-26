@@ -440,7 +440,7 @@ void saveIndices( vector<bitset<4>> &inGuide_bit, vector<bitset<4>> &targetOfGui
                                 mismatches.emplace_back(mm - d); // save mismatches
                                 if (bulType == 0)
                                 { // NO BULGE case
-                                        bulgeType.emplace_back(" X ");
+                                        bulgeType.emplace_back("X");
                                         bulgeSize.emplace_back(0);
                                 }
                                 else
