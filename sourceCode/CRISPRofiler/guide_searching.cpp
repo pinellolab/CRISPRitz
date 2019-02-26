@@ -35,7 +35,7 @@ extern vector<bitset<4>> genomebit, targetfoundbit;
 extern vector<vector<bitset<4>>> guidesbit;
 extern vector<vector<bitset<4>>> reverseguidesbit;
 
-string reversetarget(string targetfound)//reverse del target per poterlo confrontare con la guida
+string reversetarget(string targetfound) //reverse del target per poterlo confrontare con la guida
 {
    targetfoundbit.clear();
    targetfoundbit.resize(guidelen);
@@ -111,6 +111,11 @@ string reversetarget(string targetfound)//reverse del target per poterlo confron
       {
          targetfound[j] = 'B';
          targetfoundbit[guidelen - 1 - j] = bitset<4>(string("1110"));
+      }
+      else if (targetfound[j] == 'N')
+      {
+         targetfound[j] = 'N';
+         targetfoundbit[guidelen - 1 - j] = bitset<4>(string("1111"));
       }
    }
 
@@ -435,17 +440,21 @@ void guide_searching()
    //check delle posizioni con risultati
    for (i = 0; i < respos.size(); i++)
    {
+      totalbuf += "X"; //bulge type (X stands for no bulge)
+      totalbuf += "\t";
       totalbuf += guides[guidepos[i]]; //guida
+      totalbuf += "\t";
+      totalbuf += missmatching(genome.substr(respos[i], guidelen), respos[i], guidepos[i], 0); //calcolo della stringa e aggiornamento contatori profili
       totalbuf += "\t";
       totalbuf += chrnames; //nome chr
       totalbuf += "\t";
       totalbuf += to_string(respos[i]); //posizione del TARGET nel genoma
       totalbuf += "\t";
-      totalbuf += missmatching(genome.substr(respos[i], guidelen), respos[i], guidepos[i], 0); //calcolo della stringa e aggiornamento contatori profili
+      totalbuf += "+"; //strand
       totalbuf += "\t";
-      totalbuf += "+";
+      totalbuf += to_string(countmissmatchpos); //mismatch per target
       totalbuf += "\t";
-      totalbuf += to_string(countmissmatchpos);
+      totalbuf += "0"; //num bulge, sempre uguale 0
       totalbuf += "\n";
    }
 
@@ -461,18 +470,22 @@ void guide_searching()
 
    for (i = 0; i < resneg.size(); i++)
    {
+      totalbuf += "X"; //bulge type (X stands for no bulge)
+      totalbuf += "\t";
       totalbuf += guides[guideneg[i]];
+      totalbuf += "\t";
+      string reversesequence = reversetarget(genome.substr(resneg[i], guidelen));
+      totalbuf += missmatching(reversesequence, resneg[i], guideneg[i], 1);
       totalbuf += "\t";
       totalbuf += chrnames;
       totalbuf += "\t";
       totalbuf += to_string(resneg[i]);
       totalbuf += "\t";
-      string reversesequence = reversetarget(genome.substr(resneg[i], guidelen));
-      totalbuf += missmatching(reversesequence, resneg[i], guideneg[i], 1);
-      totalbuf += "\t";
       totalbuf += "-";
       totalbuf += "\t";
       totalbuf += to_string(countmissmatchpos);
+      totalbuf += "\t";
+      totalbuf += "0";
       totalbuf += "\n";
    }
 

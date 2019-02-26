@@ -222,173 +222,180 @@ start_time = time.time()
 print("ANNOTATING")
 
 
+outFile.write(
+    "#Bulge_type\tcrRNA\tDNA\tChromosome\tPosition\tDirection\tMismatches\tBulge_Size\tAnnotation_Type\n")
+
+next(inResult)
 for line in inResult:
-    x = line.split('\t')
-    # exons interval query
-    foundExons = sorted(exonsTree[int(x[2]):(int(x[2])+int(len(x[0]))+1)])
-    # introns interval query
-    foundIntrons = sorted(intronsTree[int(x[2]):(int(x[2])+int(len(x[0]))+1)])
-    foundPromoters = sorted(promotersTree[int(x[2]):(int(x[2])+int(len(x[0]))+1)])
-    foundCtcf = sorted(ctcfTree[int(x[2]):(int(x[2])+int(len(x[0]))+1)])
-    foundDnase = sorted(dnaseTree[int(x[2]):(int(x[2])+int(len(x[0]))+1)])
+   x = line.split('\t')
+   #print(x)
+   # exons interval query
+   foundExons = sorted(exonsTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
+   # introns interval query
+   foundIntrons = sorted(intronsTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
+   foundPromoters = sorted(promotersTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
+   foundCtcf = sorted(ctcfTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
+   foundDnase = sorted(dnaseTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
 
-    for item in range(0, len(foundExons)):
-        if foundExons[item].data == str(x[1]):
-            outFile.write(str(x[3]) + '\t' + str(foundExons[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[0]))) + '\t' + str(foundExons[item].begin) + '\t'
-                          + str(foundExons[item].end) + '\t' + str(x[4]) + '\t' + "exon" + '\t' + str(x[5]))  # file write of exons results
-            if str(x[5]) == '0\n':
-                d_exons_0MM[str(x[0])] += 1
-            elif str(x[5]) == '1\n':
-                d_exons_1MM[str(x[0])] += 1
-            elif str(x[5]) == '2\n':
-                d_exons_2MM[str(x[0])] += 1
-            elif str(x[5]) == '3\n':
-                d_exons_3MM[str(x[0])] += 1
-            elif str(x[5]) == '4\n':
-                d_exons_4MM[str(x[0])] += 1
-            elif str(x[5]) == '5\n':
-                d_exons_5MM[str(x[0])] += 1
-            elif str(x[5]) == '6\n':
-                d_exons_6MM[str(x[0])] += 1
-            elif str(x[5]) == '7\n':
-                d_exons_7MM[str(x[0])] += 1
-            elif str(x[5]) == '8\n':
-                d_exons_8MM[str(x[0])] += 1
-            elif str(x[5]) == '9\n':
-                d_exons_9MM[str(x[0])] += 1
-            elif str(x[5]) == '10\n':
-                d_exons_10MM[str(x[0])] += 1
+   flag=False
 
-    for item in range(0, len(foundIntrons)):
-        if foundIntrons[item].data == str(x[1]):
-            outFile.write(str(x[3]) + '\t' + str(foundIntrons[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[0]))) + '\t' + str(foundIntrons[item].begin) + '\t'
-                          + str(foundIntrons[item].end) + '\t' + str(x[4]) + '\t' + "intron" + '\t' + str(x[5]))  # file write of introns results
-            if str(x[5]) == '0\n':
-                d_introns_0MM[str(x[0])] += 1
-            elif str(x[5]) == '1\n':
-                d_introns_1MM[str(x[0])] += 1
-            elif str(x[5]) == '2\n':
-                d_introns_2MM[str(x[0])] += 1
-            elif str(x[5]) == '3\n':
-                d_introns_3MM[str(x[0])] += 1
-            elif str(x[5]) == '4\n':
-                d_introns_4MM[str(x[0])] += 1
-            elif str(x[5]) == '5\n':
-                d_introns_5MM[str(x[0])] += 1
-            elif str(x[5]) == '6\n':
-                d_introns_6MM[str(x[0])] += 1
-            elif str(x[5]) == '7\n':
-                d_introns_7MM[str(x[0])] += 1
-            elif str(x[5]) == '8\n':
-                d_introns_8MM[str(x[0])] += 1
-            elif str(x[5]) == '9\n':
-                d_introns_9MM[str(x[0])] += 1
-            elif str(x[5]) == '10\n':
-                d_introns_10MM[str(x[0])] += 1
+   for item in range(0, len(foundExons)): #check if line in result falls in a tree for a genetic notation and updates the relative count and the summary count
+      if foundExons[item].data == str(x[3]):
+         # outFile.write(str(x[3]) + '\t' + str(foundExons[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[0]))) + '\t' + str(foundExons[item].begin) + '\t'+ str(foundExons[item].end) + '\t' + str(x[4]) + '\t' + "exon" + '\t' + str(x[6]))  # file write of exons results
+         outFile.write(line.rstrip() + '\t' + "exon\n")
+         if str(x[6]) == '0':
+            d_exons_0MM[str(x[1])] += 1
+         elif str(x[6]) == '1':
+            d_exons_1MM[str(x[1])] += 1
+         elif str(x[6]) == '2':
+            d_exons_2MM[str(x[1])] += 1
+         elif str(x[6]) == '3':
+            d_exons_3MM[str(x[1])] += 1
+         elif str(x[6]) == '4':
+            d_exons_4MM[str(x[1])] += 1
+         elif str(x[6]) == '5':
+            d_exons_5MM[str(x[1])] += 1
+         elif str(x[6]) == '6':
+            d_exons_6MM[str(x[1])] += 1
+         elif str(x[6]) == '7':
+            d_exons_7MM[str(x[1])] += 1
+         elif str(x[6]) == '8':
+            d_exons_8MM[str(x[1])] += 1
+         elif str(x[6]) == '9':
+            d_exons_9MM[str(x[1])] += 1
+         elif str(x[6]) == '10':
+            d_exons_10MM[str(x[1])] += 1
 
-    for item in range(0, len(foundPromoters)):
-        if foundPromoters[item].data == str(x[1]):
-            outFile.write(str(x[3]) + '\t' + str(foundPromoters[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[0]))) + '\t' + str(foundPromoters[item].begin) + '\t'
-                          + str(foundPromoters[item].end) + '\t' + str(x[4]) + '\t' + "promoter" + '\t' + str(x[5]))  # file write of promoters results
-            if str(x[5]) == '0\n':
-                d_promoters_0MM[str(x[0])] += 1
-            elif str(x[5]) == '1\n':
-                d_promoters_1MM[str(x[0])] += 1
-            elif str(x[5]) == '2\n':
-                d_promoters_2MM[str(x[0])] += 1
-            elif str(x[5]) == '3\n':
-                d_promoters_3MM[str(x[0])] += 1
-            elif str(x[5]) == '4\n':
-                d_promoters_4MM[str(x[0])] += 1
-            elif str(x[5]) == '5\n':
-                d_promoters_5MM[str(x[0])] += 1
-            elif str(x[5]) == '6\n':
-                d_promoters_6MM[str(x[0])] += 1
-            elif str(x[5]) == '7\n':
-                d_promoters_7MM[str(x[0])] += 1
-            elif str(x[5]) == '8\n':
-                d_promoters_8MM[str(x[0])] += 1
-            elif str(x[5]) == '9\n':
-                d_promoters_9MM[str(x[0])] += 1
-            elif str(x[5]) == '10\n':
-                d_promoters_10MM[str(x[0])] += 1
+   for item in range(0, len(foundIntrons)):
+      if foundIntrons[item].data == str(x[3]):
+         #outFile.write(str(x[3]) + '\t' + str(foundIntrons[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[1]))) + '\t' + str(foundIntrons[item].begin) + '\t'+ str(foundIntrons[item].end) + '\t' + str(x[4]) + '\t' + "intron" + '\t' + str(x[6]))  # file write of introns results
+         outFile.write(line.rstrip() + '\t' + "intron\n")
+         if str(x[6]) == '0':
+            d_introns_0MM[str(x[1])] += 1
+         elif str(x[6]) == '1':
+            d_introns_1MM[str(x[1])] += 1
+         elif str(x[6]) == '2':
+            d_introns_2MM[str(x[1])] += 1
+         elif str(x[6]) == '3':
+            d_introns_3MM[str(x[1])] += 1
+         elif str(x[6]) == '4':
+            d_introns_4MM[str(x[1])] += 1
+         elif str(x[6]) == '5':
+            d_introns_5MM[str(x[1])] += 1
+         elif str(x[6]) == '6':
+            d_introns_6MM[str(x[1])] += 1
+         elif str(x[6]) == '7':
+            d_introns_7MM[str(x[1])] += 1
+         elif str(x[6]) == '8':
+            d_introns_8MM[str(x[1])] += 1
+         elif str(x[6]) == '9':
+            d_introns_9MM[str(x[1])] += 1
+         elif str(x[6]) == '10':
+            d_introns_10MM[str(x[1])] += 1
 
-    for item in range(0, len(foundCtcf)):
-        if foundCtcf[item].data == str(x[1]):
-            outFile.write(str(x[3]) + '\t' + str(foundCtcf[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[0]))) + '\t' + str(foundCtcf[item].begin) + '\t'
-                          + str(foundCtcf[item].end) + '\t' + str(x[4]) + '\t' + "ctcf" + '\t' + str(x[5]))  # file write of ctcf results
-            if str(x[5]) == '0\n':
-                d_ctcf_0MM[str(x[0])] += 1
-            elif str(x[5]) == '1\n':
-                d_ctcf_1MM[str(x[0])] += 1
-            elif str(x[5]) == '2\n':
-                d_ctcf_2MM[str(x[0])] += 1
-            elif str(x[5]) == '3\n':
-                d_ctcf_3MM[str(x[0])] += 1
-            elif str(x[5]) == '4\n':
-                d_ctcf_4MM[str(x[0])] += 1
-            elif str(x[5]) == '5\n':
-                d_ctcf_5MM[str(x[0])] += 1
-            elif str(x[5]) == '6\n':
-                d_ctcf_6MM[str(x[0])] += 1
-            elif str(x[5]) == '7\n':
-                d_ctcf_7MM[str(x[0])] += 1
-            elif str(x[5]) == '8\n':
-                d_ctcf_8MM[str(x[0])] += 1
-            elif str(x[5]) == '9\n':
-                d_ctcf_9MM[str(x[0])] += 1
-            elif str(x[5]) == '10\n':
-                d_ctcf_10MM[str(x[0])] += 1
+   for item in range(0, len(foundPromoters)):
+      if foundPromoters[item].data == str(x[3]):
+         #outFile.write(str(x[3]) + '\t' + str(foundPromoters[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[1]))) + '\t' + str(foundPromoters[item].begin) + '\t'+ str(foundPromoters[item].end) + '\t' + str(x[4]) + '\t' + "promoter" + '\t' + str(x[6]))  # file write of promoters results
+         outFile.write(line.rstrip() + '\t' + "promoter\n")
+         if str(x[6]) == '0':
+            d_promoters_0MM[str(x[1])] += 1
+         elif str(x[6]) == '1':
+            d_promoters_1MM[str(x[1])] += 1
+         elif str(x[6]) == '2':
+            d_promoters_2MM[str(x[1])] += 1
+         elif str(x[6]) == '3':
+            d_promoters_3MM[str(x[1])] += 1
+         elif str(x[6]) == '4':
+            d_promoters_4MM[str(x[1])] += 1
+         elif str(x[6]) == '5':
+            d_promoters_5MM[str(x[1])] += 1
+         elif str(x[6]) == '6':
+            d_promoters_6MM[str(x[1])] += 1
+         elif str(x[6]) == '7':
+            d_promoters_7MM[str(x[1])] += 1
+         elif str(x[6]) == '8':
+            d_promoters_8MM[str(x[1])] += 1
+         elif str(x[6]) == '9':
+            d_promoters_9MM[str(x[1])] += 1
+         elif str(x[6]) == '10':
+            d_promoters_10MM[str(x[1])] += 1
 
-    for item in range(0, len(foundDnase)):
-        if foundDnase[item].data == str(x[1]):
-            outFile.write(str(x[3]) + '\t' + str(foundDnase[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[0]))) + '\t' + str(foundDnase[item].begin) + '\t'
-                          + str(foundDnase[item].end) + '\t' + str(x[4]) + '\t' + "dnase" + '\t' + str(x[5]))  # file write of dnase results
-            if str(x[5]) == '0\n':
-                d_dnase_0MM[str(x[0])] += 1
-            elif str(x[5]) == '1\n':
-                d_dnase_1MM[str(x[0])] += 1
-            elif str(x[5]) == '2\n':
-                d_dnase_2MM[str(x[0])] += 1
-            elif str(x[5]) == '3\n':
-                d_dnase_3MM[str(x[0])] += 1
-            elif str(x[5]) == '4\n':
-                d_dnase_4MM[str(x[0])] += 1
-            elif str(x[5]) == '5\n':
-                d_dnase_5MM[str(x[0])] += 1
-            elif str(x[5]) == '6\n':
-                d_dnase_6MM[str(x[0])] += 1
-            elif str(x[5]) == '7\n':
-                d_dnase_7MM[str(x[0])] += 1
-            elif str(x[5]) == '8\n':
-                d_dnase_8MM[str(x[0])] += 1
-            elif str(x[5]) == '9\n':
-                d_dnase_9MM[str(x[0])] += 1
-            elif str(x[5]) == '10\n':
-                d_dnase_10MM[str(x[0])] += 1
+   for item in range(0, len(foundCtcf)):
+      if foundCtcf[item].data == str(x[3]):
+         #outFile.write(str(x[3]) + '\t' + str(foundCtcf[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[1]))) + '\t' + str(foundCtcf[item].begin) + '\t'+ str(foundCtcf[item].end) + '\t' + str(x[4]) + '\t' + "ctcf" + '\t' + str(x[6]))  # file write of ctcf results
+         outFile.write(line.rstrip() + '\t' + "ctcf\n")
+         if str(x[6]) == '0':
+            d_ctcf_0MM[str(x[1])] += 1
+         elif str(x[6]) == '1':
+            d_ctcf_1MM[str(x[1])] += 1
+         elif str(x[6]) == '2':
+            d_ctcf_2MM[str(x[1])] += 1
+         elif str(x[6]) == '3':
+            d_ctcf_3MM[str(x[1])] += 1
+         elif str(x[6]) == '4':
+            d_ctcf_4MM[str(x[1])] += 1
+         elif str(x[6]) == '5':
+            d_ctcf_5MM[str(x[1])] += 1
+         elif str(x[6]) == '6':
+            d_ctcf_6MM[str(x[1])] += 1
+         elif str(x[6]) == '7':
+            d_ctcf_7MM[str(x[1])] += 1
+         elif str(x[6]) == '8':
+            d_ctcf_8MM[str(x[1])] += 1
+         elif str(x[6]) == '9':
+            d_ctcf_9MM[str(x[1])] += 1
+         elif str(x[6]) == '10':
+            d_ctcf_10MM[str(x[1])] += 1
 
-    if int(x[5])==0:
-        total_0MM +=1
-    elif int(x[5])==1:
-        total_1MM +=1
-    elif int(x[5])==2:
-        total_2MM +=1
-    elif int(x[5])==3:
-        total_3MM +=1
-    elif int(x[5])==4:
-        total_4MM +=1
-    elif int(x[5])==5:
-        total_5MM +=1
-    elif int(x[5])==6:
-        total_6MM +=1
-    elif int(x[5])==7:
-        total_7MM +=1
-    elif int(x[5])==8:
-        total_8MM +=1
-    elif int(x[5])==9:
-        total_9MM +=1
-    elif int(x[5])==10:
-        total_10MM +=1
+   for item in range(0, len(foundDnase)):
+      if foundDnase[item].data == str(x[3]):
+         #outFile.write(str(x[3]) + '\t' + str(foundDnase[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[1]))) + '\t' + str(foundDnase[item].begin) + '\t'+ str(foundDnase[item].end) + '\t' + str(x[4]) + '\t' + "dnase" + '\t' + str(x[6]))  # file write of dnase results
+         outFile.write(line.rstrip() + '\t' + "dnase\n")
+         if str(x[6]) == '0':
+            d_dnase_0MM[str(x[1])] += 1
+         elif str(x[6]) == '1':
+            d_dnase_1MM[str(x[1])] += 1
+         elif str(x[6]) == '2':
+            d_dnase_2MM[str(x[1])] += 1
+         elif str(x[6]) == '3':
+            d_dnase_3MM[str(x[1])] += 1
+         elif str(x[6]) == '4':
+            d_dnase_4MM[str(x[1])] += 1
+         elif str(x[6]) == '5':
+            d_dnase_5MM[str(x[1])] += 1
+         elif str(x[6]) == '6':
+            d_dnase_6MM[str(x[1])] += 1
+         elif str(x[6]) == '7':
+            d_dnase_7MM[str(x[1])] += 1
+         elif str(x[6]) == '8':
+            d_dnase_8MM[str(x[1])] += 1
+         elif str(x[6]) == '9':
+            d_dnase_9MM[str(x[1])] += 1
+         elif str(x[6]) == '10':
+            d_dnase_10MM[str(x[1])] += 1
+
+   if int(x[6]) == 0:
+      total_0MM += 1
+   elif int(x[6]) == 1:
+      total_1MM += 1
+   elif int(x[6]) == 2:
+      total_2MM += 1
+   elif int(x[6]) == 3:
+      total_3MM += 1
+   elif int(x[6]) == 4:
+      total_4MM += 1
+   elif int(x[6]) == 5:
+      total_5MM += 1
+   elif int(x[6]) == 6:
+      total_6MM += 1
+   elif int(x[6]) == 7:
+      total_7MM += 1
+   elif int(x[6]) == 8:
+      total_8MM += 1
+   elif int(x[6]) == 9:
+      total_9MM += 1
+   elif int(x[6]) == 10:
+      total_10MM += 1
 
 
 print("ANNOTATION CYCLE TIME: %s seconds" % (time.time() - start_time))
@@ -404,65 +411,89 @@ outfileDNAse = open(annotatedFile + '.DNAseCount.txt', "w")
 outfileTotal = open(annotatedFile + '.SummaryCount.txt', "w")
 
 outfileTotal.write("Total_targets" + '\t' + str(total_0MM) + '\t' + str(total_1MM) + '\t' + str(total_2MM) + '\t'
-+ str(total_3MM) + '\t' + str(total_4MM) + '\t' 
-+ str(total_5MM) + '\t' + str(total_6MM) + '\t'
-+ str(total_7MM) + '\t' + str(total_8MM) + '\t' 
-+ str(total_9MM)+ '\t' + str(total_10MM) + '\n')
+                   + str(total_3MM) + '\t' + str(total_4MM) + '\t'
+                   + str(total_5MM) + '\t' + str(total_6MM) + '\t'
+                   + str(total_7MM) + '\t' + str(total_8MM) + '\t'
+                   + str(total_9MM) + '\t' + str(total_10MM) + '\n')
 
 outfileTotal.write("Total_exons" + '\t' + str(sum(d_exons_0MM.values())) + '\t' + str(sum(d_exons_1MM.values())) + '\t' + str(sum(d_exons_2MM.values())) + '\t'
-+ str(sum(d_exons_3MM.values())) + '\t' + str(sum(d_exons_4MM.values())) + '\t' 
-+ str(sum(d_exons_5MM.values())) + '\t' + str(sum(d_exons_6MM.values())) + '\t'
-+ str(sum(d_exons_7MM.values())) + '\t' + str(sum(d_exons_8MM.values())) + '\t' 
-+ str(sum(d_exons_9MM.values())) + '\t' + str(sum(d_exons_10MM.values())) + '\n')
+                   + str(sum(d_exons_3MM.values())) + '\t' +
+                   str(sum(d_exons_4MM.values())) + '\t'
+                   + str(sum(d_exons_5MM.values())) + '\t' +
+                   str(sum(d_exons_6MM.values())) + '\t'
+                   + str(sum(d_exons_7MM.values())) + '\t' +
+                   str(sum(d_exons_8MM.values())) + '\t'
+                   + str(sum(d_exons_9MM.values())) + '\t' + str(sum(d_exons_10MM.values())) + '\n')
 
 outfileTotal.write("Total_introns" + '\t' + str(sum(d_introns_0MM.values())) + '\t' + str(sum(d_introns_1MM.values())) + '\t' + str(sum(d_introns_2MM.values())) + '\t'
-+ str(sum(d_introns_3MM.values())) + '\t' + str(sum(d_introns_4MM.values())) + '\t' 
-+ str(sum(d_introns_5MM.values())) + '\t' + str(sum(d_introns_6MM.values())) + '\t'
-+ str(sum(d_introns_7MM.values())) + '\t' + str(sum(d_introns_8MM.values())) + '\t' 
-+ str(sum(d_introns_9MM.values())) + '\t' + str(sum(d_introns_10MM.values())) + '\n')
+                   + str(sum(d_introns_3MM.values())) + '\t' +
+                   str(sum(d_introns_4MM.values())) + '\t'
+                   + str(sum(d_introns_5MM.values())) + '\t' +
+                   str(sum(d_introns_6MM.values())) + '\t'
+                   + str(sum(d_introns_7MM.values())) + '\t' +
+                   str(sum(d_introns_8MM.values())) + '\t'
+                   + str(sum(d_introns_9MM.values())) + '\t' + str(sum(d_introns_10MM.values())) + '\n')
 
 outfileTotal.write("Total_ctcf" + '\t' + str(sum(d_ctcf_0MM.values())) + '\t' + str(sum(d_ctcf_1MM.values())) + '\t' + str(sum(d_ctcf_2MM.values())) + '\t'
-+ str(sum(d_ctcf_3MM.values())) + '\t' + str(sum(d_ctcf_4MM.values())) + '\t' 
-+ str(sum(d_ctcf_5MM.values())) + '\t' + str(sum(d_ctcf_6MM.values())) + '\t'
-+ str(sum(d_ctcf_7MM.values())) + '\t' + str(sum(d_ctcf_8MM.values())) + '\t' 
-+ str(sum(d_ctcf_9MM.values())) + '\t' + str(sum(d_ctcf_10MM.values())) + '\n')
+                   + str(sum(d_ctcf_3MM.values())) + '\t' +
+                   str(sum(d_ctcf_4MM.values())) + '\t'
+                   + str(sum(d_ctcf_5MM.values())) + '\t' +
+                   str(sum(d_ctcf_6MM.values())) + '\t'
+                   + str(sum(d_ctcf_7MM.values())) + '\t' +
+                   str(sum(d_ctcf_8MM.values())) + '\t'
+                   + str(sum(d_ctcf_9MM.values())) + '\t' + str(sum(d_ctcf_10MM.values())) + '\n')
 
 outfileTotal.write("Total_dnase" + '\t' + str(sum(d_dnase_0MM.values())) + '\t' + str(sum(d_dnase_1MM.values())) + '\t' + str(sum(d_dnase_2MM.values())) + '\t'
-+ str(sum(d_dnase_3MM.values())) + '\t' + str(sum(d_dnase_4MM.values())) + '\t' 
-+ str(sum(d_dnase_5MM.values())) + '\t' + str(sum(d_dnase_6MM.values())) + '\t'
-+ str(sum(d_dnase_7MM.values())) + '\t' + str(sum(d_dnase_8MM.values())) + '\t' 
-+ str(sum(d_dnase_9MM.values())) + '\t' + str(sum(d_dnase_10MM.values())) + '\n')
+                   + str(sum(d_dnase_3MM.values())) + '\t' +
+                   str(sum(d_dnase_4MM.values())) + '\t'
+                   + str(sum(d_dnase_5MM.values())) + '\t' +
+                   str(sum(d_dnase_6MM.values())) + '\t'
+                   + str(sum(d_dnase_7MM.values())) + '\t' +
+                   str(sum(d_dnase_8MM.values())) + '\t'
+                   + str(sum(d_dnase_9MM.values())) + '\t' + str(sum(d_dnase_10MM.values())) + '\n')
 
 outfileTotal.write("Total_promoters" + '\t' + str(sum(d_promoters_0MM.values())) + '\t' + str(sum(d_promoters_1MM.values())) + '\t' + str(sum(d_promoters_2MM.values())) + '\t'
-+ str(sum(d_promoters_3MM.values())) + '\t' + str(sum(d_promoters_4MM.values())) + '\t' 
-+ str(sum(d_promoters_5MM.values())) + '\t' + str(sum(d_promoters_6MM.values())) + '\t'
-+ str(sum(d_promoters_7MM.values())) + '\t' + str(sum(d_promoters_8MM.values())) + '\t' 
-+ str(sum(d_promoters_9MM.values())) + '\t' + str(sum(d_promoters_10MM.values())) + '\n')
+                   + str(sum(d_promoters_3MM.values())) + '\t' +
+                   str(sum(d_promoters_4MM.values())) + '\t'
+                   + str(sum(d_promoters_5MM.values())) + '\t' +
+                   str(sum(d_promoters_6MM.values())) + '\t'
+                   + str(sum(d_promoters_7MM.values())) + '\t' +
+                   str(sum(d_promoters_8MM.values())) + '\t'
+                   + str(sum(d_promoters_9MM.values())) + '\t' + str(sum(d_promoters_10MM.values())) + '\n')
 
 for line in inGuides:
     x = line.split('\n')
 
     outfileExons.write(str(x[0]) + '\t' + str(d_exons_0MM[str(x[0])]) + '\t' + str(d_exons_1MM[str(x[0])]) + '\t' + str(d_exons_2MM[str(x[0])]) + '\t'
-                       + str(d_exons_3MM[str(x[0])]) + '\t' + str(d_exons_4MM[str(x[0])]) + '\t' 
-                          + str(d_exons_5MM[str(x[0])]) + '\t' + str(d_exons_6MM[str(x[0])]) + '\t'
+                       + str(d_exons_3MM[str(x[0])]) + '\t' +
+                       str(d_exons_4MM[str(x[0])]) + '\t'
+                       + str(d_exons_5MM[str(x[0])]) + '\t' +
+                       str(d_exons_6MM[str(x[0])]) + '\t'
                        + str(d_exons_7MM[str(x[0])]) + '\t' + str(d_exons_8MM[str(x[0])]) + '\t' + str(d_exons_9MM[str(x[0])]) + '\t' + str(d_exons_10MM[str(x[0])]) + '\n')
 
     outfileIntrons.write(str(x[0]) + '\t' + str(d_introns_0MM[str(x[0])]) + '\t' + str(d_introns_1MM[str(x[0])]) + '\t' + str(d_introns_2MM[str(x[0])]) + '\t'
-                         + str(d_introns_3MM[str(x[0])]) + '\t' + str(d_introns_4MM[str(x[0])]) + '\t' + 
-                            str(d_introns_5MM[str(x[0])]) + '\t' + str(d_introns_6MM[str(x[0])]) + '\t'
+                         + str(d_introns_3MM[str(x[0])]) + '\t' + str(d_introns_4MM[str(x[0])]) + '\t' +
+                         str(d_introns_5MM[str(x[0])]) + '\t' +
+                         str(d_introns_6MM[str(x[0])]) + '\t'
                          + str(d_introns_7MM[str(x[0])]) + '\t' + str(d_introns_8MM[str(x[0])]) + '\t' + str(d_introns_9MM[str(x[0])]) + '\t' + str(d_introns_10MM[str(x[0])]) + '\n')
 
     outfilePromoters.write(str(x[0]) + '\t' + str(d_promoters_0MM[str(x[0])]) + '\t' + str(d_promoters_1MM[str(x[0])]) + '\t' + str(d_promoters_2MM[str(x[0])]) + '\t'
-                           + str(d_promoters_3MM[str(x[0])]) + '\t' + str(d_promoters_4MM[str(x[0])]) + '\t' 
-                              + str(d_promoters_5MM[str(x[0])]) + '\t' + str(d_promoters_6MM[str(x[0])]) + '\t'
+                           + str(d_promoters_3MM[str(x[0])]) + '\t' +
+                           str(d_promoters_4MM[str(x[0])]) + '\t'
+                           + str(d_promoters_5MM[str(x[0])]) + '\t' +
+                           str(d_promoters_6MM[str(x[0])]) + '\t'
                            + str(d_promoters_7MM[str(x[0])]) + '\t' + str(d_promoters_8MM[str(x[0])]) + '\t' + str(d_promoters_9MM[str(x[0])]) + '\t' + str(d_promoters_10MM[str(x[0])]) + '\n')
 
     outfileCTCF.write(str(x[0]) + '\t' + str(d_ctcf_0MM[str(x[0])]) + '\t' + str(d_ctcf_1MM[str(x[0])]) + '\t' + str(d_ctcf_2MM[str(x[0])]) + '\t'
-                      + str(d_ctcf_3MM[str(x[0])]) + '\t' + str(d_ctcf_4MM[str(x[0])]) + '\t' 
-                         + str(d_ctcf_5MM[str(x[0])]) + '\t' + str(d_ctcf_6MM[str(x[0])]) + '\t'
+                      + str(d_ctcf_3MM[str(x[0])]) + '\t' +
+                      str(d_ctcf_4MM[str(x[0])]) + '\t'
+                      + str(d_ctcf_5MM[str(x[0])]) + '\t' +
+                      str(d_ctcf_6MM[str(x[0])]) + '\t'
                       + str(d_ctcf_7MM[str(x[0])]) + '\t' + str(d_ctcf_8MM[str(x[0])]) + '\t' + str(d_ctcf_9MM[str(x[0])]) + '\t' + str(d_ctcf_10MM[str(x[0])]) + '\n')
 
     outfileDNAse.write(str(x[0]) + '\t' + str(d_dnase_0MM[str(x[0])]) + '\t' + str(d_dnase_1MM[str(x[0])]) + '\t' + str(d_dnase_2MM[str(x[0])]) + '\t'
-                       + str(d_dnase_3MM[str(x[0])]) + '\t' + str(d_dnase_4MM[str(x[0])]) + '\t' 
-                          + str(d_dnase_5MM[str(x[0])]) + '\t' + str(d_dnase_6MM[str(x[0])]) + '\t'
+                       + str(d_dnase_3MM[str(x[0])]) + '\t' +
+                       str(d_dnase_4MM[str(x[0])]) + '\t'
+                       + str(d_dnase_5MM[str(x[0])]) + '\t' +
+                       str(d_dnase_6MM[str(x[0])]) + '\t'
                        + str(d_dnase_7MM[str(x[0])]) + '\t' + str(d_dnase_8MM[str(x[0])]) + '\t' + str(d_dnase_9MM[str(x[0])]) + '\t' + str(d_dnase_10MM[str(x[0])]) + '\n')

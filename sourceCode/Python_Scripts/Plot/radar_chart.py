@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 # Libraries
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import pandas as pd
@@ -13,6 +14,17 @@ from itertools import islice
 import glob
 import warnings
 warnings.filterwarnings("ignore")
+
+# #matplotlib.font_manager.findSystemFonts(fontpaths=None, fontext='ttf')
+# #matplotlib.font_manager._rebuild()
+
+# #print([f.name for f in matplotlib.font_manager.fontManager.afmlist])
+
+# plt.rcParams['font.size'] = 12
+# plt.rcParams['font.family'] = 'sans-serif'
+# plt.rcParams['font.sans-serif'] = ['Courier']
+
+# #matplotlib.font_manager._rebuild()
 
 
 if len(sys.argv) < 6:
@@ -159,11 +171,9 @@ arrayguidesExtendedProfile.shape = (5*((uppermm-0)+1), 20)
 next(inGuidesProfile)
 for line in inGuidesProfile:
     x = line.split('\t')
-    profileMissmatchGlobal.append(
-        (x[26], x[27], x[28], x[29], x[30], x[31], x[32]))
+    profileMissmatchGlobal.append((x[26], x[27], x[28], x[29], x[30]))
     if str(x[0]) == guide:
-        arrayprofileMissmatch = np.array(
-            (x[26], x[27], x[28], x[29], x[30], x[31], x[32]), dtype=int)
+        arrayprofileMissmatch = np.array((x[26], x[27], x[28], x[29], x[30]), dtype=int)
 
 # reading every count file to obtain results for the ecdf and percentile count for annotated type
 for line in inExonsCountFile:
@@ -342,8 +352,7 @@ if len(sys.argv[9]) == 1:
 
     # Draw ylabels
     ax.set_rlabel_position(0)
-    plt.yticks([0, 0.25, 0.50, 0.75, 1], ["0", "0.25",
-                                          "0.50", "0.75"], color="grey", size=13)
+    plt.yticks([0, 0.25, 0.50, 0.75, 1], ["0", "0.25", "0.50", "0.75"], color="grey", size=13)
     plt.ylim(0, 1)
     #plt.yticks([10,20,30], ["10","20","30"], color="grey", size=7)
     # plt.ylim(0,40)
@@ -440,8 +449,7 @@ if len(sys.argv[9]) == 1:
     # plt.tight_layout()
 
     #plt.suptitle(string +' '+ "ANALYSIS",horizontalalignment='center', color='black', weight='bold',size='large')
-    plt.suptitle(str(missmatch)+"MM", horizontalalignment='center',
-                 color='black', weight='bold', size='large')
+    plt.suptitle(str(missmatch)+"MM", horizontalalignment='center', color='black', weight='bold', size='large')
 
     plt.show()
     # generate your plot
@@ -484,11 +492,12 @@ else:
 
         plt.xticks(angles[:-1], ['CTCF'+' ('+str(arrayCTCFMissmatch[row])+')', 'DNAse'+' ('+str(arrayDNAseMissmatch[row])+')', 'EXONS'+' ('+str(arrayexonsMissmatch[row])+')', 'GENERAL' +
                                  ' ('+str(arrayprofileMissmatch[row])+')', 'INTRONS'+' ('+str(arrayintronsMissmatch[row])+')', 'PROMOTERS'+' ('+str(arraypromotersMissmatch[row])+')'], color='black', size=14)
+        
 
+        
         # Draw ylabels
         ax.set_rlabel_position(0)
-        plt.yticks([0, 0.25, 0.50, 0.75], ["0", "0.25",
-                                           "0.50", "0.75"], color="black", size=14)
+        plt.yticks([0, 0.25, 0.50, 0.75], ["0", "0.25", "0.50", "0.75"], color="black", size=14)
         plt.ylim(0, 1)
 
         # Ind1
@@ -506,7 +515,7 @@ else:
                    fontsize='13', ncol=1, handlelength=0, handletextpad=0, title="MAX VALUE")
 
         # Add a title
-        plt.title(title, size=8, y=1.1)
+        plt.title(title, size=15, y=1.1)
 
     def make_motif(row, count):
 

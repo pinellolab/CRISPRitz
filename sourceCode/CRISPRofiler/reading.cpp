@@ -48,12 +48,18 @@ void reading_guide()
    while (getline(guidefile, line))
    {
       transform(line.begin(), line.end(), line.begin(), ::toupper);
-      space = line.find("\r");
-      string guida = line.substr(0, space);
+      space = line.find_last_of("N");
+      string guida = line.substr(0, space+1);
       if (guida.length() == pamlen)
       {
          guides.push_back(guida);
       }
+      else
+      {
+         cerr<<"SOME GUIDE IS NOT THE SAME LENGTH AS PAM, PLEASE CHECK"<<endl;
+         exit(0);
+      }
+      
       missmatchthrestotal.push_back(inputmissmatch);
    }
 

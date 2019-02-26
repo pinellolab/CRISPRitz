@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <omp.h>
 #include <ctype.h>
 #include <vector>
 #include <algorithm>
@@ -21,9 +20,9 @@ using namespace std;
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define MAXS 10000
-#define MAXC 93
-#define MAXW 2560
+// #define MAXS 10000
+// #define MAXC 93
+// #define MAXW 10000
 
 extern int i, j, genlen, pamlen, guidelen, pamlimit, threads;
 extern vector<int> pamindices, pamindicesreverse;
@@ -111,8 +110,6 @@ void searchPam() //funzione che cerca le PAM nel genoma
    vector<int> pamindices_private;
    vector<int> pamindicesreverse_private;
 
-   buildMachine();
-
    #pragma omp parallel private(tid, state, index, i, chunkfine, pamindices_private, pamindicesreverse_private) num_threads(threads)
    {
       tid = omp_get_thread_num();
@@ -135,7 +132,6 @@ void searchPam() //funzione che cerca le PAM nel genoma
 
          if (out[state].count() == 1) //check if can be present the same PAM on both strands
          {
-
             if ((out[state]._Find_first() < mez_list)) //check what pam was found, if the first half, it's a positive pam, negative otherwise
             {
                if ((i - (pamlen - 1)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)

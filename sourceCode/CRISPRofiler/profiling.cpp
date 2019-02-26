@@ -18,108 +18,130 @@
 
 using namespace std;
 
-extern int i,j,guidelen,pamlimit,totalguides;
+extern int i, j, guidelen, pamlimit, totalguides;
 extern vector<string> guides;
 extern vector<vector<int>> guideprofiling;
 extern vector<vector<vector<vector<int>>>> matrixprofiling;
-extern string writeprofile,writeextensiveprofile;
-
+extern string writeprofile, writeextensiveprofile;
+extern int guidelen,inputmissmatch,pamlimit;
 
 void profiler()
 {
-    writeprofile="GUIDE\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\t\tONT\tOFFT\tOFFT/MM\t\t0MM\t1MM\t2MM\t3MM\t4MM\t5MM\t6MM\t7MM\t8MM\t9MM\t10MM\n";
+   //writeprofile = "GUIDE\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\t\tONT\tOFFT\tOFFT/MM\t\t0MM\t1MM\t2MM\t3MM\t4MM\t5MM\t6MM\t7MM\t8MM\t9MM\t10MM\n";
+   writeprofile ="GUIDE\t";
+   for (int ff=0;ff<(guidelen-pamlimit);ff++)
+   {
+      writeprofile += "BP\t";
+   }
 
-    for(i=0;i<totalguides;i++)
-    {
-        writeprofile+=guides[i]; //scrivo la guida iesima nel profilo
-        writeprofile+="\t";
+   writeprofile += "\tONT\tOFFT\tOFFT/MM\t\t";
 
-        for(j=0;j<(guidelen-pamlimit);j++)
-        {
-            writeprofile+=to_string(guideprofiling[i][j]); //scrivo tutti i valori delle basi (mismatches generati da ogni base)
-            writeprofile+="\t";
-        }
+   for (int ff=0;ff<=inputmissmatch;ff++)
+   {
+      writeprofile += to_string(ff)+"MM\t";
+   }
 
-        writeprofile+="\t";
-        writeprofile+=to_string(guideprofiling[i][20]); //on-target (off-target con 0 mismatch)
+   writeprofile += "\n";
+   
 
-        writeprofile+="\t";
-        writeprofile+=to_string(guideprofiling[i][21]); //off-target
-        writeprofile+="\t";
+   for (i = 0; i < totalguides; i++)
+   {
+      writeprofile += guides[i]; //scrivo la guida iesima nel profilo
+      writeprofile += "\t";
 
-        double offtarget=guideprofiling[i][21]; // offtarget
-        double missmatch=guideprofiling[i][22]; // offtarget/missmatch
-        double meanmissmatch=missmatch/offtarget;
+      for (j = 0; j < (guidelen - pamlimit); j++)
+      {
+         writeprofile += to_string(guideprofiling[i][j]); //scrivo tutti i valori delle basi (mismatches generati da ogni base)
+         writeprofile += "\t";
+      }
 
-        writeprofile+=to_string(meanmissmatch);
-        writeprofile+="\t";
-        writeprofile+="\t";
+      writeprofile += "\t";
+      writeprofile += to_string(guideprofiling[i][guidelen-pamlimit]); //on-target (off-target con 0 mismatch)
 
-        for(j=23;j<(guidelen-pamlimit+14);j++)
-        {
-            writeprofile+=to_string(guideprofiling[i][j]); //scrivo tutti i risultati delle colonne con threshold di mismatches
-            writeprofile+="\t";
-        }
+      writeprofile += "\t";
+      writeprofile += to_string(guideprofiling[i][(guidelen-pamlimit)+1]); //off-target
+      writeprofile += "\t";
 
-        writeprofile+="\n";
+      double offtarget = guideprofiling[i][(guidelen-pamlimit)+1]; // offtarget
+      double missmatch = guideprofiling[i][(guidelen-pamlimit)+2]; // offtarget/missmatch
+      double meanmissmatch = missmatch / offtarget;
 
-        writeextensiveprofile+=">"+guides[i];
-        writeextensiveprofile+="\n";
-        writeextensiveprofile+="\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tTARGETS\n";
+      writeprofile += to_string(meanmissmatch);
+      writeprofile += "\t\t";
 
-        for(int hh=0;hh<11;hh++)
-        {
-            writeextensiveprofile+=to_string(hh) + " MISMATCHES"; //scrivo le righe 0 MISMATCH, 1 MISMATCH, ECC
+      for (j = (guidelen - pamlimit + 3); j <= (guidelen - pamlimit + 3 + inputmissmatch); j++)
+      {
+         writeprofile += to_string(guideprofiling[i][j]); //scrivo tutti i risultati delle colonne con threshold di mismatches
+         writeprofile += "\t";
+      }
 
-            for(int dd=0;dd<(guidelen-pamlimit);dd++)
-            {                
-                writeextensiveprofile+="\t";
-                writeextensiveprofile+=to_string(matrixprofiling[i][hh][dd][4]); // totale mismatches per base (in quella threshold di mismatches)
-            }
+      writeprofile += "\n";
 
-            writeextensiveprofile+="\t";
-            writeextensiveprofile+=to_string(guideprofiling[i][23+hh]); //totale off-targets in quella threshold di mismatches
+      writeextensiveprofile += ">" + guides[i];
+      writeextensiveprofile += "\n";
+      writeextensiveprofile += "\t";
+      //writeextensiveprofile += "\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tBP\tTARGETS\n";
 
-            writeextensiveprofile+="\n";
+      for (int ff=0;ff<(guidelen-pamlimit);ff++)
+      {
+         writeextensiveprofile += "BP\t";
+      }
 
-            writeextensiveprofile+="NUCLEOTIDE A";
+      writeextensiveprofile += "TARGETS";
+      writeextensiveprofile += "\n";
 
-            for(int ff=0;ff<(guidelen-pamlimit);ff++)
-            {
-                writeextensiveprofile+="\t";
-                writeextensiveprofile+=to_string(matrixprofiling[i][hh][ff][0]); //totale mismatches per BP con nucleotide indicato
-            }
+      for (int hh = 0; hh <=inputmissmatch; hh++)
+      {
+         writeextensiveprofile += to_string(hh) + " MISMATCHES"; //scrivo le righe 0 MISMATCH, 1 MISMATCH, ECC
 
-            writeextensiveprofile+="\n";
-            writeextensiveprofile+="NUCLEOTIDE C";
+         for (int dd = 0; dd < (guidelen - pamlimit); dd++)
+         {
+            writeextensiveprofile += "\t";
+            writeextensiveprofile += to_string(matrixprofiling[i][hh][dd][4]); // totale mismatches per base (in quella threshold di mismatches)
+         }
 
-            for(int ff=0;ff<(guidelen-pamlimit);ff++)
-            {
-                writeextensiveprofile+="\t";
-                writeextensiveprofile+=to_string(matrixprofiling[i][hh][ff][1]); //totale mismatches per BP con nucleotide indicato
-            }
+         writeextensiveprofile += "\t";
+         writeextensiveprofile += to_string(guideprofiling[i][(guidelen-pamlimit)+3 + hh]); //totale off-targets in quella threshold di mismatches
 
-            writeextensiveprofile+="\n";
-            writeextensiveprofile+="NUCLEOTIDE G";
+         writeextensiveprofile += "\n";
 
-            for(int ff=0;ff<(guidelen-pamlimit);ff++)
-            {
-                writeextensiveprofile+="\t";
-                writeextensiveprofile+=to_string(matrixprofiling[i][hh][ff][2]); //totale mismatches per BP con nucleotide indicato
-            }
+         writeextensiveprofile += "NUCLEOTIDE A";
 
-            writeextensiveprofile+="\n";
-            writeextensiveprofile+="NUCLEOTIDE T";
+         for (int ff = 0; ff < (guidelen - pamlimit); ff++)
+         {
+            writeextensiveprofile += "\t";
+            writeextensiveprofile += to_string(matrixprofiling[i][hh][ff][0]); //totale mismatches per BP con nucleotide indicato
+         }
 
-            for(int ff=0;ff<(guidelen-pamlimit);ff++)
-            {
-                writeextensiveprofile+="\t";
-                writeextensiveprofile+=to_string(matrixprofiling[i][hh][ff][3]); //totale mismatches per BP con nucleotide indicato
-            }
+         writeextensiveprofile += "\n";
+         writeextensiveprofile += "NUCLEOTIDE C";
 
-            writeextensiveprofile+="\n";
-            writeextensiveprofile+="\n";
+         for (int ff = 0; ff < (guidelen - pamlimit); ff++)
+         {
+            writeextensiveprofile += "\t";
+            writeextensiveprofile += to_string(matrixprofiling[i][hh][ff][1]); //totale mismatches per BP con nucleotide indicato
+         }
 
-        }
-    }
+         writeextensiveprofile += "\n";
+         writeextensiveprofile += "NUCLEOTIDE G";
+
+         for (int ff = 0; ff < (guidelen - pamlimit); ff++)
+         {
+            writeextensiveprofile += "\t";
+            writeextensiveprofile += to_string(matrixprofiling[i][hh][ff][2]); //totale mismatches per BP con nucleotide indicato
+         }
+
+         writeextensiveprofile += "\n";
+         writeextensiveprofile += "NUCLEOTIDE T";
+
+         for (int ff = 0; ff < (guidelen - pamlimit); ff++)
+         {
+            writeextensiveprofile += "\t";
+            writeextensiveprofile += to_string(matrixprofiling[i][hh][ff][3]); //totale mismatches per BP con nucleotide indicato
+         }
+
+         writeextensiveprofile += "\n";
+         writeextensiveprofile += "\n";
+      }
+   }
 }

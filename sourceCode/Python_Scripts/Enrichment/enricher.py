@@ -4,6 +4,7 @@ import sys
 import re
 import time
 import textwrap
+import os
 
 
 start_time = time.time()
@@ -142,6 +143,7 @@ for line in inAltFile:
 
 genomeStr = "".join(genomeList)
 
+os.chdir("./SNPs_genome/")
 outFile = open(genomeHeader[1:(len(genomeHeader)-1)]+'.enriched'+'.fa', 'w')
 outFile.write(genomeHeader+genomeStr)
 
@@ -158,6 +160,8 @@ for line in inAltFile:
 
 genomeStr = "".join(genomeList)
 
+os.chdir("../")
+os.chdir("./INDELs_genome/")
 outfile = open(genomeHeader[1:(len(genomeHeader)-1)]+'.indels'+'.fa', 'w')
 outfile.write(genomeHeader+genomeStr)
 

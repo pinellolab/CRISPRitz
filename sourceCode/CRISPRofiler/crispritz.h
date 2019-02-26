@@ -17,13 +17,17 @@
 
 using namespace std;
 
+#define MAXS 10000
+#define MAXC 93
+#define MAXW 5488
+
 void analysis();
 void reading_pam();
 void reading_guide();
 void reading_chromosomes(char **argv);
 void reverse_guide();
 void generateprimenumbers();
-int buildMatchingMachine(string arr[], int k);
+void buildMachine();
 void searchPam();
 string switchSymbol(char sym);
 string reverse(string pamInput);
