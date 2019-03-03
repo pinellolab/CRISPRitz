@@ -18,7 +18,7 @@ using namespace std;
 // Should be equal to the sum of the length of all keywords.
 #define MAXS 10000
 #define MAXC 93
-#define MAXW 2560
+#define MAXW 5488
 
 int i;
 

@@ -32,19 +32,11 @@ void analysis()
    //pamindices.resize(genlen);
    //pamindicesreverse.resize(genlen);
 
-   double start=omp_get_wtime();
    //start pam searching
    searchPam();
-   double end=omp_get_wtime();
-   cout<<"pam search time "<<end-start<<endl;
-   totaltimepam+=end-start;
 
-   start=omp_get_wtime();
    //start guides searching, executed number of guides times
    guide_searching();
-   end=omp_get_wtime();
-   cout<<"guide search time "<<end-start<<endl;
-   totaltimeguide+=end-start;
 
    //clear the genome string for the next genome analysis
    genome.clear();

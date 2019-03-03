@@ -151,12 +151,12 @@ else:
         #text_file.close()
 
         # run searchOnTST
-        start_time = time.time()
 
-        print("Search on index-genome")
+        print("Start Search")
+        start_time = time.time()
         subprocess.run(["./searchOnTST", str(dirTSTgenome), str(fileGuide), str(mm), str(bDNA), str(bRNA), str(PAM), str(nameResult), str(r), str(th)]) 
-        print("Finish Searching")
-        print("Searching runtime: %s seconds" % (time.time() - start_time))
+        print("Finish Search")
+        print("Search runtime: %s seconds" % (time.time() - start_time))
 
     # -------------------- Normal search --------------------
     elif sys.argv[1] == "search":
@@ -211,12 +211,12 @@ else:
             print("Please select an output")
             sys.exit()
 
-        # run searchOnTST
-        print("Start Searching")
+        # run searchBruteForce
+        print("Start Search")
         start_time = time.time()
         subprocess.run(["./searchBruteForce", str(genomeDir), str(filePAM),str(fileGuide), str(mm), str(result), str(th), str(r)])
-        print("Finish Searching")
-        print("Searching runtime: %s seconds" % (time.time() - start_time))
+        print("Finish Search")
+        print("Search runtime: %s seconds" % (time.time() - start_time))
 
         # -------------------- VCF File Parsing --------------------
     elif sys.argv[1] == "add-variants":

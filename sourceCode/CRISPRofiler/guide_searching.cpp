@@ -296,17 +296,17 @@ string missmatching(string targetfound, int index, int guidafound, int reverse) 
       if (countmissmatchpos > 0)
       {
          //aggiorno il profili della guida con OFF-TARGET E MM TOTALI
-         guideprofiling[guidafound][21]++;
-         guideprofiling[guidafound][22] += countmissmatchpos;
+         guideprofiling[guidafound][guidelencorrected+1]++;
+         guideprofiling[guidafound][guidelencorrected+2] += countmissmatchpos;
       }
       else
       {
          //aggiorno profilo con ON-TARGET
-         guideprofiling[guidafound][20]++;
+         guideprofiling[guidafound][guidelencorrected]++;
       }
 
       //aggiorno profilo con nuovi MM nella colonna con threshold
-      guideprofiling[guidafound][23 + countmissmatchpos]++;
+      guideprofiling[guidafound][guidelen + countmissmatchpos]++;
 
       //aggiorno extendend_profile con dati della guida
       for (int gg = 0; gg < guidelen - pamlimit; gg++)
@@ -362,10 +362,7 @@ void guide_searching()
    int pampossize = pamindices.size();
    int pamnegsize = pamindicesreverse.size();
 
-   double start, end;
-
    //parallel region to find all targets on a selected chromosome
-   start = omp_get_wtime();
    #pragma omp parallel num_threads(threads) private(respos_private, guidepos_private, resneg_private, guideneg_private)
    {
       #pragma omp for schedule(static) private(j, guidecount, currentmissmatch) nowait
@@ -430,12 +427,6 @@ void guide_searching()
       }
    }
 
-   end = omp_get_wtime();
-   cout << "search guide " << end - start << endl;
-
-   totaltimeguidesearch += end - start;
-
-   start = omp_get_wtime();
 
    //check delle posizioni con risultati
    for (i = 0; i < respos.size(); i++)
@@ -498,6 +489,4 @@ void guide_searching()
       results << totalbuf;
       totalbuf.clear();
    }
-   end = omp_get_wtime();
-   cout << "guide analysis " << end - start << endl;
 }

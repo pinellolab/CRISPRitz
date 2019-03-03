@@ -105,8 +105,6 @@ int main(int argc, char **argv)
       results << "#Bulge_type\tcrRNA\tDNA\tChromosome\tPosition\tDirection\tMismatches\tBulge_Size\n";
    }
 
-   cout << "SEARCH START" << endl;
-
    //reading pam
    reading_pam(); //leggo il file pam dall'input
 
@@ -134,8 +132,6 @@ int main(int argc, char **argv)
    //reading chromosomes and execute analysis
    reading_chromosomes(argv); //inizio la ricerca sui cromosomi
 
-   cout << "ANALYSIS COMPLETE" << endl;
-
    //profiling guides
    profiler(); //scrivo la profilazione
 
@@ -146,11 +142,8 @@ int main(int argc, char **argv)
    }
    else if (argc > 7 && (argv[7] == profilewriting)) //chiudo i file di profili
    {
-      double start = omp_get_wtime();
       profile << writeprofile;
       extentedprofile << writeextensiveprofile;
-      double end = omp_get_wtime();
-      cout << "total time writing " << end - start << endl;
 
       profile.close();
       extentedprofile.close();
@@ -159,24 +152,15 @@ int main(int argc, char **argv)
    {
       results.close();
 
-      double start = omp_get_wtime();
       profile << writeprofile;
       extentedprofile << writeextensiveprofile;
-      double end = omp_get_wtime();
-      cout << "total time writing " << end - start << endl;
-
       profile.close();
       extentedprofile.close();
    }
    //end total execution time
    endtotal = omp_get_wtime();
 
-   cout << "total time reading " << totaltimereading << endl;
-   cout << "total time guide parallelo " << totaltimeguidesearch << endl;
-   cout << "total time guide " << totaltimeguide << endl;
-   cout << "total time pam " << totaltimepam << endl;
-
-   cout << "SEARCH DONE IN TIME: " << endtotal - starttotal << endl;
+   cout << "TOTAL TIME: " << endtotal - starttotal << endl;
 
    return 0;
 }

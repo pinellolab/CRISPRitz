@@ -16,6 +16,7 @@
 #include <bitset>
 #include "crispritz.h"
 #include <parallel/algorithm>
+#include <iomanip>
 
 using namespace std;
 
@@ -49,17 +50,17 @@ void reading_guide()
    {
       transform(line.begin(), line.end(), line.begin(), ::toupper);
       space = line.find_last_of("N");
-      string guida = line.substr(0, space+1);
+      string guida = line.substr(0, space + 1);
       if (guida.length() == pamlen)
       {
          guides.push_back(guida);
       }
       else
       {
-         cerr<<"SOME GUIDE IS NOT THE SAME LENGTH AS PAM, PLEASE CHECK"<<endl;
+         cerr << "SOME GUIDE IS NOT THE SAME LENGTH AS PAM, PLEASE CHECK" << endl;
          exit(0);
       }
-      
+
       missmatchthrestotal.push_back(inputmissmatch);
    }
 
@@ -71,9 +72,7 @@ void reading_chromosomes(char **argv)
 {
    if (fastaname.find(".fa") != -1)
    {
-      double start;
-      start = omp_get_wtime();
-      ifstream fasta(fastaname.substr(0,fastaname.size()-1));
+      ifstream fasta(fastaname.substr(0, fastaname.size() - 1));
 
       while (getline(fasta, line).good())
       {
@@ -88,14 +87,9 @@ void reading_chromosomes(char **argv)
          }
       }
 
-      double end;
-      end = omp_get_wtime();
-
       genlen = genome.length();
 
       cout << "ANALYZING CHROMOSOME: " << chrnames << endl;
-
-      cout << "reading file time " << end - start << endl;
 
       genomebitconversion();
 
@@ -125,9 +119,6 @@ void reading_chromosomes(char **argv)
          //reading every fasta file in the folder and call analysis for every fasta file
          for (int i = 0; i < filenumber; i++)
          {
-            double start;
-            start = omp_get_wtime();
-
             fastaname = argv[1];
             fastaname += fileList[i];
             ifstream fasta(fastaname);
@@ -145,19 +136,9 @@ void reading_chromosomes(char **argv)
                }
             }
 
-            double end;
-            end = omp_get_wtime();
-
-            totaltimereading += end - start;
-
             genlen = genome.length();
 
-            cout << "ANALYZING CHROMOSOME: " << chrnames << endl;
-
-            cout << "reading file time " << end - start << endl;
-
-            totaltimereading += end - start;
-            start = 0;
+            cout << "ANALYZING CHROMOSOME "<< chrnames << " (Total progress: " << fixed << std::setprecision(1) << (100.0*(i+1)/filenumber) << "%)"<<endl;
 
             genomebitconversion();
 

@@ -101,7 +101,7 @@ void profiler()
          }
 
          writeextensiveprofile += "\t";
-         writeextensiveprofile += to_string(guideprofiling[i][(guidelen-pamlimit)+3 + hh]); //totale off-targets in quella threshold di mismatches
+         writeextensiveprofile += to_string(guideprofiling[i][(guidelen-pamlimit)+ 3 + hh]); //totale off-targets in quella threshold di mismatches
 
          writeextensiveprofile += "\n";
 
