@@ -868,11 +868,11 @@ int main(int argc, char **argv)
                         }
 
                         //Free memory
-                        // for (i = 0; i < numLeaves; i++)
-                        // {
-                        //         delete[] targetOnDNA[i].guideDNA_bit;
-                        //         delete[] targetOnDNA[i].guideDNA;
-                        // }
+                        for (i = 0; i < numLeaves; i++)
+                        {
+                                delete[] targetOnDNA[i].guideDNA_bit;
+                                delete[] targetOnDNA[i].guideDNA;
+                        }
 
                         //free targetonDNA
                         free(targetOnDNA);
