@@ -131,8 +131,8 @@ void searchWords(vector<int> &indices, string arr[], int k, string text, int pam
 	// Build machine with goto, failure and output functions
 	buildMatchingMachine(arr, k);
 
-// Traverse the text through the nuilt machine to find all occurrences of words in arr[]
-//#pragma parallel omp for private(j, currentState, ch)
+	// Traverse the text through the nuilt machine to find all occurrences of words in arr[]
+	//#pragma parallel omp for private(j, currentState, ch)
 	#pragma omp parallel private(tid, j, currentState, ch, i, chunckfine, indices_private)
 	{
 		tid = omp_get_thread_num();
@@ -153,20 +153,23 @@ void searchWords(vector<int> &indices, string arr[], int k, string text, int pam
 			}
 
 			// Match found, print all matching words of arr[] using output function.
-			for (j = MAXW - 1; j >= 0; j--)
+			for (j = 0; j < k; j++)
 			{
-				if (out[currentState][j] && j > mez_K) //check what pam was found, if the first half, it's a positive pam, negative otherwise
+				if (out[currentState][j])
 				{
-					if ((i - (pamlen - 1 + 2)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
+					if (j < mez_K) //check what pam was found, iFf the first half, it's a positive pam, negative otherwise
 					{
-						indices_private.push_back(i - (pamlen - 1 + 2));
+						if ((i - (pamlen - 1 + 2)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
+						{
+							indices_private.push_back(i - (pamlen - 1 + 2));
+						}
 					}
-				}
-				else if(out[currentState][j] && j <= mez_K)
-				{
-					if ((i - (pamlimit - 1)) <= (l - (pamlen + 2))) //same as for positive pam(out of bound problem)
+					else if (j >= mez_K)
 					{
-						indices_private.push_back(-(i - (pamlimit - 1)));
+						if ((i - (pamlimit - 1)) <= (l - (pamlen + 2))) //same as for positive pam(out of bound problem)
+						{
+							indices_private.push_back(-(i - (pamlimit - 1)));
+						}
 					}
 				}
 			}
