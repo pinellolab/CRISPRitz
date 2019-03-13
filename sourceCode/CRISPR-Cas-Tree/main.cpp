@@ -31,16 +31,16 @@ Tptr tree = (Tptr)malloc(MAXWORDS * 10 * sizeof(Tnode));
 int nodeUsed; // number of nodes
 
 Tleaf targetOnDNA[MAXWORDS]; // array of target on DNA
-string pamRNA;					  // input pam RNA
-string chrName;				  // input chromosome name
-string chrSeq;					  // input chromosome sequence
+string pamRNA;							 // input pam RNA
+string chrName;							 // input chromosome name
+string chrSeq;							 // input chromosome sequence
 
 // function that inserts a guide DNA in TST
 void insert(char *s, int i)
 {
-	int d;						 // distance between characters
+	int d;									 // distance between characters
 	s = s + pamRNA.length(); // insert after pam DNA
-	Tptr pp = tree;			 // insert start from root
+	Tptr pp = tree;					 // insert start from root
 	while (nodeUsed)
 	{ // move through TST
 		if ((d = *s - pp->splitchar) == 0)
@@ -294,7 +294,7 @@ void saveTST(int arrayDim, int part)
 	fileTree.write((char *)&arrayDim, sizeof(int)); // write number of targets
 
 	for (int i = 0; i < arrayDim; i++)
-	{																						  // write array of targets on DNA
+	{																																	 // write array of targets on DNA
 		fileTree.write((char *)&targetOnDNA[i].guideIndex, sizeof(int)); // write index of target on DNA
 
 		int k = 0;
@@ -355,7 +355,7 @@ void saveTST(int arrayDim, int part)
 			targetOnDNA[i].guideDNA++;
 			if (!*(targetOnDNA[i].guideDNA) || k == 2)
 			{
-				if (counter % 3 == 0 && counter != 0)
+				if (counter % 3 == 0 && counter != 0) //TODO da modificare per le pam pari
 					bitNuc <<= 4;
 				fileTree.put(bitNuc);
 				bitNuc = 0;
@@ -377,7 +377,7 @@ void saveTST(int arrayDim, int part)
 	}
 
 	fileTree.write((char *)&nodeUsed, sizeof(int)); // write number of nodes
-	serialize(&tree[0]);										// serialize TST
+	serialize(&tree[0]);														// serialize TST
 
 	fileTree.close();
 }
@@ -401,99 +401,46 @@ void insall(int l, int r)
 	insall(m + 1, r);
 }
 
-int main(int argc, char **argv)
+/**
+ * Function that extracts the sequences from the genome. Used only if the user selects the -PAMstart flag
+ **/
+void extractTargets(vector<int> &pamIndices, int pamlen, int group_tst)
 {
-	string line;															 // line of fasta file
-	double start, end, globalstart, globalend, globalpartial; // start and end time, global start and end time
-	vector<string> all_pam;												 // vector of all possible pam RNA
-	vector<int> pamIndices;												 // vector of target indices of pam RNA on DNA
-	ifstream fasta(argv[1]);											 // input fasta file
-	ifstream pamfile(argv[2]);											 // input pam.txt
-
-	globalstart = omp_get_wtime(); // start global time
-
-	// ----------------------- READ INPUT FASTA ---------------------------
-	//Read chromosome name
-	getline(fasta, chrName);
-	chrName = chrName.substr(1, chrName.length() - 1);
-	cout << "Load chr:\t";
-	start = omp_get_wtime();
-	while (getline(fasta, line).good())
-	{ // read chromosome sequence
-		chrSeq += line;
-	}
-	__gnu_parallel::transform(chrSeq.begin(), chrSeq.end(), chrSeq.begin(), ::toupper); // parallelized to uppercase
-	end = omp_get_wtime();
-	cout << end - start << "\n";
-
-	// ------------------- GENERATE ALL POSSIBLE PAM -------------------
-	getline(pamfile, line);
-	transform(line.begin(), line.end(), line.begin(), ::toupper); // uppercase of the pam
-	int delimiter = line.find(" ");
-	string pam = line.substr(0, delimiter);
-	int pamlimit = stoi(line.substr(delimiter, line.length() - 1)); //number that identifies the PAM length: NNNNNNNNNNNNNNNNNNNNNGG (3)
-	int pamlen = pam.length();													 //length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
-	pamRNA = pam.substr(pamlen - pamlimit, pamlimit);
-	all_pam = generatePam(pam.substr(pamlen - pamlimit, pamlimit)); // generate a vector of each possible input pam
-
-	// make list of all possible pam RNA
-	string list[all_pam.size()];
-
-	for (int j = 0; j < all_pam.size(); j++)
-	{
-		list[j] = all_pam[j];
-	}
-
-	// ------------------- SEARCH PAM IN THE CHROMOSOME -------------------
-	cout << "Search PAM:\t";
-	start = omp_get_wtime();
-	searchWords(pamIndices, list, all_pam.size(), chrSeq, pamlen, pamlimit);
-	all_pam.clear();
-	end = omp_get_wtime();
-	cout << end - start << "\n";
-
-	// ------------------------ CREATE THE TST ----------------------------
-
-	char *t;
-	t = (char *)malloc(80000000 * sizeof(char));
-	free(t);
-
-	double pam_double = pamIndices.size();
-	int group_tst = ceil(pam_double / 5000000); // if a tree is too big, divide it into group_tst smaller trees
+	double start, end;
 	for (int jk = 0; jk < group_tst; jk++)
 	{
 		int inizio = jk * 5000000;
 		int fine = MIN(((jk + 1) * 5000000), pamIndices.size());
 		char *s = space;
 		string target;
-		cout<< "Creating tree "<< jk+1 << " of "<< group_tst <<endl;
+		cout << "Creating tree " << jk + 1 << " of " << group_tst << endl;
 		cout << "Retrieve seq:\t";
 		start = omp_get_wtime();
 		int i = 0;
 		int counter_index = 0;
-		
+
 		for (i = inizio; i < fine; i++)
 		{
-			if (pamIndices[i] > 0) //entro se pam positivo
+			if (pamIndices[i] < 0) //entro se pam negativo
 			{
-				target = chrSeq.substr(pamIndices[i], pamlen + 2); //estraggo target+pam dal cromosoma
-				if (target.find('N') != std::string::npos)			//se trovo N nel target, salto il target e abbasso il contatore degli indici del cromosoma
+				target = chrSeq.substr((pamIndices[i]) * -1, pamlen + 2); //estraggo target+pam dal cromosoma
+				if (target.find('N') != std::string::npos)								//se trovo N nel target, salto il target e abbasso il contatore degli indici del cromosoma
 				{
 					counter_index--;
 				}
 				else
 				{
 					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], s, 0}; //salvo l'indice del target
-
-					reverse(target.begin(), target.end()); //reverse per aggiungere nell'albero
-					for (char &c : target)						//salvo la stringa
+					//cout << "target  <0: " << target << endl;
+					//reverse(target.begin(), target.end()); //reverse per aggiungere nell'albero
+					for (char &c : target) //salvo la stringa
 						*s++ = c;
 				}
 			}
 			else
 			{
-				target = chrSeq.substr((pamIndices[i]) * -1, pamlen + 2);
-
+				target = chrSeq.substr((pamIndices[i]), pamlen + 2);
+				//cout << "target >0 prima: " << target << endl;
 				if (target.find('N') != std::string::npos)
 				{
 					counter_index--;
@@ -501,8 +448,12 @@ int main(int argc, char **argv)
 				else
 				{
 					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], s, 0};
+					//cout << "s: ";
+					reverse(target.begin(), target.end()); //reverse per aggiungere nell'albero
+					//cout << "target  >0: " << target << endl;
+					for (char &c : target)
+					{ //complemento dei nucleotidi per pam negativa
 
-					for (char &c : target) //complemento dei nucleotidi per pam negativa
 						switch (c)
 						{
 						case 'A':
@@ -552,6 +503,13 @@ int main(int argc, char **argv)
 							*s++ = 'N';
 							break;
 						}
+						//cout << c;
+					}
+					// cout << "s: ";
+					// for (int jj = 0; jj < 25; jj++){
+					// 	cout << s[jj];
+					// }
+					// cout << endl;
 				}
 			}
 			*s++ = 0;
@@ -578,9 +536,214 @@ int main(int argc, char **argv)
 		end = omp_get_wtime();
 		cout << end - start << "\n";
 	}
+}
+
+int main(int argc, char **argv)
+{
+	string line;																							// line of fasta file
+	double start, end, globalstart, globalend, globalpartial; // start and end time, global start and end time
+	vector<string> all_pam;																		// vector of all possible pam RNA
+	vector<int> pamIndices;																		// vector of target indices of pam RNA on DNA
+	ifstream fasta(argv[1]);																	// input fasta file
+	ifstream pamfile(argv[2]);																// input pam.txt
+	bool variant = atoi(argv[3]);															// variant genome or not
+	bool pam_at_start = false;																// pam is at beginning or end of guide
+	// if (pam_at_start_s.compare("True") == 0)
+	// 	pam_at_start = true;
+	globalstart = omp_get_wtime(); // start global time
+
+	// ----------------------- READ INPUT FASTA ---------------------------
+	//Read chromosome name
+	getline(fasta, chrName);
+	chrName = chrName.substr(1, chrName.length() - 1);
+	cout << "Load chr:\t";
+	start = omp_get_wtime();
+	while (getline(fasta, line).good())
+	{ // read chromosome sequence
+		chrSeq += line;
+	}
+	__gnu_parallel::transform(chrSeq.begin(), chrSeq.end(), chrSeq.begin(), ::toupper); // parallelized to uppercase
+	end = omp_get_wtime();
+	cout << end - start << "\n";
+
+	// ------------------- GENERATE ALL POSSIBLE PAM -------------------
+	getline(pamfile, line);
+	transform(line.begin(), line.end(), line.begin(), ::toupper); // uppercase of the pam
+	int delimiter = line.find(" ");
+	string pam = line.substr(0, delimiter);
+	int pamlimit = stoi(line.substr(delimiter, line.length() - 1)); //number that identifies the PAM length: NNNNNNNNNNNNNNNNNNNNNGG (3)
+	if (pamlimit < 0)
+	{
+		pam_at_start = true;
+		pamlimit = pamlimit * -1;
+	}
+	int pamlen = pam.length(); //length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
+	if (!pam_at_start)
+	{
+		pamRNA = pam.substr(pamlen - pamlimit, pamlimit);
+	}
+	else
+	{
+		pamRNA = pam.substr(0, pamlimit); // if pam_at_start is set, then PAM = TTTNNNNNNNNNNNNNNNNNNNNN 4, i select the first 4 chars
+	}
+
+	all_pam = generatePam(pamRNA, variant); // generate a vector of each possible input pam
+
+	// make list of all possible pam RNA
+	string list[all_pam.size()];
+	//cout << "allpam size: " << all_pam.size() << ", pam: " << pamRNA << endl;
+	for (int j = 0; j < all_pam.size(); j++)
+	{
+		list[j] = all_pam[j];
+		//cout << "pams " << list[j] << endl;
+	}
+
+	// ------------------- SEARCH PAM IN THE CHROMOSOME -------------------
+	cout << "Search PAM:\t";
+	start = omp_get_wtime();
+	searchWords(pamIndices, list, all_pam.size(), chrSeq, pamlen, pamlimit, pam_at_start);
+	all_pam.clear();
+	end = omp_get_wtime();
+	cout << end - start << "\n";
+
+	// ------------------------ CREATE THE TST ----------------------------
+
+	// char *t;
+	// t = (char *)malloc(80000000 * sizeof(char));
+	// free(t);
+
+	double pam_double = pamIndices.size();
+	int candidate_targets_per_tst = 10000000;
+	int group_tst = ceil(pam_double / candidate_targets_per_tst); // if a tree is too big, divide it into group_tst smaller trees
+
+	if (pam_at_start)
+	{
+		extractTargets(pamIndices, pamlen, group_tst);
+	}
+	else
+	{ //The user didn't set the -PAMstart flag
+		for (int jk = 0; jk < group_tst; jk++)
+		{
+			int inizio = jk * candidate_targets_per_tst;
+			int fine = MIN(((jk + 1) * candidate_targets_per_tst), pamIndices.size());
+			char *s = space;
+			string target;
+			cout << "Creating tree " << jk + 1 << " of " << group_tst << endl;
+			cout << "Retrieve seq:\t";
+			start = omp_get_wtime();
+			int i = 0;
+			int counter_index = 0;
+
+			for (i = inizio; i < fine; i++)
+			{
+				if (pamIndices[i] > 0) //entro se pam positivo
+				{
+					target = chrSeq.substr(pamIndices[i], pamlen + 2); //estraggo target+pam dal cromosoma
+					if (target.find('N') != std::string::npos)				 //se trovo N nel target, salto il target e abbasso il contatore degli indici del cromosoma
+					{
+						counter_index--;
+					}
+					else
+					{
+						targetOnDNA[counter_index] = (Tleaf){pamIndices[i], s, 0}; //salvo l'indice del target
+
+						reverse(target.begin(), target.end()); //reverse per aggiungere nell'albero
+						for (char &c : target)								 //salvo la stringa
+							*s++ = c;
+					}
+				}
+				else
+				{
+					target = chrSeq.substr((pamIndices[i]) * -1, pamlen + 2);
+
+					if (target.find('N') != std::string::npos)
+					{
+						counter_index--;
+					}
+					else
+					{
+						targetOnDNA[counter_index] = (Tleaf){pamIndices[i], s, 0};
+
+						for (char &c : target) //complemento dei nucleotidi per pam negativa
+							switch (c)
+							{
+							case 'A':
+								*s++ = 'T';
+								break;
+							case 'T':
+								*s++ = 'A';
+								break;
+							case 'C':
+								*s++ = 'G';
+								break;
+							case 'G':
+								*s++ = 'C';
+								break;
+							case 'R':
+								*s++ = 'Y';
+								break;
+							case 'Y':
+								*s++ = 'R';
+								break;
+							case 'S':
+								*s++ = 'S';
+								break;
+							case 'W':
+								*s++ = 'W';
+								break;
+							case 'M':
+								*s++ = 'K';
+								break;
+							case 'K':
+								*s++ = 'M';
+								break;
+							case 'H':
+								*s++ = 'D';
+								break;
+							case 'D':
+								*s++ = 'H';
+								break;
+							case 'B':
+								*s++ = 'V';
+								break;
+							case 'V':
+								*s++ = 'B';
+								break;
+							default:
+								cerr << "The character (" << c << ") of the PAM is not part of the IUPAC nucleotide nomenclature" << endl;
+								*s++ = 'N';
+								break;
+							}
+					}
+				}
+				*s++ = 0;
+				counter_index++;
+			}
+
+			end = omp_get_wtime();
+			cout << end - start << "\n";
+
+			cout << "Sorting:\t";
+			start = omp_get_wtime(); // sorting the strins before inserting into the tree
+			__gnu_parallel::sort(targetOnDNA, targetOnDNA + counter_index, compareFunc);
+			end = omp_get_wtime();
+			cout << end - start << "\n";
+			cout << "Build TST:\t";
+			start = omp_get_wtime(); // build tst
+			nodeUsed = 0;
+			insall(0, counter_index - 1);
+			end = omp_get_wtime();
+			cout << end - start << "\n";
+			cout << "Save TST:\t";
+			start = omp_get_wtime(); // save tst on .bin file
+			saveTST(counter_index, jk + 1);
+			end = omp_get_wtime();
+			cout << end - start << "\n";
+		}
+	}
 	globalend = omp_get_wtime(); // end global time
 	cout << "-----------------------"
-		  << "\n";
+			 << "\n";
 	cout << "Total time:\t" << globalend - globalstart << "\n";
 	//cout << "C++ end" << endl;
 	return 0;

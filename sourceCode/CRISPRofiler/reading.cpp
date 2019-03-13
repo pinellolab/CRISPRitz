@@ -1,56 +1,66 @@
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <omp.h>
-#include <ctype.h>
-#include <vector>
-#include <algorithm>
-#include <dirent.h>
-#include <unistd.h>
-#include <cstring>
-#include <fcntl.h>
-#include <cmath>
-#include <iterator>
-#include <omp.h>
-#include <bits/stdc++.h>
-#include <bitset>
-#include "crispritz.h"
-#include <parallel/algorithm>
-#include <iomanip>
+#include "include/crispritz.h"
 
 using namespace std;
 
-extern DIR *d;
-extern dirent *dir;
-extern int i, genlen, pamlen, space, pamlimit, totalguides, filenumber, inputmissmatch;
-extern double totaltimereading;
-extern vector<int> missmatchthrestotal;
-extern vector<string> fileList, guides;
-extern string fastaname, pamname, guidename, chrnames, pam, line, genome;
+DIR *d;
+dirent *dir;
+int genlen, pamlen, guidelen, pamlimit, totalguides;
+string pam, genome, chrnames;
+vector<string> guides, listPam;
+extern string fastaname, pamname, guidename;
+extern bool pamdirection;
+
+//generate all pam and automata construction
+void pamGeneration()
+{
+   //generate all PAMs
+   if (!pamdirection)
+   {
+      //genero lista comprensiva di PAM
+      listPam = generatePam(pam.substr(pamlen - pamlimit, pamlimit));
+   }
+   else
+   {
+      listPam = generatePam(pam.substr(0, pamlimit));
+   }
+
+   //generate the automata for PAM search
+   buildMachine();
+}
 
 void reading_pam()
 {
    ifstream pamfile(pamname);
+   string line;
 
    while (getline(pamfile, line))
    {
       transform(line.begin(), line.end(), line.begin(), ::toupper);
-      space = line.find(" ");
+      int space = line.find(" ");
       pam = line.substr(0, space);
       pamlimit = stoi(line.substr(space, line.length() - 1));
+      if (pamlimit < 0)
+      {
+         pamdirection = 1;
+         pamlimit = pamlimit * -1;
+      }
       pamlen = pam.length();
    }
+
+   pamGeneration();
 }
 
 void reading_guide()
 {
    ifstream guidefile(guidename);
+   string line;
 
    while (getline(guidefile, line))
    {
+      string guida;
       transform(line.begin(), line.end(), line.begin(), ::toupper);
-      space = line.find_last_of("N");
-      string guida = line.substr(0, space + 1);
+      guida = line.substr(0, pamlen);
+
       if (guida.length() == pamlen)
       {
          guides.push_back(guida);
@@ -60,16 +70,18 @@ void reading_guide()
          cerr << "SOME GUIDE IS NOT THE SAME LENGTH AS PAM, PLEASE CHECK" << endl;
          exit(0);
       }
-
-      missmatchthrestotal.push_back(inputmissmatch);
    }
 
+   guidelen = guides[0].size();
    totalguides = guides.size();
    guidesbitconversion();
 }
 
 void reading_chromosomes(char **argv)
 {
+   string line;
+   vector<string> fileList;
+
    if (fastaname.find(".fa") != -1)
    {
       ifstream fasta(fastaname.substr(0, fastaname.size() - 1));
@@ -98,7 +110,7 @@ void reading_chromosomes(char **argv)
    else
    {
       //reading folder of chromosomes
-      i = 0;
+      int i = 0;
       d = opendir(argv[1]);
       if (d)
       {
@@ -115,7 +127,7 @@ void reading_chromosomes(char **argv)
             i++;
             fileList.push_back(dir->d_name);
          }
-         filenumber = fileList.size();
+         int filenumber = fileList.size();
          //reading every fasta file in the folder and call analysis for every fasta file
          for (int i = 0; i < filenumber; i++)
          {
@@ -138,7 +150,7 @@ void reading_chromosomes(char **argv)
 
             genlen = genome.length();
 
-            cout << "ANALYZING CHROMOSOME "<< chrnames << " (Total progress: " << fixed << std::setprecision(1) << (100.0*(i+1)/filenumber) << "%)"<<endl;
+            cout << "ANALYZING CHROMOSOME " << chrnames << " (Total progress: " << fixed << std::setprecision(1) << (100.0 * (i + 1) / filenumber) << "%)" << endl;
 
             genomebitconversion();
 

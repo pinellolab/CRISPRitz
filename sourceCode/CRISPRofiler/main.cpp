@@ -1,52 +1,14 @@
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <omp.h>
-#include <ctype.h>
-#include <vector>
-#include <algorithm>
-#include <dirent.h>
-#include <unistd.h>
-#include <cstring>
-#include <fcntl.h>
-#include <cmath>
-#include <iterator>
-#include <omp.h>
-#include <bits/stdc++.h>
-#include <bitset>
-#include <cstdlib>
-#include "crispritz.h"
+#include "include/crispritz.h"
 
 using namespace std;
 
-// #define MAXS 10000
-// #define MAXC 93
-// #define MAXW 2000
-
-DIR *d;
-dirent *dir;
 ofstream results, profile, extentedprofile;
-int i, j, genlen, pamlen, guidelen, currentmissmatch, space, pamlimit, guidecount, totalguides, filenumber, threads, pampossize, pamnegsizeinputmissmatch, countmissmatchpos, guidelencorrected, inputmissmatch;
-double startime, endtime, starttotal, endtotal, writestart, writend, totalallocazione, totalpam, totalguide, totallettura, totalpostprocessing, totaltimepam, totaltimeguide, totaltimereading, totaltimeguidesearch;
-vector<int> missmatchthrestotal, pamindices, pamindicesreverse, totalprimenumbers;
-vector<string> fileList, guides, reverseguides, writingresults, listPam;
-string fastaname, pamname, guidename, exoname, introname, resultname, profilename, extendedprofilename, annotationame, chrnames, guide, pam, substring, reversesubstring, reverseguide, reversepam, line, genome, nullnucleotide, buf, totalbuf, subpos, subneg;
+int threads, inputmissmatch;
+double starttotal, endtotal;
+string fastaname, pamname, guidename, resultname, profilename, extendedprofilename;
 char nowriting, noprofile;
 string writeprofile, writeextensiveprofile;
-vector<bitset<4>> targetfoundbit;
-
-//PAM automata dimensions
-int g[MAXS][MAXC];
-int f[MAXS];
-bitset<MAXW> out[MAXS];
-
-//profiler
-vector<vector<int>> guideprofiling;                  //vettore contenente il profilo
-vector<vector<vector<vector<int>>>> matrixprofiling; //vettore contenente il profilo extended
-//genome and guides bit
-vector<bitset<4>> genomebit;                //genoma in bit
-vector<vector<bitset<4>>> guidesbit;        //guide in bit
-vector<vector<bitset<4>>> reverseguidesbit; //reverse guide in bit
+bool pamdirection, variant;
 
 int main(int argc, char **argv)
 {
@@ -57,7 +19,6 @@ int main(int argc, char **argv)
    string resultwriting = "r";
    string profilewriting = "p";
    string profileplusresult = "t";
-   nullnucleotide = "N";
    nowriting = 'n';
    noprofile = 'n';
    fastaname = argv[1];
@@ -70,17 +31,14 @@ int main(int argc, char **argv)
    profilename += ".profile.xls";
    extendedprofilename = argv[5];
    extendedprofilename += ".extended_profile.xls";
+   pamdirection = 0;
+   variant = atoi(argv[8]);
 
    //setting number threads used
-   threads = omp_get_max_threads();
-
-   if (argc > 6) //controllo che l'utente abbia inserito il valore thread altrimenti metto default tutto il disponibile
+   threads = atoi(argv[6]);
+   if (threads > omp_get_max_threads() || threads == 0)
    {
-      threads = atoi(argv[6]);
-      if (threads > omp_get_max_threads() || threads == 0)
-      {
-         threads = omp_get_max_threads();
-      }
+      threads = omp_get_max_threads();
    }
 
    if (argc > 7 && (argv[7] == resultwriting)) //consenso a scrivere i result
@@ -106,26 +64,13 @@ int main(int argc, char **argv)
    }
 
    //reading pam
-   reading_pam(); //leggo il file pam dall'input
+   reading_pam();
 
    //reading guides
-   reading_guide(); //leggo il file guide dall'input
-
-   //counting number guides
-
-   //reverse complement of guides
-   //reverse_guide();
-
-   //generating prime numbers to avoid guides conflict
-   //generateprimenumbers();
+   reading_guide();
 
    //profiler setting
-   profilersetting(); //inizializzo le matrici dei profili
-
-   //generate all PAMs
-   listPam = generatePam(pam.substr(pamlen - pamlimit, pamlimit)); //genero lista comprensiva di PAM
-
-   buildMachine(); //generate the automata for PAM search
+   profilersetting();
 
    cout << "USED THREADS " << threads << endl;
 
