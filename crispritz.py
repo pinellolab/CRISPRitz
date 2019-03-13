@@ -16,11 +16,11 @@ bulgeDNA = ["--bulgeDNA", "-bDNA"]					# bulge DNA
 
 if len(sys.argv) < 2:
     print("help:",
-      "\n\tcrispritz add-variants <vcfFilesDirectory> <genomeDirectory>",
-      "\n\tcrispritz index-genome <name_genome> <genomeDirectory> <pamFile> ",
-      "\n\tcrispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {-index} (flag to search with index-genome, allow searching with bulges) -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread>] {-r,-p,-t} (write only off-targets results, write only profiles, write both)",
-      "\n\tcrispritz annotate-results <guidesFile> <resultsFile> <outputFile> -exons <exonsbedFile> -introns <intronsbedFile> -ctcf <ctcfbedFile> -dnase <dnasebedFile> -promoters <promotersbedFile>",
-      "\n\tcrispritz generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profile <guideProfile> -extprofile <guideExtendedProfile> -exons <exonsCountFile> -introns <intronsCountFile> -ctcf <CTCFCountFile> -dnase <DNAseCountFile> -promoters <promotersCountFile> [-gecko (to use gecko pre-computed profile)] [-sumone <summaryReferenceCountFile>][-sumtwo <summaryEnrichedCountFile>]")
+          "\n\tcrispritz add-variants <vcfFilesDirectory> <genomeDirectory>",
+          "\n\tcrispritz index-genome <name_genome> <genomeDirectory> <pamFile> ",
+          "\n\tcrispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {-index} (flag to search with index-genome, allow searching with bulges) -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread>] {-r,-p,-t} (write only off-targets results, write only profiles, write both)",
+          "\n\tcrispritz annotate-results <guidesFile> <resultsFile> <outputFile> -exons <exonsbedFile> -introns <intronsbedFile> -ctcf <ctcfbedFile> -dnase <dnasebedFile> -promoters <promotersbedFile>",
+          "\n\tcrispritz generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profile <guideProfile> -extprofile <guideExtendedProfile> -exons <exonsCountFile> -introns <intronsCountFile> -ctcf <CTCFCountFile> -dnase <DNAseCountFile> -promoters <promotersCountFile> [-gecko (to use gecko pre-computed profile)] [-sumone <summaryReferenceCountFile>][-sumtwo <summaryEnrichedCountFile>]")
 
 
 else:
@@ -37,17 +37,27 @@ else:
         # retrive PAM
         PAM = filePAM.read()
         PAM_size = int(PAM.split()[1])
-        PAM = PAM.split()[0][-PAM_size:]
+        if(PAM_size < 0):
+            PAM_size = PAM_size * -1
+            PAM = PAM.split()[0][0:PAM_size]
+        else:
+            PAM = PAM.split()[0][-PAM_size:]
 
         TSTgenome = PAM + "_" + nameGenome					# name of the genome in TST format
         dirTSTgenome = "./genome_library/" + TSTgenome		# dir of the genome in TST format
 
         print(TSTgenome, "Indexing generation:")
 
+        # variant
+        variant = 0
+        if "-var" in sys.argv[1:]:
+            variant = 1
+
         # compile buildTST
         if (os.path.isfile("buildTST")) == False:
             print("Compiling...")
-            subprocess.run(["g++", "-O3", "sourceCode/CRISPR-Cas-Tree/main.cpp","-o", "buildTST", "-fopenmp", "-std=c++11"])
+            subprocess.run(["g++", "-O3", "sourceCode/CRISPR-Cas-Tree/main.cpp",
+                            "-o", "buildTST", "-fopenmp", "-std=c++11"])
 
         if os.path.isdir(dirTSTgenome):							# check if TSTgenome dir exists
             shutil.rmtree(dirTSTgenome)							# remove old TSTgenome dir
@@ -58,21 +68,22 @@ else:
         start_time = time.time()
         for f in listChrs:
             print("Indexing:", f)
-            subprocess.run(["./../../buildTST", str(dirGenome)+"/"+str(f), str(dirPAM)])
+            subprocess.run(
+                ["./../../buildTST", str(dirGenome)+"/"+str(f), str(dirPAM), str(variant)])
         print("Finish indexing")
         print("Indexing runtime: %s seconds" % (time.time() - start_time))
 
     # -------------------- Indexed search --------------------
     elif sys.argv[1] == "search" and "-index" in sys.argv[1:]:
 
-        #nameGenome = sys.argv[2]						# save name of the genome
+        # nameGenome = sys.argv[2]						# save name of the genome
         PAM = sys.argv[3]								# save PAM
         # open file Guide (with absolute path)
         fileGuide = os.path.realpath(sys.argv[4])
-        #print(fileGuide)
-        #TSTgenome = PAM + "_" + nameGenome				# name of the genome in TST format
-        #dirTSTgenome = "./genome_library/" + TSTgenome  # dir of the genome in TST format
-        nameResult = (sys.argv[5])      #name of result file
+        # print(fileGuide)
+        # TSTgenome = PAM + "_" + nameGenome				# name of the genome in TST format
+        # dirTSTgenome = "./genome_library/" + TSTgenome  # dir of the genome in TST format
+        nameResult = (sys.argv[5])  # name of result file
         dirTSTgenome = os.path.realpath(sys.argv[2])+"/"
 
         if not os.path.isdir(dirTSTgenome):				# check if TSTgenome dir exists
@@ -80,15 +91,15 @@ else:
                   "\" with \"" + PAM + "\", before the search using index!")
             sys.exit()
 
-        #listChrs = os.listdir(dirTSTgenome)				# save list of chromosomes
+        # listChrs = os.listdir(dirTSTgenome)				# save list of chromosomes
 
         #print(TSTgenome, "Search using indexing:")
 
         # compile searchOnTST
         if (os.path.isfile("searchOnTST")) == False:
             print("Compiling...")
-            subprocess.run(["g++", "-O3", "sourceCode/CRISPR-Cas-Tree/searchTest.cpp", "sourceCode/CRISPR-Cas-Tree/detailedOutput.cpp", "sourceCode/CRISPR-Cas-Tree/convert.cpp", "-I", "sourceCode/CRISPR-Cas-Tree/include", "-o", "searchOnTST", "-fopenmp", "-std=c++11", "-g"]) 
-
+            subprocess.run(["g++", "-O3", "sourceCode/CRISPR-Cas-Tree/searchTest.cpp", "sourceCode/CRISPR-Cas-Tree/detailedOutput.cpp",
+                            "sourceCode/CRISPR-Cas-Tree/convert.cpp", "-I", "sourceCode/CRISPR-Cas-Tree/include", "-o", "searchOnTST", "-fopenmp", "-std=c++11", "-g"])
 
         # read number of mismatches
         mm = 0
@@ -123,7 +134,7 @@ else:
                     "ATTENTION! Check the bulge DNA option: -bDNA <bDNA_num> (bDNA_num is a number)")
                 sys.exit()
 
-        #read number of threads
+        # read number of threads
         th = 1
         if "-th" in sys.argv[1:]:
             try:
@@ -147,14 +158,15 @@ else:
 
         # write the header of results file
         #text_file = open("result.txt", "w")
-        #text_file.write("#Bulge type\tcrRNA\tDNA\tChromosome\tPosition\tDirection\tMismatches\tBulge Size\n")
-        #text_file.close()
+        # text_file.write("#Bulge type\tcrRNA\tDNA\tChromosome\tPosition\tDirection\tMismatches\tBulge Size\n")
+        # text_file.close()
 
         # run searchOnTST
 
         print("Start Search")
         start_time = time.time()
-        subprocess.run(["./searchOnTST", str(dirTSTgenome), str(fileGuide), str(mm), str(bDNA), str(bRNA), str(PAM), str(nameResult), str(r), str(th)]) 
+        subprocess.run(["./searchOnTST", str(dirTSTgenome), str(fileGuide), str(mm),
+                        str(bDNA), str(bRNA), str(PAM), str(nameResult), str(r), str(th)])
         print("Finish Search")
         print("Search runtime: %s seconds" % (time.time() - start_time))
 
@@ -211,10 +223,16 @@ else:
             print("Please select an output")
             sys.exit()
 
+        # variant
+        variant = 0
+        if "-var" in sys.argv[1:]:
+            variant = 1
+
         # run searchBruteForce
         print("Start Search")
         start_time = time.time()
-        subprocess.run(["./searchBruteForce", str(genomeDir), str(filePAM),str(fileGuide), str(mm), str(result), str(th), str(r)])
+        subprocess.run(["./searchBruteForce", str(genomeDir), str(filePAM),
+                        str(fileGuide), str(mm), str(result), str(th), str(r), str(variant)])
         print("Finish Search")
         print("Search runtime: %s seconds" % (time.time() - start_time))
 
@@ -245,7 +263,8 @@ else:
         # genfile = str(dirGenome+'/'+splitf[0]+'.fa')
         # print ("Parsing:", f)
         # print ('Alt file', altfile)
-        subprocess.run(['../sourceCode/Python_Scripts/Enrichment/./bcf_query.sh', dirVCFFiles+'/'])
+        subprocess.run(
+            ['../sourceCode/Python_Scripts/Enrichment/./bcf_query.sh', dirVCFFiles+'/'])
 
         print("Finish Extraction of Variants")
         print("Runtime: %s seconds" % (time.time() - start_time))
@@ -276,7 +295,8 @@ else:
             print("Adding Variants to:", splitf[0])
             # print ('Alt file', altfile)
             # subprocess.run(['../sourceCode/Python_Scripts/Enrichment/./enricher.sh', altfile, genfile])
-            subprocess.run(['../sourceCode/Python_Scripts/Enrichment/enricher.py', altfile, genfile])
+            subprocess.run(
+                ['../sourceCode/Python_Scripts/Enrichment/enricher.py', altfile, genfile])
 
         print("Finish Adding of Variants")
         print("Runtime: %s seconds" % (time.time() - start_time))
@@ -346,90 +366,90 @@ else:
 
     # -------------------- Guide Report --------------------
     elif sys.argv[1] == "generate-report":
-      guidesFile = str(sys.argv[2])
+        guidesFile = str(sys.argv[2])
 
-      mm = 0
-      if "-mm" in sys.argv[1:]:
-         try:
-               mm = (sys.argv).index("-mm") + 1
-               mm = (sys.argv[mm])
-         except:
-               print(
-                  "ATTENTION! Check the mismatches option: -mm <mm_num> (mm_num is a number)")
-               sys.exit()
+        mm = 0
+        if "-mm" in sys.argv[1:]:
+            try:
+                mm = (sys.argv).index("-mm") + 1
+                mm = (sys.argv[mm])
+            except:
+                print(
+                    "ATTENTION! Check the mismatches option: -mm <mm_num> (mm_num is a number)")
+                sys.exit()
 
-      profileFile = "no"
-      if "-profile" in sys.argv[1:]:
-         profileFile = (sys.argv).index("-profile") + 1
-         profileFile = os.path.realpath(sys.argv[profileFile])
+        profileFile = "no"
+        if "-profile" in sys.argv[1:]:
+            profileFile = (sys.argv).index("-profile") + 1
+            profileFile = os.path.realpath(sys.argv[profileFile])
 
-      extProfileFile = "no"
-      if "-extprofile" in sys.argv[1:]:
-         extProfileFile = (sys.argv).index("-extprofile") + 1
-         extProfileFile = os.path.realpath(sys.argv[extProfileFile])
+        extProfileFile = "no"
+        if "-extprofile" in sys.argv[1:]:
+            extProfileFile = (sys.argv).index("-extprofile") + 1
+            extProfileFile = os.path.realpath(sys.argv[extProfileFile])
 
-      exonFile = "no"
-      if "-exons" in sys.argv[1:]:
-         exonFile = (sys.argv).index("-exons") + 1
-         exonFile = os.path.realpath(sys.argv[exonFile])
+        exonFile = "no"
+        if "-exons" in sys.argv[1:]:
+            exonFile = (sys.argv).index("-exons") + 1
+            exonFile = os.path.realpath(sys.argv[exonFile])
 
-      intronFile = "no"
-      if "-introns" in sys.argv[1:]:
-         intronFile = (sys.argv).index("-introns") + 1
-         intronFile = os.path.realpath(sys.argv[intronFile])
+        intronFile = "no"
+        if "-introns" in sys.argv[1:]:
+            intronFile = (sys.argv).index("-introns") + 1
+            intronFile = os.path.realpath(sys.argv[intronFile])
 
-      promoterFile = "no"
-      if "-promoters" in sys.argv[1:]:
-         promoterFile = (sys.argv).index("-promoters") + 1
-         promoterFile = os.path.realpath(sys.argv[promoterFile])
+        promoterFile = "no"
+        if "-promoters" in sys.argv[1:]:
+            promoterFile = (sys.argv).index("-promoters") + 1
+            promoterFile = os.path.realpath(sys.argv[promoterFile])
 
-      ctcfFile = "no"
-      if "-ctcf" in sys.argv[1:]:
-         ctcfFile = (sys.argv).index("-ctcf") + 1
-         ctcfFile = os.path.realpath(sys.argv[ctcfFile])
+        ctcfFile = "no"
+        if "-ctcf" in sys.argv[1:]:
+            ctcfFile = (sys.argv).index("-ctcf") + 1
+            ctcfFile = os.path.realpath(sys.argv[ctcfFile])
 
-      dnaseFile = "no"
-      if "-dnase" in sys.argv[1:]:
-         dnaseFile = (sys.argv).index("-dnase") + 1
-         dnaseFile = os.path.realpath(sys.argv[dnaseFile])
-         
-      summaryOne = "no"
-      if "-sumone" in sys.argv[1:]:
-         summaryOne = (sys.argv).index("-sumone") + 1
-         summaryOne = os.path.realpath(sys.argv[summaryOne])
-      
-      summaryTwo = "no"
-      if "-sumtwo" in sys.argv[1:]:
-         summaryTwo = (sys.argv).index("-sumtwo") + 1
-         summaryTwo = os.path.realpath(sys.argv[summaryTwo])
+        dnaseFile = "no"
+        if "-dnase" in sys.argv[1:]:
+            dnaseFile = (sys.argv).index("-dnase") + 1
+            dnaseFile = os.path.realpath(sys.argv[dnaseFile])
 
+        summaryOne = "no"
+        if "-sumone" in sys.argv[1:]:
+            summaryOne = (sys.argv).index("-sumone") + 1
+            summaryOne = os.path.realpath(sys.argv[summaryOne])
 
-      geckoProfile = "no"
-      geckoExonsCount = "no"
-      geckoIntronsCount = "no"
-      geckoPromotersCount = "no"
-      geckoDNAseCount = "no"
-      geckoCTCFCount = "no"
+        summaryTwo = "no"
+        if "-sumtwo" in sys.argv[1:]:
+            summaryTwo = (sys.argv).index("-sumtwo") + 1
+            summaryTwo = os.path.realpath(sys.argv[summaryTwo])
 
-      if "-gecko" in sys.argv[1:]:
-         geckoProfile = 'sourceCode/Python_Scripts/Plot/gecko/gecko.reference.profile.xls'
-         geckoExonsCount = 'sourceCode/Python_Scripts/Plot/gecko/gecko.Exons.Count.txt'
-         geckoIntronsCount = 'sourceCode/Python_Scripts/Plot/gecko/gecko.Introns.Count.txt'
-         geckoPromotersCount = 'sourceCode/Python_Scripts/Plot/gecko/gecko.Promoters.Count.txt'
-         geckoDNAseCount = 'sourceCode/Python_Scripts/Plot/gecko/gecko.DNAse.Count.txt'
-         geckoCTCFCount = 'sourceCode/Python_Scripts/Plot/gecko/gecko.CTCF.Count.txt'
+        geckoProfile = "no"
+        geckoExonsCount = "no"
+        geckoIntronsCount = "no"
+        geckoPromotersCount = "no"
+        geckoDNAseCount = "no"
+        geckoCTCFCount = "no"
 
-      if "-random1milion" in sys.argv[1:]:
-         geckoProfile = 'sourceCode/Python_Scripts/Plot/random_1_milion/random.1milion.profile.xls'
-         geckoExonsCount = 'sourceCode/Python_Scripts/Plot/random_1_milion/random.1milion.Exons.Count.txt'
-         geckoIntronsCount = 'sourceCode/Python_Scripts/Plot/random_1_milion/random.1milion.Introns.Count.txt'
-         geckoPromotersCount = 'sourceCode/Python_Scripts/Plot/random_1_milion/random.1milion.Promoters.Count.txt'
-         geckoDNAseCount = 'sourceCode/Python_Scripts/Plot/random_1_milion/random.1milion.DNAse.Count.txt'
-         geckoCTCFCount = 'sourceCode/Python_Scripts/Plot/random_1_milion/random.1milion.CTCF.Count.txt'
+        if "-gecko" in sys.argv[1:]:
+            geckoProfile = 'sourceCode/Python_Scripts/Plot/gecko/gecko.reference.profile.xls'
+            geckoExonsCount = 'sourceCode/Python_Scripts/Plot/gecko/gecko.Exons.Count.txt'
+            geckoIntronsCount = 'sourceCode/Python_Scripts/Plot/gecko/gecko.Introns.Count.txt'
+            geckoPromotersCount = 'sourceCode/Python_Scripts/Plot/gecko/gecko.Promoters.Count.txt'
+            geckoDNAseCount = 'sourceCode/Python_Scripts/Plot/gecko/gecko.DNAse.Count.txt'
+            geckoCTCFCount = 'sourceCode/Python_Scripts/Plot/gecko/gecko.CTCF.Count.txt'
 
-      subprocess.run(['sourceCode/Python_Scripts/Plot/./radar_chart.py', str(profileFile), str(extProfileFile), str(exonFile), str(intronFile), str(promoterFile), str(dnaseFile),
-                     str(ctcfFile), guidesFile, str(mm), str(geckoProfile), str(geckoExonsCount), str(geckoIntronsCount), str(geckoPromotersCount), str(geckoDNAseCount), str(geckoCTCFCount), 
-                     str(summaryOne),str(summaryTwo)])
+        if "-random1milion" in sys.argv[1:]:
+            geckoProfile = 'sourceCode/Python_Scripts/Plot/random_1_milion/random.1milion.profile.xls'
+            geckoExonsCount = 'sourceCode/Python_Scripts/Plot/random_1_milion/random.1milion.Exons.Count.txt'
+            geckoIntronsCount = 'sourceCode/Python_Scripts/Plot/random_1_milion/random.1milion.Introns.Count.txt'
+            geckoPromotersCount = 'sourceCode/Python_Scripts/Plot/random_1_milion/random.1milion.Promoters.Count.txt'
+            geckoDNAseCount = 'sourceCode/Python_Scripts/Plot/random_1_milion/random.1milion.DNAse.Count.txt'
+            geckoCTCFCount = 'sourceCode/Python_Scripts/Plot/random_1_milion/random.1milion.CTCF.Count.txt'
+
+        subprocess.run(['sourceCode/Python_Scripts/Plot/./radar_chart.py', str(profileFile), str(extProfileFile), str(exonFile), str(intronFile), str(promoterFile), str(dnaseFile),
+                        str(ctcfFile), guidesFile, str(mm), str(geckoProfile), str(geckoExonsCount), str(
+                            geckoIntronsCount), str(geckoPromotersCount), str(geckoDNAseCount), str(geckoCTCFCount),
+                        str(summaryOne), str(summaryTwo)])
 
     # -------------------- Error --------------------
     else:
