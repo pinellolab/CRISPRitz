@@ -192,11 +192,11 @@ string missmatching(string targetfound, int index, int guidafound, int reverse) 
 					}
 
 					targetfound[pos] = tolower(targetfound[pos]); //lettera minuscola
-					tmp_mismatch++;																//conto MM totali della guida
+					tmp_mismatch++;										 //conto MM totali della guida
 					if (!pamdirection)
 					{
 						guideprofiling[guidafound][pos]++; //segno un MM in una base della guida nel profilo
-						tmp_mismatch_position[pos] = 5;		 //segno posizione MM
+						tmp_mismatch_position[pos] = 5;	 //segno posizione MM
 					}
 					else
 					{
@@ -384,31 +384,27 @@ string missmatching(string targetfound, int index, int guidafound, int reverse) 
 //execute guide search
 void guide_searching()
 {
-	vector<int> respos, resneg, respos_private, resneg_private;					//inizializzazione variabili per store indici pam
+	vector<int> respos, resneg, respos_private, resneg_private;			  //inizializzazione variabili per store indici pam
 	vector<int> guidepos, guideneg, guidepos_private, guideneg_private; //inizializzaione variabili per store indici guide
 
 	int pampossize = pamindices.size();
 	int pamnegsize = pamindicesreverse.size();
 
-//parallel region to find all targets on a selected chromosome
+	//parallel region to find all targets on a selected chromosome
 #pragma omp parallel num_threads(threads) private(respos_private, guidepos_private, resneg_private, guideneg_private)
 	{
-#pragma omp for schedule(static) nowait
+#pragma omp for simd schedule(static) nowait
 		for (int i = 0; i < pampossize; i++) //ciclo sugli indici trovati precendetemente, PAM
 		{
 			for (int guidecount = 0; guidecount < totalguides; guidecount++) //ciclo le guide, su tutti gli indici
 			{
 				int currentmissmatch = 0; //missmatch di ogni guida
 
-				for (int j = 0; j < guidelencorrected; j++) //confronto lettera-lettera, guida su genoma
+				for (int j = 0; j < guidelencorrected & (currentmissmatch <= inputmissmatch); j++) //confronto lettera-lettera, guida su genoma
 				{
 					if ((genomebit[j + pamindices[i]] & guidesbit[guidecount][j]) == 0)
 					{
 						currentmissmatch++;
-					}
-					if (currentmissmatch > inputmissmatch) //superata soglia missmatch massimi, esco dal ciclo della guida
-					{
-						break;
 					}
 				}
 				if (currentmissmatch <= inputmissmatch) //se rimango nella soglia, salvo dati, guida e pam che hanno generato target
@@ -419,22 +415,18 @@ void guide_searching()
 			}
 		}
 
-#pragma omp for schedule(static) nowait
+#pragma omp for simd schedule(static) nowait
 		for (int i = 0; i < pamnegsize; i++)
 		{
 			for (int guidecount = 0; guidecount < totalguides; guidecount++)
 			{
 				int currentmissmatch = 0;
 
-				for (int j = 0; j < guidelencorrected; j++)
+				for (int j = 0; j < guidelencorrected & (currentmissmatch <= inputmissmatch); j++)
 				{
 					if ((genomebit[j + pamlimit + pamindicesreverse[i]] & reverseguidesbit[guidecount][j]) == 0)
 					{
 						currentmissmatch++;
-					}
-					if (currentmissmatch > inputmissmatch)
-					{
-						break;
 					}
 				}
 				if (currentmissmatch <= inputmissmatch)

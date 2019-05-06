@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 
 from intervaltree import Interval, IntervalTree
 import sys
@@ -105,6 +105,7 @@ dnaseTree = IntervalTree()
 
 for line in inGuides:
     x = line.split('\n')
+    
     d_exons_0MM[str(x[0])] = 0
     d_exons_1MM[str(x[0])] = 0
     d_exons_2MM[str(x[0])] = 0
@@ -164,7 +165,6 @@ for line in inGuides:
     d_ctcf_8MM[str(x[0])] = 0
     d_ctcf_9MM[str(x[0])] = 0
     d_ctcf_10MM[str(x[0])] = 0
-
 
 if(sys.argv[1] != "no"):
     exonsFile = sys.argv[1]
@@ -228,152 +228,148 @@ outFile.write(
 next(inResult)
 for line in inResult:
     x = line.split('\t')
-    # print(x)
     # exons interval query
     foundExons = sorted(exonsTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
     # introns interval query
     foundIntrons = sorted(intronsTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
-    foundPromoters = sorted(
-        promotersTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
+    foundPromoters = sorted(promotersTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
     foundCtcf = sorted(ctcfTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
     foundDnase = sorted(dnaseTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
-
-    flag = False
 
     # check if line in result falls in a tree for a genetic notation and updates the relative count and the summary count
     for item in range(0, len(foundExons)):
         if foundExons[item].data == str(x[3]):
             # outFile.write(str(x[3]) + '\t' + str(foundExons[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[0]))) + '\t' + str(foundExons[item].begin) + '\t'+ str(foundExons[item].end) + '\t' + str(x[4]) + '\t' + "exon" + '\t' + str(x[6]))  # file write of exons results
             outFile.write(line.rstrip() + '\t' + "exon\n")
-            if str(x[6]) == '0':
+            if int(x[6]) == 0:
                 d_exons_0MM[str(x[1])] += 1
-            elif str(x[6]) == '1':
+            elif int(x[6]) == 1:
                 d_exons_1MM[str(x[1])] += 1
-            elif str(x[6]) == '2':
+            elif int(x[6]) == 2:
                 d_exons_2MM[str(x[1])] += 1
-            elif str(x[6]) == '3':
+            elif int(x[6]) == 3:
                 d_exons_3MM[str(x[1])] += 1
-            elif str(x[6]) == '4':
+            elif int(x[6]) == 4:
                 d_exons_4MM[str(x[1])] += 1
-            elif str(x[6]) == '5':
+            elif int(x[6]) == 5:
                 d_exons_5MM[str(x[1])] += 1
-            elif str(x[6]) == '6':
+            elif int(x[6]) == 6:
                 d_exons_6MM[str(x[1])] += 1
-            elif str(x[6]) == '7':
+            elif int(x[6]) == 7:
                 d_exons_7MM[str(x[1])] += 1
-            elif str(x[6]) == '8':
+            elif int(x[6]) == 8:
                 d_exons_8MM[str(x[1])] += 1
-            elif str(x[6]) == '9':
+            elif int(x[6]) == 9:
                 d_exons_9MM[str(x[1])] += 1
-            elif str(x[6]) == '10':
+            elif int(x[6]) == 10:
                 d_exons_10MM[str(x[1])] += 1
 
     for item in range(0, len(foundIntrons)):
         if foundIntrons[item].data == str(x[3]):
             # outFile.write(str(x[3]) + '\t' + str(foundIntrons[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[1]))) + '\t' + str(foundIntrons[item].begin) + '\t'+ str(foundIntrons[item].end) + '\t' + str(x[4]) + '\t' + "intron" + '\t' + str(x[6]))  # file write of introns results
             outFile.write(line.rstrip() + '\t' + "intron\n")
-            if str(x[6]) == '0':
+            if int(x[6]) == 0:
                 d_introns_0MM[str(x[1])] += 1
-            elif str(x[6]) == '1':
+            elif int(x[6]) == 1:
                 d_introns_1MM[str(x[1])] += 1
-            elif str(x[6]) == '2':
+            elif int(x[6]) == 2:
                 d_introns_2MM[str(x[1])] += 1
-            elif str(x[6]) == '3':
+            elif int(x[6]) == 3:
                 d_introns_3MM[str(x[1])] += 1
-            elif str(x[6]) == '4':
+            elif int(x[6]) == 4:
                 d_introns_4MM[str(x[1])] += 1
-            elif str(x[6]) == '5':
+            elif int(x[6]) == 5:
                 d_introns_5MM[str(x[1])] += 1
-            elif str(x[6]) == '6':
+            elif int(x[6]) == 6:
                 d_introns_6MM[str(x[1])] += 1
-            elif str(x[6]) == '7':
+            elif int(x[6]) == 7:
                 d_introns_7MM[str(x[1])] += 1
-            elif str(x[6]) == '8':
+            elif int(x[6]) == 8:
                 d_introns_8MM[str(x[1])] += 1
-            elif str(x[6]) == '9':
+            elif int(x[6]) == 9:
                 d_introns_9MM[str(x[1])] += 1
-            elif str(x[6]) == '10':
+            elif int(x[6]) == 10:
                 d_introns_10MM[str(x[1])] += 1
 
     for item in range(0, len(foundPromoters)):
         if foundPromoters[item].data == str(x[3]):
             # outFile.write(str(x[3]) + '\t' + str(foundPromoters[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[1]))) + '\t' + str(foundPromoters[item].begin) + '\t'+ str(foundPromoters[item].end) + '\t' + str(x[4]) + '\t' + "promoter" + '\t' + str(x[6]))  # file write of promoters results
             outFile.write(line.rstrip() + '\t' + "promoter\n")
-            if str(x[6]) == '0':
+            if int(x[6]) == 0:
                 d_promoters_0MM[str(x[1])] += 1
-            elif str(x[6]) == '1':
+            elif int(x[6]) == 1:
                 d_promoters_1MM[str(x[1])] += 1
-            elif str(x[6]) == '2':
+            elif int(x[6]) == 2:
                 d_promoters_2MM[str(x[1])] += 1
-            elif str(x[6]) == '3':
+            elif int(x[6]) == 3:
                 d_promoters_3MM[str(x[1])] += 1
-            elif str(x[6]) == '4':
+            elif int(x[6]) == 4:
                 d_promoters_4MM[str(x[1])] += 1
-            elif str(x[6]) == '5':
+            elif int(x[6]) == 5:
                 d_promoters_5MM[str(x[1])] += 1
-            elif str(x[6]) == '6':
+            elif int(x[6]) == 6:
                 d_promoters_6MM[str(x[1])] += 1
-            elif str(x[6]) == '7':
+            elif int(x[6]) == 7:
                 d_promoters_7MM[str(x[1])] += 1
-            elif str(x[6]) == '8':
+            elif int(x[6]) == 8:
                 d_promoters_8MM[str(x[1])] += 1
-            elif str(x[6]) == '9':
+            elif int(x[6]) == 9:
                 d_promoters_9MM[str(x[1])] += 1
-            elif str(x[6]) == '10':
+            elif int(x[6]) == 10:
                 d_promoters_10MM[str(x[1])] += 1
 
     for item in range(0, len(foundCtcf)):
         if foundCtcf[item].data == str(x[3]):
             # outFile.write(str(x[3]) + '\t' + str(foundCtcf[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[1]))) + '\t' + str(foundCtcf[item].begin) + '\t'+ str(foundCtcf[item].end) + '\t' + str(x[4]) + '\t' + "ctcf" + '\t' + str(x[6]))  # file write of ctcf results
             outFile.write(line.rstrip() + '\t' + "ctcf\n")
-            if str(x[6]) == '0':
+            if int(x[6]) == 0:
                 d_ctcf_0MM[str(x[1])] += 1
-            elif str(x[6]) == '1':
+            elif int(x[6]) == 1:
                 d_ctcf_1MM[str(x[1])] += 1
-            elif str(x[6]) == '2':
+            elif int(x[6]) == 2:
                 d_ctcf_2MM[str(x[1])] += 1
-            elif str(x[6]) == '3':
+            elif int(x[6]) == 3:
                 d_ctcf_3MM[str(x[1])] += 1
-            elif str(x[6]) == '4':
+            elif int(x[6]) == 4:
                 d_ctcf_4MM[str(x[1])] += 1
-            elif str(x[6]) == '5':
+            elif int(x[6]) == 5:
                 d_ctcf_5MM[str(x[1])] += 1
-            elif str(x[6]) == '6':
+            elif int(x[6]) == 6:
                 d_ctcf_6MM[str(x[1])] += 1
-            elif str(x[6]) == '7':
+            elif int(x[6]) == 7:
                 d_ctcf_7MM[str(x[1])] += 1
-            elif str(x[6]) == '8':
+            elif int(x[6]) == 8:
                 d_ctcf_8MM[str(x[1])] += 1
-            elif str(x[6]) == '9':
+            elif int(x[6]) == 9:
                 d_ctcf_9MM[str(x[1])] += 1
-            elif str(x[6]) == '10':
+            elif int(x[6]) == 10:
                 d_ctcf_10MM[str(x[1])] += 1
 
     for item in range(0, len(foundDnase)):
         if foundDnase[item].data == str(x[3]):
             # outFile.write(str(x[3]) + '\t' + str(foundDnase[item].data) + '\t' + str(x[2]) + '\t' + str(int(x[2])+int(len(x[1]))) + '\t' + str(foundDnase[item].begin) + '\t'+ str(foundDnase[item].end) + '\t' + str(x[4]) + '\t' + "dnase" + '\t' + str(x[6]))  # file write of dnase results
             outFile.write(line.rstrip() + '\t' + "dnase\n")
-            if str(x[6]) == '0':
+            if int(x[6]) == 0:
                 d_dnase_0MM[str(x[1])] += 1
-            elif str(x[6]) == '1':
+            elif int(x[6]) == 1:
                 d_dnase_1MM[str(x[1])] += 1
-            elif str(x[6]) == '2':
+            elif int(x[6]) == 2:
                 d_dnase_2MM[str(x[1])] += 1
-            elif str(x[6]) == '3':
+            elif int(x[6]) == 3:
                 d_dnase_3MM[str(x[1])] += 1
-            elif str(x[6]) == '4':
+            elif int(x[6]) == 4:
                 d_dnase_4MM[str(x[1])] += 1
-            elif str(x[6]) == '5':
+            elif int(x[6]) == 5:
                 d_dnase_5MM[str(x[1])] += 1
-            elif str(x[6]) == '6':
+            elif int(x[6]) == 6:
                 d_dnase_6MM[str(x[1])] += 1
-            elif str(x[6]) == '7':
+            elif int(x[6]) == 7:
                 d_dnase_7MM[str(x[1])] += 1
-            elif str(x[6]) == '8':
+            elif int(x[6]) == 8:
                 d_dnase_8MM[str(x[1])] += 1
-            elif str(x[6]) == '9':
+            elif int(x[6]) == 9:
                 d_dnase_9MM[str(x[1])] += 1
-            elif str(x[6]) == '10':
+            elif int(x[6]) == 10:
                 d_dnase_10MM[str(x[1])] += 1
 
     if int(x[6]) == 0:

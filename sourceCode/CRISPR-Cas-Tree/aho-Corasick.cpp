@@ -18,7 +18,7 @@ using namespace std;
 // Should be equal to the sum of the length of all keywords.
 #define MAXS 100000
 #define MAXC 93
-#define MAXW 20000 //5488
+#define MAXW 10000//5488
 
 int i;
 
@@ -102,7 +102,7 @@ void buildMatchingMachine(string arr[], int k)
 				fail = g[fail][i];
 				f[g[s][i]] = fail;
 				out[g[s][i]] |= out[fail]; ///merging output of the node & it's failure node.
-																	 ///Read the paper of aho-corasick,published in 1975.
+													///Read the paper of aho-corasick,published in 1975.
 			}
 		}
 	}
@@ -130,9 +130,9 @@ void searchWords(vector<int> &indices, string arr[], int k, string text, int pam
 	// Build machine with goto, failure and output functions
 	buildMatchingMachine(arr, k);
 
-	// Traverse the text through the nuilt machine to find all occurrences of words in arr[]
-	//#pragma parallel omp for private(j, currentState, ch)
-#pragma omp parallel private(tid, j, currentState, ch, i, chunckfine, indices_private)
+// Traverse the text through the nuilt machine to find all occurrences of words in arr[]
+//#pragma parallel omp for private(j, currentState, ch)
+	#pragma omp parallel private(tid, j, currentState, ch, i, chunckfine, indices_private)
 	{
 		tid = omp_get_thread_num();
 		chunckfine = ((tid + 1) * chunck) + ((arr[0].size()) - 1);
@@ -152,8 +152,7 @@ void searchWords(vector<int> &indices, string arr[], int k, string text, int pam
 			}
 
 			// Match found, print all matching words of arr[] using output function.
-			if (!pam_at_start)
-			{
+			if (!pam_at_start){  
 				for (j = 0; j < k; j++)
 				{
 					if (out[currentState][j])
@@ -174,16 +173,14 @@ void searchWords(vector<int> &indices, string arr[], int k, string text, int pam
 						}
 					}
 				}
-			}
-			else
-			{ //Flag for PAM at beginning is set, now the strings in the + strand are considered as -
+			} else {		//Flag for PAM at beginning is set, now the strings in the + strand are considered as -
 				for (j = 0; j < k; j++)
 				{
 					if (out[currentState][j])
 					{
 						if (j < mez_K) //check what pam was found, iFf the first half, it's a positive pam, negative otherwise
 						{
-							if ((i - (pamlimit - 1)) <= (l - (pamlen + 2))) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
+							if ((i - (pamlimit - 1)) <= (l - (pamlen + 2)))  //save the pam position only if possible for a guide to attach that position(avoid out of bound)
 							{
 								indices_private.push_back(-(i - (pamlimit - 1)));
 							}
@@ -200,7 +197,7 @@ void searchWords(vector<int> &indices, string arr[], int k, string text, int pam
 				}
 			}
 		}
-#pragma omp critical
+		#pragma omp critical
 		{
 			//copy all threads values in a single value usable to search on genome
 			indices.insert(indices.end(), indices_private.begin(), indices_private.end());

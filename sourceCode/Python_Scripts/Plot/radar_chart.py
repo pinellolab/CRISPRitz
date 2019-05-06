@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 
 # Libraries
 import matplotlib
@@ -9,23 +9,14 @@ from math import pi
 import scipy.spatial.distance as sp
 import numpy as np
 import sys
-from statsmodels.distributions.empirical_distribution import ECDF
 from itertools import islice
 import glob
 import warnings
 warnings.filterwarnings("ignore")
 
-# #matplotlib.font_manager.findSystemFonts(fontpaths=None, fontext='ttf')
-# #matplotlib.font_manager._rebuild()
-
-# #print([f.name for f in matplotlib.font_manager.fontManager.afmlist])
-
-# plt.rcParams['font.size'] = 12
-# plt.rcParams['font.family'] = 'sans-serif'
-# plt.rcParams['font.sans-serif'] = ['Courier']
-
-# #matplotlib.font_manager._rebuild()
-
+plt.style.use('seaborn-poster')
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
 
 if len(sys.argv) < 6:
     print("example of call: python radar_chart.py guidesProfileFile guidesExtendedProfileFile exonsCountFile intronsCountFile promotersCountFile DNAseCountFile CTCFCountFile guidetoanalyze missmatch")
@@ -82,60 +73,80 @@ arraySummaryCountOne = []
 arraySummaryCountTwo = []
 
 
-if summaryCountOne!="no" and summaryCountTwo!="no":
-   inSummaryCountOne = open(summaryCountOne,"r")
-   inSummaryCountTwo = open(summaryCountTwo,"r")
+if summaryCountOne != "no" and summaryCountTwo != "no":
+    inSummaryCountOne = open(summaryCountOne, "r")
+    inSummaryCountTwo = open(summaryCountTwo, "r")
 
-   for line in inSummaryCountOne:
-      x = line.split('\t')
-      arraySummaryCountOne.append((x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11]))
+    for line in inSummaryCountOne:
+        x = line.split('\t')
+        arraySummaryCountOne.append(
+            (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11]))
 
-   for line in inSummaryCountTwo:
-      x = line.split('\t')
-      arraySummaryCountTwo.append((x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11]))
-   
-   arraySummaryCountOne = np.array(arraySummaryCountOne,dtype=int)
-   arraySummaryCountOne.shape = (6,11)
+    for line in inSummaryCountTwo:
+        x = line.split('\t')
+        arraySummaryCountTwo.append(
+            (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11]))
 
-   arraySummaryCountTwo = np.array(arraySummaryCountTwo,dtype=int)
-   arraySummaryCountTwo.shape = (6,11)
+    arraySummaryCountOne = np.array(arraySummaryCountOne, dtype=int)
+    arraySummaryCountOne.shape = (6, 11)
 
-   percentageGain = []
-   for row in range(0,6):
-      for col in range(0,uppermm+1):
-         res = max((arraySummaryCountOne[row,col]/arraySummaryCountTwo[row,col]),(arraySummaryCountTwo[row,col]/arraySummaryCountOne[row,col]))
-         percentageGain.append(res)
-   percentageGain = np.array(percentageGain,dtype=float)
-   percentageGain.shape = (6,uppermm+1)
+    arraySummaryCountTwo = np.array(arraySummaryCountTwo, dtype=int)
+    arraySummaryCountTwo.shape = (6, 11)
 
-   intergenicGainOne = (np.sum(arraySummaryCountOne, axis=0))
-   intergenicGainTwo = (np.sum(arraySummaryCountTwo, axis=0))
-   intergenicGainOne.shape = (1,11)
-   intergenicGainTwo.shape = (1,11)
-   intergenicGainOne = intergenicGainOne - arraySummaryCountOne[0,:]
-   intergenicGainTwo = intergenicGainTwo - arraySummaryCountTwo[0,:]
+    percentageGain = []
+    for row in range(0, 6):
+        for col in range(0, uppermm+1):
+            res = max((arraySummaryCountOne[row, col]/arraySummaryCountTwo[row, col]),
+                      (arraySummaryCountTwo[row, col]/arraySummaryCountOne[row, col]))
+            percentageGain.append(res)
+    percentageGain = np.array(percentageGain, dtype=float)
+    percentageGain.shape = (6, uppermm+1)
 
+    intergenicGainOne = (np.sum(arraySummaryCountOne, axis=0))
+    intergenicGainTwo = (np.sum(arraySummaryCountTwo, axis=0))
+    intergenicGainOne.shape = (1, 11)
+    intergenicGainTwo.shape = (1, 11)
+    intergenicGainOne = intergenicGainOne - arraySummaryCountOne[0, :]
+    intergenicGainTwo = intergenicGainTwo - arraySummaryCountTwo[0, :]
 
-   p1 = plt.bar(1,percentageGain[0,uppermm-1])
-   p2 = plt.bar(2,percentageGain[1,uppermm-1])
-   p3 = plt.bar(3,percentageGain[2,uppermm-1])
-   p4 = plt.bar(4,percentageGain[3,uppermm-1])
-   p5 = plt.bar(5,percentageGain[4,uppermm-1])
-   p6 = plt.bar(6,percentageGain[5,uppermm-1])
-   p7 = plt.bar(7,max((intergenicGainOne[0,uppermm-1]/intergenicGainTwo[0,uppermm-1]),(intergenicGainTwo[0,uppermm-1]/intergenicGainOne[0,uppermm-1])))
+    # p1 = plt.bar(1, percentageGain[0, uppermm-1])
+    # p2 = plt.bar(2, percentageGain[1, uppermm-1])
+    # p3 = plt.bar(3, percentageGain[2, uppermm-1])
+    # p4 = plt.bar(4, percentageGain[3, uppermm-1])
+    # p5 = plt.bar(5, percentageGain[4, uppermm-1])
+    # p6 = plt.bar(6, percentageGain[5, uppermm-1])
+    # p7 = plt.bar(7, max((intergenicGainOne[0, uppermm-1]/intergenicGainTwo[0, uppermm-1]),
+    #                     (intergenicGainTwo[0, uppermm-1]/intergenicGainOne[0, uppermm-1])))
 
-   #plt.text(np.arange(1,8),percentageGain[0,uppermm-1],'ciao')
-   
+    ind = np.arange(0, 6, 1)
+    y_range = np.arange(0, max(arraySummaryCountTwo[:, uppermm])+2000, 5000)
+    width = 0.5
 
-   plt.legend((p1[0], p2[0], p3[0], p4[0],p5[0],p6[0],p7[0]), ('Total Sites', 'Exons', 'Introns', 'DNAse','CTCF','Promoter','Intergenic'),fontsize=15)
+    p1 = plt.bar(
+        ind, arraySummaryCountOne[:, uppermm], width, color='#67a9cf', align='edge')
+    p2 = plt.bar(ind, (arraySummaryCountTwo[:, uppermm]-arraySummaryCountOne[:, uppermm]),
+                 width, bottom=arraySummaryCountOne[:, uppermm], color='#ef8a62', align='edge')
 
-   #plt.xlim(0, len(string))
-   #plt.set_ylim([1, 1.5])
-   plt.ylabel('Percentage Increasing Variant/Reference',fontsize=20)
-   plt.xlabel('Annotations',fontsize=20)
-   plt.ylim([1,max(percentageGain[:,uppermm-1])+0.1])
-   plt.xticks([])
+    plt.legend((p1[0], p2[0]), ('Reference Genome',
+                                'Enriched Genome'), fontsize=30)
 
+    #plt.xlim(0, len(string))
+    #plt.set_ylim([1, 1.5])
+    plt.title('Relative Increase Enriched/Reference Genome with ' +
+              str(uppermm) + ' Mismatches', size=25)
+    # plt.xlabel('Annotations')
+    for k in range(0, 6):
+        plt.annotate('%.2fx' % percentageGain[k, uppermm], [
+                     k+0.05, arraySummaryCountTwo[k, uppermm]+(max(arraySummaryCountTwo[:, uppermm])/100)], size=22)
+    #plt.ylim([0, max(arraySummaryCountTwo[:, uppermm])+2000],size=25)
+
+    plt.xticks(ind+0.25, ['Off-targets', 'Exons',
+                          'Introns', 'CTCF', 'DNAse', 'Promoters'], size=25)
+    plt.yticks(y_range, size=22)
+
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.95, bottom=0.06, left=0.08, right=0.99)
+    plt.show()
 
 # reading extendend profile to obtain results over mismatches counts
 for line in inGuidesProfileExtended:
@@ -173,7 +184,8 @@ for line in inGuidesProfile:
     x = line.split('\t')
     profileMissmatchGlobal.append((x[26], x[27], x[28], x[29], x[30]))
     if str(x[0]) == guide:
-        arrayprofileMissmatch = np.array((x[26], x[27], x[28], x[29], x[30]), dtype=int)
+        arrayprofileMissmatch = np.array(
+            (x[26], x[27], x[28], x[29], x[30]), dtype=int)
 
 # reading every count file to obtain results for the ecdf and percentile count for annotated type
 for line in inExonsCountFile:
@@ -313,15 +325,15 @@ arrayPromotersdistance = np.array(Promotersdistance, dtype=int)
 arrayProfiledistance = np.array(Generaldistance, dtype=int)
 arrayDNAsedistance = np.array(DNAsedistance, dtype=int)
 
-
+# SINGLE MISMATCH COUNT
 if len(sys.argv[9]) == 1:
     # Set data
     df = pd.DataFrame({
         'group': ['A'],
-        'EXONS': [np.argmin(arrayExonsFdistance[:, uppermm])/np.size(arrayCTCFMissmatchGlobal, 0)],
-        'GENERAL': [np.argmin(arrayProfiledistance[:, uppermm])/np.size(arrayCTCFMissmatchGlobal, 0)],
-        'INTRONS': [np.argmin(arrayIntronsdistance[:, uppermm])/np.size(arrayCTCFMissmatchGlobal, 0)],
-        'PROMOTERS': [np.argmin(arrayPromotersdistance[:, uppermm])/np.size(arrayCTCFMissmatchGlobal, 0)],
+        'Exons': [np.argmin(arrayExonsFdistance[:, uppermm])/np.size(arrayCTCFMissmatchGlobal, 0)],
+        'General': [np.argmin(arrayProfiledistance[:, uppermm])/np.size(arrayCTCFMissmatchGlobal, 0)],
+        'Introns': [np.argmin(arrayIntronsdistance[:, uppermm])/np.size(arrayCTCFMissmatchGlobal, 0)],
+        'Promoters': [np.argmin(arrayPromotersdistance[:, uppermm])/np.size(arrayCTCFMissmatchGlobal, 0)],
         'DNAse': [np.argmin(arrayDNAsedistance[:, uppermm])/np.size(arrayCTCFMissmatchGlobal, 0)],
         'CTCF': [np.argmin(arrayCTCFdistance[:, uppermm])/np.size(arrayCTCFMissmatchGlobal, 0)]
     })
@@ -341,21 +353,30 @@ if len(sys.argv[9]) == 1:
 
     # Initialise the spider plot
     ax = plt.subplot(2, 2, 1, polar=True)
+    #ax=plt.subplot(1, 1, 1, polar=True)
     #plt.title('RADAR CHART')
 
+    labels = ['CTCF', 'DNAse', 'Exons', 'General', 'Introns', 'Promoters']
     # Draw one axe per variable + add labels labels yet
-    plt.xticks(angles[:-1], ['CTCF', 'DNAse', 'EXONS', 'GENERAL',
-                             'INTRONS', 'PROMOTERS'], color='black', size=13)
+    plt.xticks(angles[:-1], labels, color='black', size=18)
+    for label, rot in zip(ax.get_xticklabels(), angles):
+        if (rot == 0):
+            label.set_horizontalalignment("center")
+        if (rot > 0):
+            label.set_horizontalalignment("left")
+        if (rot > 3):
+            label.set_horizontalalignment("center")
+        if (rot > 4):
+            label.set_horizontalalignment("right")
 
+    # offset posizione y-axis
     ax.set_theta_offset(pi / 2)
     ax.set_theta_direction(-1)
 
     # Draw ylabels
     ax.set_rlabel_position(0)
-    plt.yticks([0, 0.25, 0.50, 0.75, 1], ["0", "0.25", "0.50", "0.75"], color="grey", size=13)
+    plt.yticks([0, 0.25, 0.50, 0.75, 1], ["0", "0.25","0.50", "0.75"], color="black", size=18)
     plt.ylim(0, 1)
-    #plt.yticks([10,20,30], ["10","20","30"], color="grey", size=7)
-    # plt.ylim(0,40)
 
     # Plot data
     ax.plot(angles, values, linewidth=1, linestyle='solid')
@@ -363,8 +384,8 @@ if len(sys.argv[9]) == 1:
     # Fill area
     ax.fill(angles, values, 'b', alpha=0.1)
 
-    columns = ('POSITION', 'TARGETS')
-    rows = ('GENERAL', 'EXONS', 'INTRONS', 'PROMOTERS', 'DNAse', 'CTCF')
+    columns = ('Position', '# Targets')
+    rows = ('General', 'Exons', 'Introns', 'Promoters', 'DNAse', 'CTCF')
 
     exons_distance = round(np.argmin(
         arrayExonsFdistance[:, uppermm])/np.size(arrayCTCFMissmatchGlobal, 0), 2)
@@ -386,20 +407,12 @@ if len(sys.argv[9]) == 1:
     table_data = np.concatenate((distance_data, offtarget_data), axis=1)
 
     plt.subplot(2, 2, 2)
-    #plt.title('SUMMARY TABLE')
-    table = plt.table(cellText=table_data, rowLabels=rows,
-                      colLabels=columns, loc='center', colWidths=[0.35 for x in columns])
-    # table=plt.table(cellText=table_data,rowLabels=rows,colLabels=columns,loc='center',bbox=[0,-0.65,1,0.65])
-    # table.set_fontsize(20)
+    table = plt.table(cellText=table_data, rowLabels=rows,colLabels=columns, loc='center', colWidths=[0.35 for x in columns])
     table.auto_set_font_size(False)
-    table.set_fontsize(10)
-    table.scale(1, 1.5)
-    #table.scale(1.5, 1.5)
-    # cellDict=table.get_celld()
-    # cellDict[(0,0)].set_width(0.1)plt-
+    table.set_fontsize(18)
+    table.scale(1, 3)
     plt.axis('off')
 
-    # datacount=(446,525,356,710,478,2336,1319,532,449,589,2016,383,771,2573,576,439,644,366,2226,2451)
     datacount = arrayguidesExtendedProfile[missmatch*5] / \
         (max(arrayguidesExtendedProfile[missmatch*5]))
     data = np.array(datacount, dtype=float)
@@ -407,6 +420,7 @@ if len(sys.argv[9]) == 1:
     data.shape = (1, len(datacount))
 
     string = guide[0:20]
+    strArray = np.array([list(string)])
 
     A = arrayguidesExtendedProfile[missmatch*5+1] / \
         (max(arrayguidesExtendedProfile[missmatch*5]))
@@ -420,42 +434,29 @@ if len(sys.argv[9]) == 1:
     ind = np.arange(0, len(string), 1) + 0.15  # the x locations for the groups
     width = 0.7  # the width of the bars: can also be len(x) sequence
 
-    motif = plt.subplot(2, 1, 2)
+    motif = plt.subplot(2, 1, 2, frameon=False)
+    # motif=plt.subplot(1,1,1)
     p1 = plt.bar(ind, A, width, color='#d62728', align='edge')
     p2 = plt.bar(ind, C, width, bottom=A, align='edge')
     p3 = plt.bar(ind, G, width, bottom=A+C, align='edge')
     p4 = plt.bar(ind, T, width, bottom=C+G+A, align='edge')
-
     plt.xlim(0, len(string))
     plt.xticks([])
-    # plt.ylabel('Missmatches')
-    #plt.title('MOTIF LOGO')
 
-    plt.legend((p1[0], p2[0], p3[0], p4[0]), ('A', 'C', 'G', 'T'))
+    plt.legend((p1[0], p2[0], p3[0], p4[0]), ('A', 'C', 'G', 'T'), fontsize=18)
 
-    #plt.subplot(2, 1, 2)
-    #table=plt.table(cellText=data,rowLabels=row_string,colLabels=string,loc='bottom',colWidths=[0.05 for x in string])
-    table = plt.table(cellText=data, colLabels=string, loc='bottom')
-    # plt.xticks(ind)
-    # table.set_fontsize(20)
+    table = plt.table(cellText=strArray, loc='bottom', cellLoc='center', rowLoc='bottom')
     table.auto_set_font_size(False)
-    table.set_fontsize(10)
+    table.set_fontsize(18)
+    table.scale(1, 1.6)
+    table.xticks = ([])
+    table.yticks = ([])
 
-    #table.scale(1.5, 1.5)
-    # cellDict=table.get_celld()
-    # cellDict[(0,0)].set_width(0.1)
-    # plt.axis('off')
+    plt.suptitle(str(missmatch)+" Mismatches",horizontalalignment='center', color='black', size=25)
 
-    # plt.tight_layout()
-
-    #plt.suptitle(string +' '+ "ANALYSIS",horizontalalignment='center', color='black', weight='bold',size='large')
-    plt.suptitle(str(missmatch)+"MM", horizontalalignment='center', color='black', weight='bold', size='large')
-
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.90, bottom=0.07, left=0.04,right=0.99, wspace=0.05)
     plt.show()
-    # generate your plot
-    # plt.savefig("myfig.png",dpi=400,bbox_inches='tight')
-
-    # plt.savefig("image.png",bbox_inches='tight',dpi=400)
 
 else:
 
@@ -463,10 +464,10 @@ else:
 
         df = pd.DataFrame({
             'group': ['A'],
-            'EXONS': [np.argmin(arrayExonsFdistance[:, row])/np.size(arrayCTCFMissmatchGlobal, 0)],
-            'GENERAL': [np.argmin(arrayProfiledistance[:, row])/np.size(arrayCTCFMissmatchGlobal, 0)],
-            'INTRONS': [np.argmin(arrayIntronsdistance[:, row])/np.size(arrayCTCFMissmatchGlobal, 0)],
-            'PROMOTERS': [np.argmin(arrayPromotersdistance[:, row])/np.size(arrayCTCFMissmatchGlobal, 0)],
+            'Exons': [np.argmin(arrayExonsFdistance[:, row])/np.size(arrayCTCFMissmatchGlobal, 0)],
+            'General': [np.argmin(arrayProfiledistance[:, row])/np.size(arrayCTCFMissmatchGlobal, 0)],
+            'Introns': [np.argmin(arrayIntronsdistance[:, row])/np.size(arrayCTCFMissmatchGlobal, 0)],
+            'Promoters': [np.argmin(arrayPromotersdistance[:, row])/np.size(arrayCTCFMissmatchGlobal, 0)],
             'DNAse': [np.argmin(arrayDNAsedistance[:, row])/np.size(arrayCTCFMissmatchGlobal, 0)],
             'CTCF': [np.argmin(arrayCTCFdistance[:, row])/np.size(arrayCTCFMissmatchGlobal, 0)]
         })
@@ -488,16 +489,23 @@ else:
         ax.set_theta_direction(-1)
 
         # Draw one axe per variable + add labels labels yet
-        #plt.xticks(angles[:-1], ['CTCF'+' ('+str(arrayCTCFMissmatch[row])+')'+' ('+str(float('%.2g' % percentileCTCF[row]))+')','DNAse'+' ('+str(arrayDNAseMissmatch[row])+')'+' ('+str(float('%.2g' % percentileDNAse[row]))+')','EXONS'+' ('+str(arrayexonsMissmatch[row])+')'+' ('+str(float('%.2g' % percentileExons[row]))+')','GENERAL'+' ('+str(arrayprofileMissmatch[row])+')'+' ('+str(float('%.2g' % percentileProfile[row]))+')','INTRONS'+' ('+str(arrayintronsMissmatch[row])+')'+' ('+str(float('%.2g' % percentileIntrons[row]))+')','PROMOTERS'+' ('+str(arraypromotersMissmatch[row])+')'+' ('+str(float('%.2g' % percentilePromoters[row]))+')'], color='black', size=10)
 
-        plt.xticks(angles[:-1], ['CTCF'+' ('+str(arrayCTCFMissmatch[row])+')', 'DNAse'+' ('+str(arrayDNAseMissmatch[row])+')', 'EXONS'+' ('+str(arrayexonsMissmatch[row])+')', 'GENERAL' +
-                                 ' ('+str(arrayprofileMissmatch[row])+')', 'INTRONS'+' ('+str(arrayintronsMissmatch[row])+')', 'PROMOTERS'+' ('+str(arraypromotersMissmatch[row])+')'], color='black', size=14)
-        
+        plt.xticks(angles[:-1], ['CTCF'+' ('+str(arrayCTCFMissmatch[row])+')', 'DNAse'+' ('+str(arrayDNAseMissmatch[row])+')', 'Exons'+' ('+str(arrayexonsMissmatch[row])+')', 'General' +
+                                 ' ('+str(arrayprofileMissmatch[row])+')', 'Introns'+' ('+str(arrayintronsMissmatch[row])+')', 'Promoters'+' ('+str(arraypromotersMissmatch[row])+')'], color='black')
+        for label, rot in zip(ax.get_xticklabels(), angles):
+            if (rot == 0):
+                label.set_horizontalalignment("center")
+            if (rot > 0):
+                label.set_horizontalalignment("left")
+            if (rot > 3):
+                label.set_horizontalalignment("center")
+            if (rot > 4):
+                label.set_horizontalalignment("right")
 
-        
         # Draw ylabels
         ax.set_rlabel_position(0)
-        plt.yticks([0, 0.25, 0.50, 0.75], ["0", "0.25", "0.50", "0.75"], color="black", size=14)
+        plt.yticks([0, 0.25, 0.50, 0.75], [
+                   "0", "0.25", "0.50", "0.75"], color="black")
         plt.ylim(0, 1)
 
         # Ind1
@@ -507,15 +515,15 @@ else:
         ax.fill(angles, values, alpha=0.4)
 
         colors = ["white", "white", "white", "white", "white", "white"]
-        texts = ["CTCF:"+' '+str(max(arrayCTCFMissmatchGlobal[:, row])), "DNAse:"+' '+str(max(arrayDNAseMissmatchGlobal[:, row])), "EXONS:"+' '+str(max(arrayexonsMissmatchGlobal[:, row])), "GENERAL:" +
-                 ' '+str(max(arrayprofileMissmatchGlobal[:, row])), "INTRONS:"+' '+str(max(arrayintronsMissmatchGlobal[:, row])), "PROMOTERS:"+' '+str(max(arraypromotersMissmatchGlobal[:, row]))]
+        texts = ["CTCF:"+' '+str(max(arrayCTCFMissmatchGlobal[:, row])), "DNAse:"+' '+str(max(arrayDNAseMissmatchGlobal[:, row])), "Exons:"+' '+str(max(arrayexonsMissmatchGlobal[:, row])), "General:" +
+                 ' '+str(max(arrayprofileMissmatchGlobal[:, row])), "Introns:"+' '+str(max(arrayintronsMissmatchGlobal[:, row])), "Promoters:"+' '+str(max(arraypromotersMissmatchGlobal[:, row]))]
         patches = [mpatches.Patch(color=colors[i], label="{:s}".format(
             texts[i])) for i in range(len(texts))]
-        plt.legend(handles=patches, loc=(-0.35, 0.85), labelspacing=0.5,
-                   fontsize='13', ncol=1, handlelength=0, handletextpad=0, title="MAX VALUE")
+        plt.legend(handles=patches, loc=(-0.65, 0.86), labelspacing=0.1,
+                   ncol=1, handlelength=0, handletextpad=0, title="Max Value")
 
         # Add a title
-        plt.title(title, size=15, y=1.1)
+        plt.title(title, y=1.2)
 
     def make_motif(row, count):
 
@@ -556,8 +564,8 @@ else:
         # plt.xticks(ind)
         # table.set_fontsize(20))
         table.auto_set_font_size(False)
-        table.set_fontsize(10.5)
-        table.scale(1, 1.35)
+        table.set_fontsize(14)
+        table.scale(1, 1.4)
 
     # ------- PART 2: Apply to all individuals
     # initialize the figure
@@ -570,13 +578,12 @@ else:
     count = 1
     # Loop to plot
     for row in range(lowermm, uppermm+1):
-        make_spider(row=row, title=str(row) + ' MISMATCHES', count=count)
+        make_spider(row=row, title=str(row) + ' Mismatches', count=count)
         make_motif(row=row, count=count)
         # plt.subplot(3,4,count*2)
         count = count+1
 
-    # plt.tight_layout()
-    # plt.subplots_adjust(top=0.85,bottom=0.05,left=0.05,right=0.95,wspace=0.07)
-    plt.subplots_adjust(top=0.85, bottom=0.05, left=0.05, right=0.95)
-
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.85, bottom=0.05, left=0.05,
+                        right=0.99, wspace=0.1)
     plt.show()

@@ -1,7 +1,6 @@
 #include <bitset>
 #include "convert.h"
 #include "detailedOutput.h"
-#include "timer.h"
 #include <omp.h>
 
 #include <map>
@@ -23,12 +22,14 @@
  */
 void detailedOutputFast(int guideI, std::vector<std::bitset<4>> guide_bit, std::vector<std::bitset<4>> target_bit, std::string &g, std::string &t,
                         int bulType, int mm, int len_guide, std::vector<std::vector<std::vector<int>>> &profiling, std::vector<std::vector<std::vector<std::vector<std::vector<int>>>>> &ext_profiling,
-                        std::vector<std::string> &vec_guides, std::vector<std::string> &vec_targets)
+                        std::vector<std::string> &vec_guides, std::vector<std::string> &vec_targets, bool pam_at_start)
 {
+    // std::cout << "profiling size: " << profiling.size() << std::endl;
+    // std::cout << "target: " << t << std::endl;
     int thr = omp_get_thread_num();
     int mm_inside_string = 0;
     std::vector<std::pair<std::bitset<4>, int>> save_mm_pos; //array for the pair (base mm in bit, pos)
-
+    
     for (int i = 0; i < target_bit.size(); i++)
     {
         if (i < len_guide) //check for mismatches only in guide char, not pam
@@ -71,7 +72,7 @@ void detailedOutputFast(int guideI, std::vector<std::bitset<4>> guide_bit, std::
 void detailedOutputFastBulgeDNA(int guideI, std::vector<std::bitset<4>> guide_bit, std::vector<std::bitset<4>> target_bit, std::string &g, std::string &t,
                                 int bulType, int mm, int len_guide, int bD, int bulDNA, std::vector<std::vector<std::vector<int>>> &profiling_dna,
                                 std::vector<std::vector<std::vector<int>>> &profiling_dna_mm,
-                                std::vector<std::string> &vec_guides, std::vector<std::string> &vec_targets)
+                                std::vector<std::string> &vec_guides, std::vector<std::string> &vec_targets, bool pam_at_start)
 {
 
     int thr = omp_get_thread_num();
@@ -102,7 +103,7 @@ void detailedOutputFastBulgeDNA(int guideI, std::vector<std::bitset<4>> guide_bi
 void detailedOutputFastBulgeRNA(int guideI, std::vector<std::bitset<4>> guide_bit, std::vector<std::bitset<4>> target_bit, std::string &g, std::string &t,
                                 int bulType, int mm, int len_guide, int bD, int bulDNA, std::vector<std::vector<std::vector<int>>> &profiling_rna,
                                 std::vector<std::vector<std::vector<int>>> &profiling_rna_mm,
-                                std::vector<std::string> &vec_guides, std::vector<std::string> &vec_targets)
+                                std::vector<std::string> &vec_guides, std::vector<std::string> &vec_targets, bool pam_at_start)
 {
 
     int thr = omp_get_thread_num();
@@ -133,7 +134,7 @@ void saveProfileGuide(std::string guide, int guideI, int mism, int len_guide, in
                       std::vector<std::vector<std::vector<int>>> &profiling_dna, std::vector<std::vector<std::vector<int>>> &profiling_dna_mm,
                       std::vector<std::vector<std::vector<int>>> &profiling_rna, std::vector<std::vector<std::vector<int>>> &profiling_rna_mm,
                       std::ofstream &fileprofiling, std::ofstream &file_ext_profiling,
-                      std::ofstream &file_profiling_dna, std::ofstream &file_profiling_rna, int num_thr)
+                      std::ofstream &file_profiling_dna, std::ofstream &file_profiling_rna, std::ofstream &file_profiling_complete, int num_thr, int pam_size, bool pam_at_start)
 {
     //sum the layer of the matrix
     for (int i = 0; i < profiling.size(); i++)
@@ -163,20 +164,36 @@ void saveProfileGuide(std::string guide, int guideI, int mism, int len_guide, in
                     ext_profiling[guideI][mm][nuc][base][0] += ext_profiling[guideI][mm][nuc][base][j];
     }
 
+    //For the complete profile
+    std::vector<int> bp_sum_complete(len_guide + bulDNA + mism + 1, 0);
+    int ont_complete = 0;
+    int offt_complete = 0;
     //save profiling
+    if (pam_at_start)
+    {
+        for (int i = 0; i < pam_size; i++)
+            guide.insert(0,"N");
+    }
+    else
+    {
+        for (int i = 0; i < pam_size; i++)
+            guide+="N";
+    }
     fileprofiling << guide << "\t";
     for (int i = 0; i < len_guide; i++)
     {
         fileprofiling << profiling[i][guideI][0] << "\t"; //write BP columns
+        bp_sum_complete[i] += profiling[i][guideI][0]; //for complete profiling
     }
     fileprofiling << "\t";
     fileprofiling << profiling[len_guide][guideI][0] << "\t"; //write column of ONT, take data from col with number of 0mms
+    ont_complete += profiling[len_guide][guideI][0];
     int sum = 0;
     for (int i = (len_guide + 1); i < profiling.size(); i++)
     {       //sum the column 1MM,2MM...
         sum += profiling[i][guideI][0];
     }
-    
+    offt_complete += sum;
     int sum_bp = 0;
     for (int i = 0; i < len_guide; i++){
         sum_bp += profiling[i][guideI][0];
@@ -185,6 +202,7 @@ void saveProfileGuide(std::string guide, int guideI, int mism, int len_guide, in
     for (int i = len_guide; i < profiling.size(); i++)
     { //write 0MM, 1MM etc
         fileprofiling << profiling[i][guideI][0] << "\t";
+        bp_sum_complete[i + bulDNA] += profiling[i][guideI][0];
     }
     fileprofiling << "\n";
 
@@ -242,15 +260,18 @@ void saveProfileGuide(std::string guide, int guideI, int mism, int len_guide, in
     {
         file_profiling_dna << profiling_dna_mm[i][guideI][0] << "(" << profiling_dna[i][guideI][0] << ")"
                            << "\t"; //write BP columns
+        bp_sum_complete[i] += profiling_dna_mm[i][guideI][0] + profiling_dna[i][guideI][0];
     }
     file_profiling_dna << "\t";
     int total_ont = profiling_dna_mm[len_guide + bulDNA][guideI][0] + profiling_dna_mm[len_guide + bulDNA + 1][guideI][0]; // sum cols 0mm1 0mm2
+    ont_complete += total_ont;
     file_profiling_dna << total_ont << "\t";
     sum = 0;
     for (int i = (len_guide + bulDNA + 2); i < profiling_dna_mm.size(); i++)
     { //+2 because i have to skip the columns 0mm1 0mm2
         sum += profiling_dna_mm[i][guideI][0];
     }
+    offt_complete += sum;
     sum_bp = 0;
     for (int i = 0; i < len_guide + bulDNA; i++){
         sum_bp += profiling_dna_mm[i][guideI][0];
@@ -267,16 +288,19 @@ void saveProfileGuide(std::string guide, int guideI, int mism, int len_guide, in
     for (int i = 0; i < len_guide; i++)
     {
         file_profiling_rna << profiling_rna_mm[i][guideI][0] << "(" << profiling_rna[i][guideI][0] << ")"
-                           << "\t"; //write BP columns
+                           << "\t"; //write BP columns: number of mm in that position (number of bulges in that position)
+        bp_sum_complete[i] += profiling_rna_mm[i][guideI][0] + profiling_rna[i][guideI][0];
     }
     file_profiling_rna << "\t";
     total_ont = profiling_rna_mm[len_guide][guideI][0] + profiling_rna_mm[len_guide + 1][guideI][0];
+    ont_complete += total_ont;
     file_profiling_rna << total_ont << "\t";
     sum = 0;
     for (int i = (len_guide + 2); i < profiling_rna_mm.size(); i++)
     {
         sum += profiling_rna_mm[i][guideI][0];
     }
+    offt_complete += sum;
     sum_bp = 0;
     for (int i = 0; i < len_guide; i++){
         sum_bp += profiling_rna_mm[i][guideI][0];
@@ -287,4 +311,40 @@ void saveProfileGuide(std::string guide, int guideI, int mism, int len_guide, in
         file_profiling_rna << profiling_rna_mm[i][guideI][0] << "\t";
     }
     file_profiling_rna << "\n";
+
+
+    //Profiling complete
+    file_profiling_complete << guide << "\t";
+    
+
+    for (int i = 0; i < (len_guide + bulDNA); i++){
+        file_profiling_complete << bp_sum_complete[i] << "\t"; //write BP columns
+    }
+
+    file_profiling_complete << "\t";
+    
+    int m = (len_guide + bulDNA);
+    for (int i = (len_guide + bulDNA); i <  bp_sum_complete.size(); i++)
+    {
+        bp_sum_complete[i] += profiling_dna_mm[m][guideI][0];
+        bp_sum_complete[i] += profiling_dna_mm[m + 1][guideI][0];
+        m += 2;
+    }
+    m = len_guide;
+    
+    for (int i = (len_guide + bulDNA); i < bp_sum_complete.size(); i++)
+    {
+        bp_sum_complete[i] += profiling_rna_mm[m][guideI][0];
+        bp_sum_complete[i] += profiling_rna_mm[m + 1][guideI][0];
+        m += 2;
+    }
+
+    int sum_bp_complete = 0;
+    for (int i = 0 ; i < len_guide + bulDNA; i++){
+        sum_bp_complete += bp_sum_complete[i];
+    }
+    file_profiling_complete << ont_complete << "\t" << offt_complete << "\t" << sum_bp_complete / (double)offt_complete << "\t\t";
+    for (int i = (len_guide + bulDNA); i <  bp_sum_complete.size(); i++)
+        file_profiling_complete << bp_sum_complete[i] << "\t";
+
 }
