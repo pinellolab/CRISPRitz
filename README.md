@@ -1,4 +1,5 @@
-# CRISPRitz
+# CRISPRitz 
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/crispritz/README.html)
 
 CRISPRitz is a software package containing 5 different tools dedicated to perform predictive analysis and result assessement on CRISPR/Cas experiments.
 
@@ -16,7 +17,7 @@ With this aim in mind we created this package, containing the following software
 
 **SHOW THE HELP MENU**
 ```
-python3 crispritz.py
+crispritz.py
 help:
         crispritz add-variants <vcfFilesDirectory> <genomeDirectory>
         crispritz index-genome <name_genome> <genomeDirectory> <pamFile>
@@ -27,7 +28,7 @@ help:
 
 **CREATE A VARIANT GENOME (*add-variants*):**
 ```
-python3 crispritz.py add-variants <vcfFilesDirectory> <genomeDirectory>
+crispritz.py add-variants <vcfFilesDirectory> <genomeDirectory>
 
 **INPUT**
 - <vcfFilesDirectory>, the directory containing the VCF files (.vcf or .vcf.gz).
@@ -40,7 +41,7 @@ python3 crispritz.py add-variants <vcfFilesDirectory> <genomeDirectory>
 
 **CREATE A GENOME INDEX (*index-genome*):**
 ```
-python3 crispritz.py index-genome <name_genome> <genomeDirectory> <pamFile>
+crispritz.py index-genome <name_genome> <genomeDirectory> <pamFile>
 
 **INPUT**
 - <name_genome>, name of the directory that will contain all the .bin files
@@ -53,7 +54,7 @@ python3 crispritz.py index-genome <name_genome> <genomeDirectory> <pamFile>
 
 **SEARCH ON A GENOME INDEX WITH MISMATCHES AND BULGES (*search*):**
 ```
-python3 crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {-index} -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread> (default: 1)] {-r,-p,-t}
+crispritz.py search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {-index} (flag to search with index-genome, allow searching with bulges) -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread>] {-r,-p,-t} (write only off-targets results, write only profiles, write both) [-var] (to activate search with IUPAC nomenclature)
 
 **INPUT**
 - <genomeDirectory>, the directory containing the genome FASTA files (.fa).
@@ -74,7 +75,7 @@ python3 crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {
 
 **SEARCH ON A GENOME WITHOUT INDEXING WITH MISMATCHES ONLY (*search*):**
 ```
-python3 crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> -mm <mm_num> [-th <num_thread> (default: ALL)] {-r,-p,-t}
+crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> -mm <mm_num> [-th <num_thread> (default: ALL)] {-r,-p,-t}
 
 **INPUT**
 - <genomeDirectory>, the directory containing the genome FASTA files (.fa).
@@ -102,7 +103,7 @@ python3 crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> -
 
 **ANNOTATE RESULTS OBTAINED IN A PREVIOUS SEARCH PHASE (*annotate-results*):**
 ```
-python3 crispritz.py annotate-results <guidesFile> <resultsFile> <outputFile> -exons <exonsbedFile> -introns <intronsbedFile> -ctcf <ctcfbedFile> -dnase <dnasebedFile> -promoters <promotersbedFile>
+crispritz.py annotate-results <guidesFile> <resultsFile> <outputFile> -exons <exonsbedFile> -introns <intronsbedFile> -ctcf <ctcfbedFile> -dnase <dnasebedFile> -promoters <promotersbedFile>
 
 **INPUT**
 - <guidesFile>, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
@@ -121,7 +122,7 @@ python3 crispritz.py annotate-results <guidesFile> <resultsFile> <outputFile> -e
 
 **GENERATE REPORT FROM ANNOTATED RESULTS (*generate-report*):**
 ```
-python3 crispritz.py generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profile <guideProfile> -extprofile <guideExtendedProfile> -exons <exonsCountFile> -introns <intronsCountFile> -ctcf <CTCFCountFile> -dnase <DNAseCountFile> -promoters <promotersCountFile> [-gecko (to use gecko pre-computed profile)] [-sumone <summaryReferenceCountFile>][-sumtwo <summaryEnrichedCountFile>]
+crispritz.py generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profile <guideProfile> -extprofile <guideExtendedProfile> -exons <exonsCountFile> -introns <intronsCountFile> -ctcf <CTCFCountFile> -dnase <DNAseCountFile> -promoters <promotersCountFile> [-gecko (to use gecko pre-computed profile)] [-sumone <summaryReferenceCountFile>][-sumtwo <summaryEnrichedCountFile>]
 
 **INPUT**
 - <guide>, a string representing a guide (e.g., GAGTCCGAGCAGAAGAAGAANNN). MUST BE PRESENT IN THE PROFILE AND EXTENDED PROFILE FILE.
@@ -161,7 +162,7 @@ it will also download the chr22 vcf file from the 1000 genome project repository
 
 **CREATE A VARIANT GENOME (*add-variants*):**
 ```
-python3 crispritz.py add-variants chr22_vcf/ chr22_hg19/
+crispritz.py add-variants chr22_vcf/ chr22_hg19/
 
 **INPUT**
 - chr22_vcf/, the directory containing the VCF files (.vcf or .vcf.gz).
@@ -174,7 +175,7 @@ python3 crispritz.py add-variants chr22_vcf/ chr22_hg19/
 
 **CREATE A GENOME INDEX (*index-genome*):**
 ```
-python3 crispritz.py index-genome CHR22_HG19 chr22_hg19/ pam/pamNGG.txt
+crispritz.py index-genome CHR22_HG19 chr22_hg19/ pam/pamNGG.txt
 
 **INPUT**
 - CHR22_HG19, name of the directory that will contain all the .bin files (.vcf or .vcf.gz).
@@ -187,7 +188,7 @@ pam/pamNGG.txt, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNN
 
 **SEARCH ON A GENOME INDEX WITH MISMATCHES AND BULGES (*search*):**
 ```
-python3 crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt emx1_guide/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
+crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt emx1_guide/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
 
 **INPUT**
 - genome_library/NGG_CHR22_HG19/, the directory containing the genome FASTA files (.fa).
@@ -208,7 +209,7 @@ pam/pamNGG.txt, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNN
 
 **SEARCH ON A GENOME WITHOUT INDEXING WITH MISMATCHES ONLY (*search*):**
 ```
-python3 crispritz.py search chr22_hg19/ pam/pamNGG.txt emx1_guide/EMX1.txt emx1.chr22 -mm 4 -t
+crispritz.py search chr22_hg19/ pam/pamNGG.txt emx1_guide/EMX1.txt emx1.chr22 -mm 4 -t
 
 **INPUT**
 - chr22_hg19/, the directory containing the genome FASTA files (.fa).
@@ -226,7 +227,7 @@ pam/pamNGG.txt, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNN
 
 **ANNOTATE RESULTS OBTAINED IN A PREVIOUS SEARCH PHASE (*annotate-results*):**
 ```
-python3 crispritz.py annotate-results emx1_guide/EMX1.txt emx1.chr22.targets.txt emx1.chr22.annotated -exons chroms_bed/hg19_exon.bed -introns chroms_bed/hg19_intron.bed -promoters chroms_bed/hg19_promoter.bed -dnase chroms_bed/hg19_dnase.bed -ctcf chroms_bed/hg19_ctcf.bed
+crispritz.py annotate-results emx1_guide/EMX1.txt emx1.chr22.targets.txt emx1.chr22.annotated -exons chroms_bed/hg19_exon.bed -introns chroms_bed/hg19_intron.bed -promoters chroms_bed/hg19_promoter.bed -dnase chroms_bed/hg19_dnase.bed -ctcf chroms_bed/hg19_ctcf.bed
 
 **INPUT**
 - emx1_guide/EMX1.txt, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
@@ -245,7 +246,7 @@ python3 crispritz.py annotate-results emx1_guide/EMX1.txt emx1.chr22.targets.txt
 
 **GENERATE REPORT FROM ANNOTATED RESULTS (*generate-report*):**
 ```
-python3 crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 3-4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko
+crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 3-4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko
 
 **INPUT**
 - GAGTCCGAGCAGAAGAAGAANNN, a string representing a guide (e.g., GAGTCCGAGCAGAAGAAGAANNN). MUST BE PRESENT IN THE PROFILE AND EXTENDED PROFILE FILE.
