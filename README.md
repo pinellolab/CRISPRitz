@@ -158,21 +158,31 @@ CONDA
 conda install crispritz
 
 DOCKER
-docker run -v ${PWD}:/root/CRISPRitz/user_data -it pinellolab/crispritz
+docker run -v ${PWD}:/root/CRISPRitz/user_data -i pinellolab/crispritz crispritz.py
 
 ```
 
-**BEFORE START TESTING, YOU NEED TO DOWNLAOD SOME FILE, USE THE SCRIPT PROVIDED TO DO SO (SKIP THIS PART IF YOU ARE USING THE DOCKER IMAGE)**
+**BEFORE START TESTING, YOU NEED TO DOWNLAOD SOME EXAMPLE FILE**
 ```
+GO TO A LOCATION OF YOUR CHOICE AND EXECUTE THIS COMMAND
+
+git clone https://github.com/pinellolab/CRISPRITZ.git
+
+INSERT USERNAME AND PASSWORD TO DOWNLOAD THE GITHUB DIRECTORY, THE EXECUTE THESE COMMANDS
+
+cd CRISPRITZ/
+
 bash download_test_files.sh
 
-The script will download chr22 from hg19 reference genome, using the ucsc genome repository, 
-it will also download the chr22 vcf file from the 1000 genome project repository
 ```
 
 **CREATE A VARIANT GENOME (*add-variants*):**
 ```
+CONDA:
 crispritz.py add-variants chr22_vcf/ chr22_hg19/
+
+DOCKER:
+docker run -v ${PWD}:/root/CRISPRitz/user_data -w /root/CRISPRitz/user_data -i pinellolab/crispritz crispritz.py add-variants chr22_vcf/ chr22_hg19/
 
 **INPUT**
 - chr22_vcf/, the directory containing the VCF files (.vcf or .vcf.gz).
