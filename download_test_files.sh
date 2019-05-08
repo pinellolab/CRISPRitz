@@ -10,3 +10,6 @@ mkdir chr22_vcf
 cd chr22_vcf
 wget http://hgdownload.cse.ucsc.edu/gbdb/hg19/1000Genomes/phase3/ALL.chr22.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz
 cd ..
+
+rm -rf sourceCode emx1_guide docker_image
+rm *
