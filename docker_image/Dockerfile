@@ -44,7 +44,7 @@ RUN rm master.zip
 RUN mv CRISPRitz-master/ CRISPRitz
 #RUN bash CRISPRitz/download_test_files.sh
 RUN mv CRISPRitz/ root/
-RUN mv chr22_* root/CRISPRitz/
+#RUN mv chr22_* root/CRISPRitz/
 RUN rm root/CRISPRitz/download_test_files.sh root/CRISPRitz/README.md
 RUN chmod -R 700 root/CRISPRitz/*
 RUN make -f root/CRISPRitz/docker_image/Makefile_docker
