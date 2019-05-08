@@ -42,7 +42,7 @@ RUN wget https://github.com/InfOmics/CRISPRitz/archive/master.zip
 RUN unzip master.zip
 RUN rm master.zip
 RUN mv CRISPRitz-master/ CRISPRitz
-RUN bash CRISPRitz/download_test_files.sh
+#RUN bash CRISPRitz/download_test_files.sh
 RUN mv CRISPRitz/ root/
 RUN mv chr22_* root/CRISPRitz/
 RUN rm root/CRISPRitz/download_test_files.sh root/CRISPRitz/README.md
