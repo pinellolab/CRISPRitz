@@ -1,0 +1,5 @@
+#compile crispritz cpp softwares
+crispritz:
+	g++ -std=c++11 -O3 -fopenmp root/CRISPRitz/sourceCode/CRISPR-Cas-Tree/main.cpp -o buildTST
+	g++ -std=c++11 -O3 -fopenmp root/CRISPRitz/sourceCode/CRISPR-Cas-Tree/searchOnTST.cpp root/CRISPRitz/sourceCode/CRISPR-Cas-Tree/detailedOutput.cpp root/CRISPRitz/sourceCode/CRISPR-Cas-Tree/convert.cpp -I root/CRISPRitz/sourceCode/CRISPR-Cas-Tree/include -o searchTST
+	g++ -std=c++11 -O3 -fopenmp root/CRISPRitz/sourceCode/CRISPRofiler/main.cpp root/CRISPRitz/sourceCode/CRISPRofiler/profiling.cpp root/CRISPRitz/sourceCode/CRISPRofiler/guide_searching.cpp root/CRISPRitz/sourceCode/CRISPRofiler/pam_searching.cpp root/CRISPRitz/sourceCode/CRISPRofiler/pre_computation.cpp root/CRISPRitz/sourceCode/CRISPRofiler/reading.cpp root/CRISPRitz/sourceCode/CRISPRofiler/analysis.cpp -o searchBruteForce

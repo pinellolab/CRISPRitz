@@ -21,9 +21,9 @@ crispritz.py
 help:
         crispritz add-variants <vcfFilesDirectory> <genomeDirectory>
         crispritz index-genome <name_genome> <genomeDirectory> <pamFile>
-        crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {-index} (flag to search with index-genome, allow searching with bulges) -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread>] {-r,-p,-t} (write only off-targets results,write only profiles, write both)
+        crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {-index} (flag to search with index-genome, allow searching with bulges) -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread>] {-r,-p,-t} (write only off-targets results, write only profiles, write both) [-var] (to activate search with IUPAC nomenclature)
         crispritz annotate-results <guidesFile> <resultsFile> <outputFile> -exons <exonsbedFile> -introns <intronsbedFile> -ctcf <ctcfbedFile> -dnase <dnasebedFile> -promoters <promotersbedFile>
-        crispritz generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profile <guideProfile> -extprofile <guideExtendedProfile> -exons <exonsCountFile> -introns <intronsCountFile> -ctcf <CTCFCountFile> -dnase <DNAseCountFile> -promoters <promotersCountFile> [-gecko (to use gecko pre-computed profile)] [-sumone <summaryReferenceCountFile>][-sumtwo <summaryEnrichedCountFile>]
+        crispritz generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profile <guideProfile> -extprofile <guideExtendedProfile> -exons <exonsCountFile> -introns <intronsCountFile> -ctcf <CTCFCountFile> -dnase <DNAseCountFile> -promoters <promotersCountFile> [-gecko (to use gecko pre-computed profile)] [-sumref <summaryReferenceCountFile>][-sumenr <summaryEnrichedCountFile>]
 ```
 
 **CREATE A VARIANT GENOME (*add-variants*):**
@@ -152,7 +152,17 @@ crispritz.py generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profil
 
 # USAGE EXAMPLE
 
-**BEFORE START TESTING, YOU NEED TO DOWNLAOD SOME FILE, USE THE SCRIPT PROVIDED TO DO SO**
+**INSTALL THE TOOL (CONDA(LINUX 64 ONLY) or DOCKER(ALL-PLATFORMS))**
+```
+CONDA
+conda install crispritz
+
+DOCKER
+docker run -v ${PWD}:/root/CRISPRitz/user_data -it pinellolab/crispritz
+
+```
+
+**BEFORE START TESTING, YOU NEED TO DOWNLAOD SOME FILE, USE THE SCRIPT PROVIDED TO DO SO (SKIP THIS PART IF YOU ARE USING THE DOCKER IMAGE)**
 ```
 bash download_test_files.sh
 
@@ -188,7 +198,7 @@ pam/pamNGG.txt, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNN
 
 **SEARCH ON A GENOME INDEX WITH MISMATCHES AND BULGES (*search*):**
 ```
-crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt emx1_guide/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
+crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
 
 **INPUT**
 - genome_library/NGG_CHR22_HG19/, the directory containing the genome FASTA files (.fa).
@@ -209,7 +219,7 @@ pam/pamNGG.txt, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNN
 
 **SEARCH ON A GENOME WITHOUT INDEXING WITH MISMATCHES ONLY (*search*):**
 ```
-crispritz.py search chr22_hg19/ pam/pamNGG.txt emx1_guide/EMX1.txt emx1.chr22 -mm 4 -t
+crispritz.py search chr22_hg19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -mm 4 -t
 
 **INPUT**
 - chr22_hg19/, the directory containing the genome FASTA files (.fa).
@@ -227,7 +237,7 @@ pam/pamNGG.txt, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNN
 
 **ANNOTATE RESULTS OBTAINED IN A PREVIOUS SEARCH PHASE (*annotate-results*):**
 ```
-crispritz.py annotate-results emx1_guide/EMX1.txt emx1.chr22.targets.txt emx1.chr22.annotated -exons chroms_bed/hg19_exon.bed -introns chroms_bed/hg19_intron.bed -promoters chroms_bed/hg19_promoter.bed -dnase chroms_bed/hg19_dnase.bed -ctcf chroms_bed/hg19_ctcf.bed
+crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt emx1.chr22.annotated -exons chroms_bed/hg19_exon.bed -introns chroms_bed/hg19_intron.bed -promoters chroms_bed/hg19_promoter.bed -dnase chroms_bed/hg19_dnase.bed -ctcf chroms_bed/hg19_ctcf.bed
 
 **INPUT**
 - emx1_guide/EMX1.txt, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
@@ -246,7 +256,7 @@ crispritz.py annotate-results emx1_guide/EMX1.txt emx1.chr22.targets.txt emx1.ch
 
 **GENERATE REPORT FROM ANNOTATED RESULTS (*generate-report*):**
 ```
-crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 3-4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko
+crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko
 
 **INPUT**
 - GAGTCCGAGCAGAAGAAGAANNN, a string representing a guide (e.g., GAGTCCGAGCAGAAGAAGAANNN). MUST BE PRESENT IN THE PROFILE AND EXTENDED PROFILE FILE.

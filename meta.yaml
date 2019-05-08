@@ -1,4 +1,4 @@
-{% set version = "1.0.3" %}
+{% set version = "1.0.5" %}
 
 package:
   name: crispritz
@@ -6,7 +6,7 @@ package:
 
 source:
   url: https://github.com/InfOmics/CRISPRitz/archive/v{{ version }}.tar.gz
-  sha256: cf309478bdf433634c05088eaffa59f4f1fdd65d2c8343d1e1ed9f318d641a3a
+  sha256: 13c8cefd29ed0114354af725f0f94317d96914c9ef161a195ec71c0141a99acf
 
 build:
   number: 0
@@ -14,7 +14,7 @@ build:
 
 requirements:
   build:
-    - {{compiler('cxx')}}
+    - {{compiler('cxx')}} =5.4
     - make
     - boost
     

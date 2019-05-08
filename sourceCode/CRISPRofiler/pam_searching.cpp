@@ -77,7 +77,7 @@ void buildMachine() //constructing aho-corasick automata
 				fail = g[fail][i];
 				f[g[s][i]] = fail;
 				out[g[s][i]] |= out[fail]; ///merging output of the node & it's failure node.
-																	 ///Read the paper of aho-corasick,published in 1975.
+													///Read the paper of aho-corasick,published in 1975.
 			}
 		}
 	}
@@ -325,9 +325,9 @@ vector<string> getProducts(string s[], int s_size)
 // Given a pam and a automaton it fill the automaton with each pam possible
 vector<string> generatePam(string pamInput)
 {
-	string pamSup = pamInput;									// copy the input pam
-	vector<string> pam_vector;								// vector of pam
-	vector<string> outPam;										// vector of pam
+	string pamSup = pamInput;						// copy the input pam
+	vector<string> pam_vector;						// vector of pam
+	vector<string> outPam;							// vector of pam
 	string nucleotides_list[pamSup.length()]; // list of nucleotides of the pam
 	for (int v = 0; v < 2; v++)
 	{

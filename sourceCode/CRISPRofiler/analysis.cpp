@@ -8,17 +8,17 @@ extern string genome;
 
 void analysis()
 {
-   //variable reset
-   pamindices.clear();
-   pamindicesreverse.clear();
+	//variable reset
+	pamindices.clear();
+	pamindicesreverse.clear();
 
-   //start pam searching
-   searchPam();
+	//start pam searching
+	searchPam();
 
-   //start guides searching, executed number of guides times
-   guide_searching();
+	//start guides searching, executed number of guides times
+	guide_searching();
 
-   //clear the genome string for the next genome analysis
-   genome.clear();
-   genomebit.clear();
+	//clear the genome string for the next genome analysis
+	genome.clear();
+	genomebit.clear();
 }
