@@ -147,12 +147,7 @@ if summaryCountOne != "no" and summaryCountTwo != "no":
     plt.tight_layout()
     plt.subplots_adjust(top=0.95, bottom=0.06, left=0.08, right=0.99)
 
-    window = plt.get_current_fig_manager().window
-    screen_y = window.winfo_screenheight()
-    screen_x = window.winfo_screenwidth()
-
-    
-    plt.savefig("summary_histogram_" + str(uppermm) + ".svg", format="svg")
+    plt.savefig("summary_histogram_" + str(uppermm) + ".pdf", format="pdf")
     # plt.show()
 
 
@@ -187,49 +182,69 @@ arrayguidesExtendedProfile.shape = (5*((uppermm-0)+1), 20)
 
 
 # reading profile file to obtain results for every mismatch count in the general profile
+guide_len = len(guide)
 next(inGuidesProfile)
 for line in inGuidesProfile:
+    line += "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t" + \
+        "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
     x = line.split('\t')
-    profileMissmatchGlobal.append((x[26], x[27], x[28], x[29], x[30]))
+    profileMissmatchGlobal.append((x[guide_len+3], x[guide_len+4], x[guide_len+5], x[guide_len+6],
+                                   x[guide_len+7], x[guide_len+8], x[guide_len+9], x[guide_len+10], x[guide_len+11], x[guide_len+12]))
     if str(x[0]) == guide:
-        arrayprofileMissmatch = np.array(
-            (x[26], x[27], x[28], x[29], x[30]), dtype=int)
+        arrayprofileMissmatch = np.array((x[guide_len+3], x[guide_len+4], x[guide_len+5], x[guide_len+6],
+                                          x[guide_len+7], x[guide_len+8], x[guide_len+9], x[guide_len+10], x[guide_len+11], x[guide_len+12]), dtype=int)
+
 
 # reading every count file to obtain results for the ecdf and percentile count for annotated type
 for line in inExonsCountFile:
+    line += "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t" + \
+        "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
     x = line.split('\t')
-    exonsMissmatchGlobal.append((x[1], x[2], x[3], x[4], x[5], x[6], x[7]))
+    exonsMissmatchGlobal.append(
+        (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]))
     if str(x[0]) == guide:
         arrayexonsMissmatch = np.array(
-            (x[1], x[2], x[3], x[4], x[5], x[6], x[7]), dtype=int)
+            (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]), dtype=int)
 
 for line in inIntronsCountFile:
+    line += "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t" + \
+        "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
     x = line.split('\t')
-    intronsMissmatchGlobal.append((x[1], x[2], x[3], x[4], x[5], x[6], x[7]))
+    intronsMissmatchGlobal.append(
+        (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]))
     if str(x[0]) == guide:
         arrayintronsMissmatch = np.array(
-            (x[1], x[2], x[3], x[4], x[5], x[6], x[7]), dtype=int)
+            (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]), dtype=int)
 
 for line in inPromotersCountFile:
+    line += "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t" + \
+        "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
     x = line.split('\t')
-    promotersMissmatchGlobal.append((x[1], x[2], x[3], x[4], x[5], x[6], x[7]))
+    promotersMissmatchGlobal.append(
+        (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]))
     if str(x[0]) == guide:
         arraypromotersMissmatch = np.array(
-            (x[1], x[2], x[3], x[4], x[5], x[6], x[7]), dtype=int)
+            (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]), dtype=int)
 
 for line in inDNAseCountFile:
+    line += "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t" + \
+        "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
     x = line.split('\t')
-    DNAseMissmatchGlobal.append((x[1], x[2], x[3], x[4], x[5], x[6], x[7]))
+    DNAseMissmatchGlobal.append(
+        (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]))
     if str(x[0]) == guide:
         arrayDNAseMissmatch = np.array(
-            (x[1], x[2], x[3], x[4], x[5], x[6], x[7]), dtype=int)
+            (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]), dtype=int)
 
 for line in inCTCFCountFile:
+    line += "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t" + \
+        "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
     x = line.split('\t')
-    CTCFMissmatchGlobal.append((x[1], x[2], x[3], x[4], x[5], x[6], x[7]))
+    CTCFMissmatchGlobal.append(
+        (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]))
     if str(x[0]) == guide:
         arrayCTCFMissmatch = np.array(
-            (x[1], x[2], x[3], x[4], x[5], x[6], x[7]), dtype=int)
+            (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]), dtype=int)
 
 if(geckoProfile != "no"):
     inGuidesProfile = open(geckoProfile, "r")
@@ -246,35 +261,53 @@ if(geckoProfile != "no"):
     DNAseMissmatchGlobal.clear()
     CTCFMissmatchGlobal.clear()
 
+    # GECKO
     # reading profile file to obtain results for every mismatch count in the general profile
+    guide_len = len(guide)
     next(inGuidesProfile)
     for line in inGuidesProfile:
+        line += "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t" + \
+            "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
         x = line.split('\t')
-        profileMissmatchGlobal.append(
-            (x[26], x[27], x[28], x[29], x[30], x[31], x[32]))
+        profileMissmatchGlobal.append((x[guide_len+3], x[guide_len+4], x[guide_len+5], x[guide_len+6],
+                                   x[guide_len+7], x[guide_len+8], x[guide_len+9], x[guide_len+10], x[guide_len+11], x[guide_len+12]))
 
     # reading every count file to obtain results for the ecdf and percentile count for annotated type
     for line in inExonsCountFile:
+        line += "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t" + \
+            "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
         x = line.split('\t')
-        exonsMissmatchGlobal.append((x[1], x[2], x[3], x[4], x[5], x[6], x[7]))
+        exonsMissmatchGlobal.append(
+            (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]))
 
     for line in inIntronsCountFile:
+        line += "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t" + \
+            "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
         x = line.split('\t')
         intronsMissmatchGlobal.append(
-            (x[1], x[2], x[3], x[4], x[5], x[6], x[7]))
+            (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]))
 
     for line in inPromotersCountFile:
+        line += "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t" + \
+            "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
         x = line.split('\t')
         promotersMissmatchGlobal.append(
-            (x[1], x[2], x[3], x[4], x[5], x[6], x[7]))
+            (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]))
 
     for line in inDNAseCountFile:
+        line += "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t" + \
+            "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
         x = line.split('\t')
-        DNAseMissmatchGlobal.append((x[1], x[2], x[3], x[4], x[5], x[6], x[7]))
+        DNAseMissmatchGlobal.append(
+            (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]))
 
     for line in inCTCFCountFile:
+        line += "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t" + \
+            "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
         x = line.split('\t')
-        CTCFMissmatchGlobal.append((x[1], x[2], x[3], x[4], x[5], x[6], x[7]))
+        CTCFMissmatchGlobal.append(
+            (x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10]))
+
 
 arrayprofileMissmatchGlobal = np.array(profileMissmatchGlobal, dtype=int)
 arrayexonsMissmatchGlobal = np.array(exonsMissmatchGlobal, dtype=int)
@@ -467,11 +500,11 @@ if len(sys.argv[9]) == 1:
                  horizontalalignment='center', color='black', size=25)
 
     plt.tight_layout()
-    plt.subplots_adjust(top=0.90, bottom=0.07, left=0.04,right=0.99, wspace=0.05)
+    plt.subplots_adjust(top=0.90, bottom=0.07, left=0.05,
+                        right=0.99, wspace=0.1)
 
-    
-
-    plt.savefig("summary_single_guide_" + str(guide) + "_"+str(uppermm) + ".svg", format="svg")
+    plt.savefig("summary_single_guide_" + str(guide) +
+                "_"+str(uppermm) + ".pdf", format="pdf")
     # plt.show()
 
 else:
@@ -600,8 +633,9 @@ else:
         count = count+1
 
     plt.tight_layout()
-    plt.subplots_adjust(top=0.85, bottom=0.05, left=0.05,right=0.99, wspace=0.1)
+    plt.subplots_adjust(top=0.85, bottom=0.05, left=0.05,
+                        right=0.99, wspace=0.1)
 
-
-    plt.savefig("summary_multiple_guides_" + str(guide) + "_" + str(lowermm) + "-" + str(uppermm) + ".svg", format="svg")
+    plt.savefig("summary_multiple_guides_" + str(guide) + "_" +
+                str(lowermm) + "-" + str(uppermm) + ".pdf", format="pdf")
     plt.show()
