@@ -105,7 +105,7 @@ dnaseTree = IntervalTree()
 
 for line in inGuides:
     x = line.split('\n')
-    
+
     d_exons_0MM[str(x[0])] = 0
     d_exons_1MM[str(x[0])] = 0
     d_exons_2MM[str(x[0])] = 0
@@ -198,8 +198,8 @@ if(sys.argv[5] != "no"):
     dnaseFile = sys.argv[5]
     inDnase = open(dnaseFile, "r")
     for line in inDnase:
-            x = line.split('\t')
-            dnaseTree[int(x[1]):int(x[2])] = str(x[0])
+        x = line.split('\t')
+        dnaseTree[int(x[1]):int(x[2])] = str(x[0])
 
 print("TREES CREATION TIME: %s seconds" % (time.time() - start_time))
 
@@ -228,11 +228,13 @@ outFile.write(
 next(inResult)
 for line in inResult:
     x = line.split('\t')
+    x[1] = str(x[1]).replace("-","")
     # exons interval query
     foundExons = sorted(exonsTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
     # introns interval query
     foundIntrons = sorted(intronsTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
-    foundPromoters = sorted(promotersTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
+    foundPromoters = sorted(
+        promotersTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
     foundCtcf = sorted(ctcfTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
     foundDnase = sorted(dnaseTree[int(x[4]):(int(x[4])+int(len(x[1]))+1)])
 
