@@ -145,7 +145,7 @@ if summaryCountOne != "no" and summaryCountTwo != "no":
     plt.yticks(y_range, size=22)
 
     plt.tight_layout()
-    plt.subplots_adjust(top=0.95, bottom=0.06, left=0.08, right=0.99)
+    plt.subplots_adjust(top=0.95, bottom=0.06, left=0.1, right=0.99)
 
     plt.savefig("summary_histogram_" + str(uppermm) + ".pdf", format="pdf")
     # plt.show()
@@ -270,7 +270,7 @@ if(geckoProfile != "no"):
             "0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"+"0"+"\t"
         x = line.split('\t')
         profileMissmatchGlobal.append((x[guide_len+3], x[guide_len+4], x[guide_len+5], x[guide_len+6],
-                                   x[guide_len+7], x[guide_len+8], x[guide_len+9], x[guide_len+10], x[guide_len+11], x[guide_len+12]))
+                                       x[guide_len+7], x[guide_len+8], x[guide_len+9], x[guide_len+10], x[guide_len+11], x[guide_len+12]))
 
     # reading every count file to obtain results for the ecdf and percentile count for annotated type
     for line in inExonsCountFile:
