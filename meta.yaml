@@ -1,4 +1,4 @@
-{% set version = "1.0.5" %}
+{% set version = "1.0.9" %}
 
 package:
   name: crispritz
@@ -6,17 +6,18 @@ package:
 
 source:
   url: https://github.com/InfOmics/CRISPRitz/archive/v{{ version }}.tar.gz
-  sha256: 13c8cefd29ed0114354af725f0f94317d96914c9ef161a195ec71c0141a99acf
+  sha256: 3a6f22e0a4cc697a4c74ea8ca6555a713c810dfcebf16a93c7f46df197df59d1
 
 build:
   number: 0
-  skip: True # [osx]
 
 requirements:
   build:
-    - {{compiler('cxx')}} =5.4
+    - {{compiler('cxx')}} =5.4 # [not osx]
+    - {{compiler('cxx')}} # [osx]
     - make
     - boost
+    - openmp
     
   host:
     - intervaltree
@@ -29,6 +30,7 @@ requirements:
     - bcftools
     - boost
     - tk
+    - openmp
     
   run:
     - intervaltree
@@ -41,6 +43,7 @@ requirements:
     - bcftools
     - boost
     - tk
+    - openmp
     
 test:
   commands:
