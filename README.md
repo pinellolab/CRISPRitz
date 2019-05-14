@@ -307,9 +307,3 @@ docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py generat
 - detailed graphical report for the input guide, an image to visualize the guide behaviour in terms of on/off-targets found in each genomic annotation and in general (total target count).
 - barplot with percentage increasing from Variant/Reference Genome, a barplot to visualize the percentage gain in terms of found targets, grouped by every genomic annotation used in the annotation phase [optional, generated only if sumone and sumtwo are present in input]
 ```
-
-SOFTWARE REQUIREMENTS:
-- PYTHON 3.*
-- GCC 5.4 or 5.5
-- bcftools 1.2 or later
-- intervaltree-3.0.2 or later
