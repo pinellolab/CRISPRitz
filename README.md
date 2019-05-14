@@ -152,7 +152,7 @@ crispritz.py generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profil
 
 # USAGE EXAMPLE
 
-**INSTALL THE TOOL (CONDA (LINUX 64 ONLY) or DOCKER (ALL-PLATFORMS))**
+**INSTALL THE TOOL (CONDA (LINUX 64 or MAC OSX) or DOCKER (ALL-PLATFORMS))**
 ```
 CONDA
 conda install crispritz
