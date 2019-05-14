@@ -299,11 +299,26 @@ docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py generat
 - -dnase emx1.chr22.annotated.DNAseCount.txt, path to the DNAseCount file containing count of on/off-targets annotated as dnase for each mismatch threshold.
 - -promoters emx1.chr22.annotated.PromotersCount.txt, path to the PromotersCount file containing count of on/off-targets annotated as promoter for each mismatch threshold.
 - -gecko, flag to use the pre-computed Gecko Library annotated results.
-- -sumone emx1.chr22.annotated.SummaryCount.txt, path to the SummaryCount file created using a reference genome. USED WITH SUMTWO TO CREATE A BARPLOT TO SHOW THE PERCENTAGE GAIN OF ON/OFF-TARGETS FOR EACH ANNOTATION TYPE. 
-- -sumtwo emx1.chr22.enriched.SummaryCount.txt, path to the SummaryCount file created using a enriched genome (genome with variants). USED WITH SUMONE TO CREATE A BARPLOT TO SHOW THE PERCENTAGE GAIN OF ON/OFF-TARGETS FOR EACH ANNOTATION TYPE.
-
 
 **OUTPUT**
 - detailed graphical report for the input guide, an image to visualize the guide behaviour in terms of on/off-targets found in each genomic annotation and in general (total target count).
 - barplot with percentage increasing from Variant/Reference Genome, a barplot to visualize the percentage gain in terms of found targets, grouped by every genomic annotation used in the annotation phase [optional, generated only if sumone and sumtwo are present in input]
+```
+
+**GENERATE BARPLOT FROM SUMMARY COUNT RESULTS (*generate-report*):**
+```
+CONDA:
+crispritz.py generate-report -mm 4 -sumref emx1.reference.annotated.SummaryCount.txt -sumenr emx1.enriched.annotated.SummaryCount.txt
+
+DOCKER:
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py generate-report -mm 4 -sumref emx1.reference.annotated.SummaryCount.txt -sumenr emx1.enriched.annotated.SummaryCount.txt
+
+**INPUT**
+
+- -mm 4, an int number, to select the mismatches to use to generate the graphical representation (e.g., - mm 4).
+- -sumref emx1.reference.annotated.SummaryCount.txt, path to the Reference SummaryCount file containing count of total on/off-targets found for each mismatch threshold and genomic annotations.
+- -sumenr emx1.enriched.annotated.SummaryCount.txt, path to the Enriched SummaryCount file containing count of total on/off-targets found for each mismatch threshold and genomic annotations.
+
+**OUTPUT**
+- barplot with percentage increasing from Variant/Reference Genome, a barplot to visualize the percentage gain in terms of found targets, grouped by every genomic annotation used in the annotation phase
 ```
