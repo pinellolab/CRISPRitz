@@ -412,8 +412,8 @@ if guidesProfileFile != "no":
         # ax=plt.subplot(1, 1, 1, polar=True)
         # plt.title('RADAR CHART')
 
-        #labels = ['CTCF', 'DNAse', 'Exons', 'General', 'Introns', 'Promoters']
-        labels = list(df.columns.values[1:])
+        labels = ['CTCF', 'DNAse', 'Exons', 'General', 'Introns', 'Promoters']
+        #labels = list(df.columns.values[1:])
         # Draw one axe per variable + add labels labels yet
         plt.xticks(angles[:-1], labels, color='black', size=18)
         for label, rot in zip(ax.get_xticklabels(), angles):

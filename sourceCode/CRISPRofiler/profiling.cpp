@@ -122,6 +122,24 @@ void profiler()
             writeextensiveprofile += to_string(matrixprofiling[i][hh][ff][3]); //totale mismatches per BP con nucleotide indicato
          }
 
+			writeextensiveprofile += "\n";
+         writeextensiveprofile += "Bulge DNA";
+
+         for (int ff = 0; ff < (guidelen - pamlimit); ff++)
+         {
+            writeextensiveprofile += "\t";
+            writeextensiveprofile += to_string(0); //totale mismatches per BP con nucleotide indicato
+         }
+
+			writeextensiveprofile += "\n";
+         writeextensiveprofile += "Bulge RNA";
+
+         for (int ff = 0; ff < (guidelen - pamlimit); ff++)
+         {
+            writeextensiveprofile += "\t";
+            writeextensiveprofile += to_string(0); //totale mismatches per BP con nucleotide indicato
+         }
+
          writeextensiveprofile += "\n";
          writeextensiveprofile += "\n";
       }

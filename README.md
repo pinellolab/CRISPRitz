@@ -152,7 +152,7 @@ crispritz.py generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profil
 
 # USAGE EXAMPLE
 
-**INSTALL THE TOOL (CONDA(LINUX 64 ONLY) or DOCKER(ALL-PLATFORMS))**
+**INSTALL THE TOOL (CONDA (LINUX 64 ONLY) or DOCKER (ALL-PLATFORMS))**
 ```
 CONDA
 conda install crispritz
@@ -260,7 +260,7 @@ pam/pamNGG.txt, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNN
 **ANNOTATE RESULTS OBTAINED IN A PREVIOUS SEARCH PHASE (*annotate-results*):**
 ```
 CONDA:
-crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt emx1.chr22.annotated -exons chroms_bed/hg19_exon.bed -introns chroms_bed/hg19_intron.bed -promoters chroms_bed/hg19_promoter.bed -dnase chroms_bed/hg19_dnase.bed -ctcf chroms_bed/hg19_ctcf.bed
+crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt chroms_bed/annotations_path.txt emx1.chr22.annotated
 
 DOCKER:
 docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt emx1.chr22.annotated -exons chroms_bed/hg19_exon.bed -introns chroms_bed/hg19_intron.bed -promoters chroms_bed/hg19_promoter.bed -dnase chroms_bed/hg19_dnase.bed -ctcf chroms_bed/hg19_ctcf.bed

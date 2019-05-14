@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
-#include <parallel/algorithm>
+#include <algorithm>
 #include <unistd.h>
 
 using namespace std;
@@ -447,7 +447,7 @@ int main(int argc, char **argv)
 	{ // read chromosome sequence
 		chrSeq += line;
 	}
-	__gnu_parallel::transform(chrSeq.begin(), chrSeq.end(), chrSeq.begin(), ::toupper); // parallelized to uppercase
+	transform(chrSeq.begin(), chrSeq.end(), chrSeq.begin(), ::toupper); // to uppercase
 	end = omp_get_wtime();
 	cout << end - start << "\n";
 
@@ -597,8 +597,7 @@ int main(int argc, char **argv)
 	
 	cout << "Sorting:\t";
 	start = omp_get_wtime(); // sorting the strings before inserting into the tree
-	__gnu_parallel::sort(targetOnDNA.begin(), targetOnDNA.begin() + counter_index, compareFunc);
-	
+	sort(targetOnDNA.begin(), targetOnDNA.begin() + counter_index, compareFunc);
 	end = omp_get_wtime();
 	cout << end - start << "\n";
 

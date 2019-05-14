@@ -68,6 +68,11 @@ vector<vector<vector<int>>> profiling;
 
 //Create matrix for extended profiling
 vector<vector<vector<vector<vector<int>>>>> ext_profiling;
+
+//Create matrix for extended profiling dna and rna
+vector<vector<vector<vector<int>>>> ext_profiling_dna;
+vector<vector<vector<vector<int>>>> ext_profiling_rna;
+
 //Matrix for dna profiling
 vector<vector<vector<int>>> profiling_dna_mm;
 vector<vector<vector<int>>> profiling_dna;
@@ -430,6 +435,8 @@ bool create_profile;
 double save_function, save_function_start, save_function_end;
 
 
+
+
 /**
  * Function that saves the found target (in the DNA). It recursively go into the leaf of the current TST branch where the target is found, and
  * creates the strings for the Guide and the Target. The appropriate array are filled with data about the Target (mismatches, bulges, position in
@@ -507,7 +514,6 @@ void saveIndices( Tnode *p, int d, int bD, int bR, int bulType)
 			}
 
 			reverse(t_bit.begin(), t_bit.begin() + len_guide + bulDNA - bD);
-			
 			//Check what type of result to create
 			if (create_target)
 			{
@@ -552,9 +558,10 @@ void saveIndices( Tnode *p, int d, int bD, int bR, int bulType)
 					if (bulType == 0)
 						detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
 					else if (bulType > 0)
-						detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
+						detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
 					else
-						detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
+						detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
+					
 				}
 				else
 				{
@@ -567,9 +574,9 @@ void saveIndices( Tnode *p, int d, int bD, int bR, int bulType)
 				if (bulType == 0)
 					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
 				else if (bulType > 0)
-					detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
+					detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
 				else
-					detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
+					detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);	
 			}
 			
 			index = (targetOnDNA[thr][index].next + 1) * -1;
@@ -577,8 +584,7 @@ void saveIndices( Tnode *p, int d, int bD, int bR, int bulType)
 		} while (index > -1);
 	}
 	else if (p->eqkid > 0)
-		saveIndices( &albero_glb[omp_get_thread_num()][p->eqkid], d, bD, bR, bulType
-								); //go to eqkid
+		saveIndices( &albero_glb[omp_get_thread_num()][p->eqkid], d, bD, bR, bulType); //go to eqkid
 }
 
 // CONTROLLARE LA QUESTIONE BULGE CONTEMPORANEI IN DNA ED RNA
@@ -837,6 +843,10 @@ int main(int argc, char **argv)
 	ext_profiling.resize(numGuide, vector<vector<vector<vector<int>>>>(mm + 1, vector<vector<vector<int>>>(4, vector<vector<int>>(pamlen - pamlimit, vector<int>(num_thr, 0)))));
 	//1 dim = id of guide, 2 dim = select matrix with an x number of mms in the target, 3 dim = select nucleotide (acgt), 4 dim = select position
 
+	//Resize matrix for extended profiling dna and rna
+	ext_profiling_dna.resize(numGuide, vector<vector<vector<int>>>(mm + 1, vector<vector<int>>(pamlen - pamlimit, vector<int>(num_thr, 0))));
+	ext_profiling_rna.resize(numGuide, vector<vector<vector<int>>>(mm + 1, vector<vector<int>>(pamlen - pamlimit, vector<int>(num_thr, 0))));
+	
 	//Matrix for dna profiling
 	profiling_dna_mm.resize(pamlen - pamlimit + bulDNA + (mm + 1) * 2, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
 	profiling_dna.resize(pamlen - pamlimit + bulDNA + (mm + 1) * 2, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
@@ -865,6 +875,7 @@ int main(int argc, char **argv)
 	len_guide = pamlen - pamlimit;
 	inGuide.resize(num_thr);
 	targetOfGuide.resize(num_thr);
+	
 	int numNodes;
 	int numLeaves;
 
@@ -1001,7 +1012,7 @@ int main(int argc, char **argv)
 
 		//Cols labels for DNA profiling output file
 		file_profiling_dna << "GUIDE\t";
-		for (int i = 0; i < (len_guide + bulDNA); i++)
+		for (int i = 0; i < (len_guide); i++) //+bulDNA
 		{
 			file_profiling_dna << "BP\t";
 		}
@@ -1031,7 +1042,7 @@ int main(int argc, char **argv)
 
 		//Cols label for file_profiling_complete
 		file_profiling_complete << "GUIDE\t";
-		for (int i = 0; i < (len_guide + bulDNA); i++)
+		for (int i = 0; i < (len_guide); i++)
 		{
 			file_profiling_complete << "BP\t";
 		}
@@ -1047,7 +1058,7 @@ int main(int argc, char **argv)
 		for (int i = 0; i < numGuide; i++)
 		{
 			saveProfileGuide(guideRNA_s[i], i, mm, len_guide, bulDNA, profiling, ext_profiling, profiling_dna, profiling_dna_mm, profiling_rna, profiling_rna_mm,
-											 fileprofiling, file_ext_profiling, file_profiling_dna, file_profiling_rna, file_profiling_complete , num_thr, pamRNA.size(), pam_at_start);
+											 fileprofiling, file_ext_profiling, file_profiling_dna, file_profiling_rna, file_profiling_complete , num_thr, pamRNA.size(), pam_at_start, ext_profiling_dna, ext_profiling_rna);
 		}
 		fileprofiling.close();
 		file_ext_profiling.close();

@@ -50,9 +50,10 @@ RUN chmod -R 700 root/CRISPRitz/*
 RUN make -f root/CRISPRitz/docker_image/Makefile_docker
 RUN mv root/CRISPRitz/docker_image/crispritz.py buildTST searchBruteForce searchTST /usr/bin/
 RUN cp -R root/CRISPRitz/sourceCode/Python_Scripts/ /usr/bin/
-RUN rm root/CRISPRitz/Makefile root/CRISPRitz/meta.yaml root/CRISPRitz/build.sh root/CRISPRitz/LICENSE root/CRISPRitz/crispritz.py
-RUN rm -rf root/CRISPRitz/docker_image
-RUN rm -rf root/CRISPRitz/sourceCode
+#RUN rm root/CRISPRitz/Makefile root/CRISPRitz/meta.yaml root/CRISPRitz/build.sh root/CRISPRitz/LICENSE root/CRISPRitz/Dockerfile root/CRISPRitz/crispritz.py
+#RUN rm -rf root/CRISPRitz/docker_image
+#RUN rm -rf root/CRISPRitz/sourceCode
+RUN rm -rf root/CRISPRitz
 
 # Set workdir
 WORKDIR root/CRISPRitz

@@ -2,14 +2,16 @@
 
 // C++ program for implementation of Aho Corasick algorithm for string matching
 using namespace std;
-#include <bits/stdc++.h>
+//#include <bits/stdc++.h>
 #include <string>
 #include <omp.h>
 #include <vector>
 #include <algorithm>
 #include <cmath>
-
+#include <stdio.h>
+#include <string.h>
 #include <bitset>
+#include <queue>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -18,7 +20,7 @@ using namespace std;
 // Should be equal to the sum of the length of all keywords.
 #define MAXS 100000
 #define MAXC 93
-#define MAXW 10000//5488
+#define MAXW 100000//5488
 
 int i;
 

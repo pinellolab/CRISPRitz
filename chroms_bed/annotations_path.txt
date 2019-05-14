@@ -1,0 +1,5 @@
+EXONS	chroms_bed/hg19_exon.bed
+INTRONS	chroms_bed/hg19_intron.bed
+CTCF	chroms_bed/hg19_ctcf.bed
+DNASE	chroms_bed/hg19_dnase.bed
+PROMOTERS	chroms_bed/hg19_promoter.bed

@@ -3,6 +3,8 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <stdio.h>
+#include <queue>
 #include <omp.h>
 #include <ctype.h>
 #include <vector>
@@ -14,9 +16,9 @@
 #include <cmath>
 #include <iterator>
 #include <omp.h>
-#include <bits/stdc++.h>
+//#include <bits/stdc++.h>
 #include <bitset>
-#include <parallel/algorithm>
+#include <algorithm>
 #include <iomanip>
 #include <boost/dynamic_bitset.hpp>
 
