@@ -103,7 +103,7 @@ crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> -mm <mm_n
 
 **ANNOTATE RESULTS OBTAINED IN A PREVIOUS SEARCH PHASE (*annotate-results*):**
 ```
-crispritz.py annotate-results <guidesFile> <resultsFile> <outputFile> -exons <exonsbedFile> -introns <intronsbedFile> -ctcf <ctcfbedFile> -dnase <dnasebedFile> -promoters <promotersbedFile>
+crispritz.py annotate-results <guidesFile> <resultsFile> <annotationsPathFile> <outputFile>
 
 **INPUT**
 - <guidesFile>, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
@@ -157,9 +157,9 @@ crispritz.py generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profil
 CONDA
 conda install crispritz
 
+IF YOU ENCOUNTER ANY PROBLEM USING CONDA, PLEASE USE THE DOCKER PACKAGE
 DOCKER
-docker run -v ${PWD}:/DATA -i pinellolab/crispritz crispritz.py
-
+docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.1.1--py37hb9e633b_1 crispritz.py
 ```
 
 **BEFORE START TESTING, YOU NEED TO DOWNLAOD SOME EXAMPLE FILE**
@@ -182,7 +182,7 @@ CONDA:
 crispritz.py add-variants chr22_vcf/ chr22_hg19/
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py add-variants chr22_vcf/ chr22_hg19/
+docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.1.1--py37hb9e633b_1 crispritz.py add-variants chr22_vcf/ chr22_hg19/
 
 **INPUT**
 - chr22_vcf/, the directory containing the VCF files (.vcf or .vcf.gz).
@@ -199,7 +199,7 @@ CONDA:
 crispritz.py index-genome CHR22_HG19 chr22_hg19/ pam/pamNGG.txt
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py index-genome CHR22_HG19 chr22_hg19/ pam/pamNGG.txt
+docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.1.1--py37hb9e633b_1 crispritz.py index-genome CHR22_HG19 chr22_hg19/ pam/pamNGG.txt
 
 **INPUT**
 - CHR22_HG19, name of the directory that will contain all the .bin files (.vcf or .vcf.gz).
@@ -216,7 +216,7 @@ CONDA:
 crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
+docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.1.1--py37hb9e633b_1 crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
 
 **INPUT**
 - genome_library/NGG_CHR22_HG19/, the directory containing the genome FASTA files (.fa).
@@ -241,7 +241,7 @@ CONDA:
 crispritz.py search chr22_hg19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -mm 4 -t
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search chr22_hg19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -mm 4 -t
+docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.1.1--py37hb9e633b_1 crispritz.py search chr22_hg19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -mm 4 -t
 
 **INPUT**
 - chr22_hg19/, the directory containing the genome FASTA files (.fa).
@@ -263,7 +263,7 @@ CONDA:
 crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt chroms_bed/annotations_path.txt emx1.chr22.annotated
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt emx1.chr22.annotated -exons chroms_bed/hg19_exon.bed -introns chroms_bed/hg19_intron.bed -promoters chroms_bed/hg19_promoter.bed -dnase chroms_bed/hg19_dnase.bed -ctcf chroms_bed/hg19_ctcf.bed
+docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.1.1--py37hb9e633b_1 crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt emx1.chr22.annotated -exons chroms_bed/hg19_exon.bed -introns chroms_bed/hg19_intron.bed -promoters chroms_bed/hg19_promoter.bed -dnase chroms_bed/hg19_dnase.bed -ctcf chroms_bed/hg19_ctcf.bed
 
 **INPUT**
 - emx1_guide/EMX1.txt, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
@@ -286,7 +286,7 @@ CONDA:
 crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko
+docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.1.1--py37hb9e633b_1 crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko
 
 **INPUT**
 - GAGTCCGAGCAGAAGAAGAANNN, a string representing a guide (e.g., GAGTCCGAGCAGAAGAAGAANNN). MUST BE PRESENT IN THE PROFILE AND EXTENDED PROFILE FILE.
@@ -311,7 +311,7 @@ CONDA:
 crispritz.py generate-report -mm 4 -sumref emx1.reference.annotated.SummaryCount.txt -sumenr emx1.enriched.annotated.SummaryCount.txt
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py generate-report -mm 4 -sumref emx1.reference.annotated.SummaryCount.txt -sumenr emx1.enriched.annotated.SummaryCount.txt
+docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.1.1--py37hb9e633b_1 crispritz.py generate-report -mm 4 -sumref emx1.reference.annotated.SummaryCount.txt -sumenr emx1.enriched.annotated.SummaryCount.txt
 
 **INPUT**
 
