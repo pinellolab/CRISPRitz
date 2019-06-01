@@ -263,7 +263,7 @@ CONDA:
 crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt chroms_bed/annotations_path.txt emx1.chr22.annotated
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.1.1--py37hb9e633b_1 crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt emx1.chr22.annotated -exons chroms_bed/hg19_exon.bed -introns chroms_bed/hg19_intron.bed -promoters chroms_bed/hg19_promoter.bed -dnase chroms_bed/hg19_dnase.bed -ctcf chroms_bed/hg19_ctcf.bed
+docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.1.1--py37hb9e633b_1 crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt chroms_bed/annotations_path.txt emx1.chr22.annotated
 
 **INPUT**
 - emx1_guide/EMX1.txt, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
