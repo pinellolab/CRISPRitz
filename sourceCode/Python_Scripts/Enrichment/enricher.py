@@ -23,11 +23,20 @@ inGenomeFile = open(genomeFile, "r")  # genome file open
 genomeHeader = inGenomeFile.readline()
 
 genomeStr = inGenomeFile.read()
-#genomeStr = genomeStr.replace('\n','')
+#print ("0.S " + genomeStr[3000023-20:3000023+20])
+# print (len(genomeStr))
+# #genomeStr.rstrip('\n')
+# print (len(genomeStr))
+genomeStr = genomeStr.replace('\n','')
+#print ("0.after replace " + genomeStr[3000023-20:3000023+20])
+# if '\n' in genomeStr:
+#     print("Escape in genomeStr")
+# print (len(genomeStr))
 genomeStr = genomeStr.upper()
 
-genomeList = list(genomeStr)
 
+genomeList = list(genomeStr)
+#print ("0.L " + str(genomeList[3000023-10:3000023+10]))
 
 iupac_code = {}
 
@@ -44,7 +53,7 @@ iupac_code.setdefault('W', []).append('AT')
 iupac_code.setdefault('W', []).append('TA')
 
 iupac_code.setdefault('K', []).append('GT')
-iupac_code.setdefault('k', []).append('TG')
+iupac_code.setdefault('K', []).append('TG')
 
 iupac_code.setdefault('M', []).append('AC')
 iupac_code.setdefault('M', []).append('CA')
@@ -107,6 +116,7 @@ iupac_code.setdefault('N', []).append('TACG')
 
 for line in inAltFile:
     x = line.split(' ')
+    x[0] = str(int(x[0])-1) #taaac
     if (',' in x[2]) and (len(x[1]) == 1) and ('>' not in x[2]) and (len(x[2]) < 6) and ('\n' not in genomeList[int(x[0])]):
         altstr = str(x[2])
         k = altstr.split(',')
@@ -138,17 +148,23 @@ for line in inAltFile:
         iupacvalue = str(original+snp)
         for key, value in iupac_code.items():
             if iupacvalue in value:
+                #print ("1.L " + genomeList[int(x[0])] + ", pos: " + str(int(x[0])))
+                #print ("1.S " + genomeStr[int(x[0])] + ", pos: " + str(int(x[0])))
                 genomeList[int(x[0])] = str(key)
+                #print ("2. "+ genomeList[int(x[0])] + ", pos: " + str(int(x[0])))
+                #print ("2.after insert " + str(genomeList[int(x[0])-20:int(x[0])+20]))
+                
 
 
 genomeStr = "".join(genomeList)
 
 os.chdir("./SNPs_genome/")
 outFile = open(genomeHeader[1:(len(genomeHeader)-1)]+'.enriched'+'.fa', 'w')
-outFile.write(genomeHeader+genomeStr)
+outFile.write(genomeHeader+genomeStr+'\n')
 
 for line in inAltFile:
     x = line.split(' ')
+    x[0] = str(int(x[0])-1) #taaac
     if (',' not in x[2]) and (',' not in x[1]) and ('>' not in x[2]) and (len(x[1]) == 1) and (len(x[2]) > 1) and ('\n' not in genomeList[int(x[0]):(int(x[0])+len(x[2]))]):
         genomeList[int(x[0])] = str(x[2])
     elif (',' not in x[2]) and (',' not in x[1]) and ('>' not in x[2]) and (len(x[1]) > 1) and (len(x[2]) == 1) and ('\n' not in genomeList[int(x[0]):(int(x[0])+len(x[1]))]):
@@ -163,6 +179,6 @@ genomeStr = "".join(genomeList)
 os.chdir("../")
 os.chdir("./INDELs_genome/")
 outfile = open(genomeHeader[1:(len(genomeHeader)-1)]+'.indels'+'.fa', 'w')
-outfile.write(genomeHeader+genomeStr)
+outfile.write(genomeHeader+genomeStr+'\n')
 
 print("Done")

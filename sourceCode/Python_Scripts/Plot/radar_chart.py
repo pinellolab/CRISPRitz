@@ -3,8 +3,9 @@
 # Libraries
 import math
 import matplotlib
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
+matplotlib.use("TkAgg")
+from matplotlib import pyplot as plt
+from matplotlib import patches as mpatches
 import pandas as pd
 from math import pi
 import scipy.spatial.distance as sp

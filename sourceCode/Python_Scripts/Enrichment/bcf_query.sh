@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 VCFFILES=$1*
 for f in $VCFFILES
 do
