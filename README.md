@@ -147,7 +147,7 @@ crispritz.py generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profil
 ![fig_medium_guide-1](https://user-images.githubusercontent.com/32717860/53101072-5b1bf180-3529-11e9-8c9a-cb5895f2c6c0.png)
 
 **EXAMPLE OF PERCENTAGE GAIN OBTAINED USING ENRICHED GENOME**
-![fig_enrichment-1](https://user-images.githubusercontent.com/32717860/53101078-5ce5b500-3529-11e9-97c1-448f2de8c4be.png)
+<img width="645" alt="Capture" src="https://user-images.githubusercontent.com/32717860/62580929-e9055200-b8a7-11e9-8c6d-a83e229905b0.PNG">
 
 
 # USAGE EXAMPLE
@@ -159,7 +159,7 @@ conda install crispritz
 
 IF YOU ENCOUNTER ANY PROBLEM USING CONDA, PLEASE USE THE DOCKER PACKAGE
 DOCKER
-docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.2.1--py37hb9e633b_0 crispritz.py
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py
 ```
 
 **BEFORE START TESTING, YOU NEED TO DOWNLAOD SOME EXAMPLE FILE**
@@ -182,7 +182,7 @@ CONDA:
 crispritz.py add-variants chr22_vcf/ chr22_hg19/
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.2.1--py37hb9e633b_0 crispritz.py add-variants chr22_vcf/ chr22_hg19/
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py add-variants chr22_vcf/ chr22_hg19/
 
 **INPUT**
 - chr22_vcf/, the directory containing the VCF files (.vcf or .vcf.gz).
@@ -199,7 +199,7 @@ CONDA:
 crispritz.py index-genome CHR22_HG19 chr22_hg19/ pam/pamNGG.txt
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.2.1--py37hb9e633b_0 crispritz.py index-genome CHR22_HG19 chr22_hg19/ pam/pamNGG.txt
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py index-genome CHR22_HG19 chr22_hg19/ pam/pamNGG.txt
 
 **INPUT**
 - CHR22_HG19, name of the directory that will contain all the .bin files (.vcf or .vcf.gz).
@@ -216,7 +216,7 @@ CONDA:
 crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.2.1--py37hb9e633b_0 crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
 
 **INPUT**
 - genome_library/NGG_CHR22_HG19/, the directory containing the genome FASTA files (.fa).
@@ -241,7 +241,7 @@ CONDA:
 crispritz.py search chr22_hg19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -mm 4 -t
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.2.1--py37hb9e633b_0 crispritz.py search chr22_hg19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -mm 4 -t
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search chr22_hg19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -mm 4 -t
 
 **INPUT**
 - chr22_hg19/, the directory containing the genome FASTA files (.fa).
@@ -263,7 +263,7 @@ CONDA:
 crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt chroms_bed/annotations_path.txt emx1.chr22.annotated
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.2.1--py37hb9e633b_0 crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt chroms_bed/annotations_path.txt emx1.chr22.annotated
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt chroms_bed/annotations_path.txt emx1.chr22.annotated
 
 **INPUT**
 - emx1_guide/EMX1.txt, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
@@ -286,7 +286,7 @@ CONDA:
 crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko
 
 DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i quay.io/biocontainers/crispritz:1.2.1--py37hb9e633b_0 crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko
 
 **INPUT**
 - GAGTCCGAGCAGAAGAAGAANNN, a string representing a guide (e.g., GAGTCCGAGCAGAAGAAGAANNN). MUST BE PRESENT IN THE PROFILE AND EXTENDED PROFILE FILE.
