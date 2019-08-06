@@ -12,6 +12,6 @@ RUN conda config --add channels bioconda
 
 RUN apt-get update && apt-get install gsl-bin libgsl0-dev -y && apt-get clean
 
-#Install stream package
+#Install crispritz package
 RUN conda install crispritz -y && conda clean --all -y
 
