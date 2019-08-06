@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
+//#include <parallel/algorithm>
 #include <algorithm>
 #include <unistd.h>
 
@@ -433,7 +434,7 @@ int main(int argc, char **argv)
 	vector<int> pamIndices;									  // vector of target indices of pam RNA on DNA
 	ifstream fasta(argv[1]);								  // input fasta file
 	ifstream pamfile(argv[2]);								  // input pam.txt
-
+	int max_bulges = stoi(argv[4]);							//max allowed bulges
 	pam_at_start = false;
 	globalstart = omp_get_wtime(); // start global time
 
@@ -447,7 +448,8 @@ int main(int argc, char **argv)
 	{ // read chromosome sequence
 		chrSeq += line;
 	}
-	transform(chrSeq.begin(), chrSeq.end(), chrSeq.begin(), ::toupper); // to uppercase
+	//__gnu_parallel::transform(chrSeq.begin(), chrSeq.end(), chrSeq.begin(), ::toupper); // parallelized to uppercase
+	transform(chrSeq.begin(), chrSeq.end(), chrSeq.begin(), ::toupper);
 	end = omp_get_wtime();
 	cout << end - start << "\n";
 
@@ -471,7 +473,6 @@ int main(int argc, char **argv)
 	else
 	{
 		pamRNA = pam.substr(0, pamlimit); // if pam_at_start is set, then PAM = TTTNNNNNNNNNNNNNNNNNNNNN -4, i select the first 4 chars
-		cout << "pam: " << pamRNA << endl;
 	}
 	
 	all_pam = generatePam(pamRNA); // generate a vector of each possible input pam
@@ -487,7 +488,7 @@ int main(int argc, char **argv)
 	// ------------------- SEARCH PAM IN THE CHROMOSOME -------------------
 	cout << "Search PAM:\t";
 	start = omp_get_wtime();
-	searchWords(pamIndices, list, all_pam.size(), chrSeq, pamlen, pamlimit, pam_at_start);
+	searchWords(pamIndices, list, all_pam.size(), chrSeq, pamlen, pamlimit, pam_at_start, max_bulges);
 	all_pam.clear();
 	end = omp_get_wtime();
 	cout << end - start << "\n";
@@ -505,7 +506,7 @@ int main(int argc, char **argv)
 		string target;
 		if (pamIndices[i] > 0) 
 		{
-			target = chrSeq.substr(pamIndices[i], pamlen + 2); //extract target + pam + 2 char for bulges from the chromosome
+			target = chrSeq.substr(pamIndices[i], pamlen + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
 			if (target.find('N') != std::string::npos)		   //if 'N' is in the target, remove the target
 			{
 				counter_index--;
@@ -522,7 +523,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-			target = chrSeq.substr((pamIndices[i]) * -1, pamlen + 2);
+			target = chrSeq.substr((pamIndices[i]) * -1, pamlen + max_bulges);
 			if (target.find('N') != std::string::npos)
 			{
 				counter_index--;
@@ -597,7 +598,9 @@ int main(int argc, char **argv)
 	
 	cout << "Sorting:\t";
 	start = omp_get_wtime(); // sorting the strings before inserting into the tree
+	//__gnu_parallel::sort(targetOnDNA.begin(), targetOnDNA.begin() + counter_index, compareFunc);
 	sort(targetOnDNA.begin(), targetOnDNA.begin() + counter_index, compareFunc);
+
 	end = omp_get_wtime();
 	cout << end - start << "\n";
 

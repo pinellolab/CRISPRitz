@@ -2,16 +2,14 @@
 
 // C++ program for implementation of Aho Corasick algorithm for string matching
 using namespace std;
-//#include <bits/stdc++.h>
+#include <bits/stdc++.h>
 #include <string>
 #include <omp.h>
 #include <vector>
 #include <algorithm>
 #include <cmath>
-#include <stdio.h>
-#include <string.h>
+
 #include <bitset>
-#include <queue>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -111,7 +109,7 @@ void buildMatchingMachine(string arr[], int k)
 }
 
 // This function finds all occurrences of all array words in text.
-void searchWords(vector<int> &indices, string arr[], int k, string text, int pamlen, int pamlimit, bool pam_at_start)
+void searchWords(vector<int> &indices, string arr[], int k, string text, int pamlen, int pamlimit, bool pam_at_start, int max_bulges)
 {
 	int l = text.size();
 	//int nThr = omp_get_max_threads();
@@ -161,14 +159,14 @@ void searchWords(vector<int> &indices, string arr[], int k, string text, int pam
 					{
 						if (j < mez_K) //check what pam was found, iFf the first half, it's a positive pam, negative otherwise
 						{
-							if ((i - (pamlen - 1 + 2)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
+							if ((i - (pamlen - 1 + max_bulges)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
 							{
-								indices_private.push_back(i - (pamlen - 1 + 2));
+								indices_private.push_back(i - (pamlen - 1 + max_bulges));
 							}
 						}
 						else if (j >= mez_K)
 						{
-							if ((i - (pamlimit - 1)) <= (l - (pamlen + 2))) //same as for positive pam(out of bound problem)
+							if ((i - (pamlimit - 1)) <= (l - (pamlen + max_bulges))) //same as for positive pam(out of bound problem)
 							{
 								indices_private.push_back(-(i - (pamlimit - 1)));
 							}
@@ -182,7 +180,7 @@ void searchWords(vector<int> &indices, string arr[], int k, string text, int pam
 					{
 						if (j < mez_K) //check what pam was found, iFf the first half, it's a positive pam, negative otherwise
 						{
-							if ((i - (pamlimit - 1)) <= (l - (pamlen + 2)))  //save the pam position only if possible for a guide to attach that position(avoid out of bound)
+							if ((i - (pamlimit - 1)) <= (l - (pamlen + max_bulges)))  //save the pam position only if possible for a guide to attach that position(avoid out of bound)
 							{
 								indices_private.push_back(-(i - (pamlimit - 1)));
 							}
@@ -190,9 +188,9 @@ void searchWords(vector<int> &indices, string arr[], int k, string text, int pam
 						else if (j >= mez_K)
 						{
 							//same as for positive pam(out of bound problem)
-							if ((i - (pamlen - 1 + 2)) >= 0)
+							if ((i - (pamlen - 1 + max_bulges)) >= 0)
 							{
-								indices_private.push_back(i - (pamlen - 1 + 2));
+								indices_private.push_back(i - (pamlen - 1 + max_bulges));
 							}
 						}
 					}
