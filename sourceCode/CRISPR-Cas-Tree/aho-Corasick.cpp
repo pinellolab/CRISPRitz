@@ -8,8 +8,10 @@ using namespace std;
 #include <vector>
 #include <algorithm>
 #include <cmath>
-
+#include <stdio.h>
+#include <string.h>
 #include <bitset>
+#include <queue>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
