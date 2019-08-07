@@ -136,6 +136,8 @@ void searchWords(vector<int> &indices, string arr[], int k, string text, int pam
 //#pragma parallel omp for private(j, currentState, ch)
 	#pragma omp parallel private(tid, j, currentState, ch, i, chunckfine, indices_private)
 	{
+		ch = 0;
+		currentState = 0;
 		tid = omp_get_thread_num();
 		chunckfine = ((tid + 1) * chunck) + ((arr[0].size()) - 1);
 		//cout << "i " << (tid*chunck) << endl;
