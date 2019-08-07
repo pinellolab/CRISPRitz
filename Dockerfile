@@ -15,5 +15,6 @@ RUN conda config --add channels bioconda
 RUN apt-get update && apt-get install gsl-bin libgsl0-dev -y && apt-get install libgomp1 -y && apt-get clean
 
 #Install crispritz package (change the dafault version of python to 3.6)
+RUN conda update -n base -c defaults conda
 RUN conda install python=3.6 -y
 RUN conda install crispritz -y && conda clean --all -y
