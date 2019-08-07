@@ -6,12 +6,14 @@ MAINTAINER Samuele Cancelleri
 
 ENV SHELL bash
 
-RUN conda config --add channels defaults
+#update conda channel with bioconda and conda-forge
+RUN conda config --add channels defaults 
 RUN conda config --add channels conda-forge
 RUN conda config --add channels bioconda
 
+#update packages of the docker system
 RUN apt-get update && apt-get install gsl-bin libgsl0-dev -y && apt-get install libgomp1 -y && apt-get clean
 
-#Install crispritz package
+#Install crispritz package (change the dafault version of python to 3.6)
+RUN conda install python=3.6 -y
 RUN conda install crispritz -y && conda clean --all -y
-
