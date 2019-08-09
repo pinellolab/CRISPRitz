@@ -166,10 +166,6 @@ docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py
 ```
 GO TO A LOCATION OF YOUR CHOICE AND EXECUTE THESE COMMANDS
 
-git clone https://github.com/pinellolab/CRISPRITZ.git
-
-cd CRISPRITZ/
-
 bash download_test_files.sh
 
 NOW YOU HAVE ALL THE TEST FILES YOU NEED TO TRY CRISPRitz
