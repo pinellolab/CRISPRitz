@@ -18,11 +18,11 @@ With this aim in mind we created this package, containing the following software
 **SHOW THE HELP MENU**
 ```
 crispritz.py
-help:
-        crispritz add-variants <vcfFilesDirectory> <genomeDirectory>
-        crispritz index-genome <name_genome> <genomeDirectory> <pamFile>
-        crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {-index} (flag to search with index-genome, allow searching with bulges) -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread>] {-r,-p,-t} (write only off-targets results, write only profiles, write both) [-var] (to activate search with IUPAC nomenclature)
-        crispritz annotate-results <guidesFile> <resultsFile> <outputFile> -exons <exonsbedFile> -introns <intronsbedFile> -ctcf <ctcfbedFile> -dnase <dnasebedFile> -promoters <promotersbedFile>
+
+crispritz add-variants <vcfFilesDirectory> <genomeDirectory>
+        crispritz index-genome <name_genome> <genomeDirectory> <pamFile> -bMax <maxBulges_num>
+        crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {-index} (flag to search with index-genome, allow searching with bulges) -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread>] {-r,-p,-t} (write only off-targets results, write only profiles, write both) [-var] (to activate search with IUPAC nomenclature) [-scores <fastaGenomeDirectory> (to calculate CFD and Doench 2016 scores)]
+        crispritz annotate-results <guidesFile> <resultsFile> <annotationsPathFile> <outputFile>
         crispritz generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profile <guideProfile> -extprofile <guideExtendedProfile> -exons <exonsCountFile> -introns <intronsCountFile> -ctcf <CTCFCountFile> -dnase <DNAseCountFile> -promoters <promotersCountFile> [-gecko (to use gecko pre-computed profile)] [-sumref <summaryReferenceCountFile>][-sumenr <summaryEnrichedCountFile>]
 ```
 
@@ -41,7 +41,7 @@ crispritz.py add-variants <vcfFilesDirectory> <genomeDirectory>
 
 **CREATE A GENOME INDEX (*index-genome*):**
 ```
-crispritz.py index-genome <name_genome> <genomeDirectory> <pamFile>
+crispritz.py index-genome <name_genome> <genomeDirectory> <pamFile> -bMax <Max bulges allowed>
 
 **INPUT**
 - <name_genome>, name of the directory that will contain all the .bin files
