@@ -13,290 +13,433 @@ With this aim in mind we created this package, containing the following software
 - annotate-results: Tool to annotate results found during search with functional annotations (promoter, chromatin accessibility, insulator, etc). The output is a set of files, one is the list of on/off-targets with the annotation type, the others are files containing counts for each guide, the counts are the total on/off-targets found with the specific mismatch threshold and the specific annotation.
 - generate-report: Tool to generate a graphical report with annotated and overall mismatch and bulge profile for a given guide. The output is a graphical representation of the input guide behaviour.
 
-# USAGE MANUAL
+# CRISPRitz Installation and Usage
+The two fastest way to use CRISPRitz is through the installation of Docker or Conda.
+Here we summarize the steps to install CRISPRitz with Docker and Conda.
 
-**SHOW THE HELP MENU**
-```
-crispritz.py
+## Installation (Phase 1)
+**Conda installation (Linux and MacOS):**
+- Open a terminal window
+- Paste this command into the terminal (Linux):
+    ```
+    curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh --output Miniconda3-latest-Linux-x86_64.sh
+    ```
+- Paste this command into the terminal (MacOS):
+    ```
+    curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh --output Miniconda3-latest-MacOSX-x86_64.sh
+    ```
+- If the file is correctly downloaded you now need to execute it to complete the installation, so paste this command into the terminal:
+    - Linux
+    ```
+    bash Miniconda3-latest-Linux-x86_64.sh
+    ```
+    - MacOS
+    ```    
+    bash Miniconda3-latest-MacOSX-x86_64.sh
+    ```
+- Press ENTER when requested and yes when an answer is requested, in this way you allow conda to set all the directories in your HOME path for an easy use
+- After the complete installation you will receive this message “Thank you for installing Miniconda3!” to certify the correct installation.
+- Now you need to close the terminal window you are using and open a new one, to allow the system to start conda.
+- In the new terminal window you should see something like this:
+    ```
+    (base) user@nameofPC:~$
+    ```
+    If you read the "(base)" like this, conda is loaded correctly and you can start using it.
+- Now you need to set the channels to allow conda to access different repositories and set the default version of python to version 3.6, so paste these commands into the terminal you just opened:
+    ```
+    conda config --add channels defaults
+    conda config --add channels bioconda
+    conda config --add channels conda-forge
+    conda install python=3.6
+    ```
+- Now, you can install CRISPRitz by typing the command:
+    ```
+    conda install crispritz
+    ```
+- To test your installation, type the command:
+    ```
+    crispritz.py
+    ```
+- After the execution of the command you should see a list of CRISPRitz tools.
+![crispritz.py_help](https://user-images.githubusercontent.com/40895152/63214203-8452be80-c115-11e9-88e2-4613ba8c3718.png)
+Now the software is installed and ready to be used.
 
-crispritz add-variants <vcfFilesDirectory> <genomeDirectory>
-        crispritz index-genome <name_genome> <genomeDirectory> <pamFile> -bMax <maxBulges_num>
-        crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {-index} (flag to search with index-genome, allow searching with bulges) -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread>] {-r,-p,-t} (write only off-targets results, write only profiles, write both) [-var] (to activate search with IUPAC nomenclature) [-scores <fastaGenomeDirectory> (to calculate CFD and Doench 2016 scores)]
-        crispritz annotate-results <guidesFile> <resultsFile> <annotationsPathFile> <outputFile>
-        crispritz generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profile <guideProfile> -extprofile <guideExtendedProfile> -exons <exonsCountFile> -introns <intronsCountFile> -ctcf <CTCFCountFile> -dnase <DNAseCountFile> -promoters <promotersCountFile> [-gecko (to use gecko pre-computed profile)] [-sumref <summaryReferenceCountFile>][-sumenr <summaryEnrichedCountFile>]
-```
+**Docker installation:  
+Note: if you are using MasOS or Windows, you just need to download the installer file
+and follow the on screen instructions.  
+https://docs.docker.com/docker-for-windows/install/ (Windows)  
+https://docs.docker.com/docker-for-mac/install/ (MacOS)**
 
-**CREATE A VARIANT GENOME (*add-variants*):**
-```
-crispritz.py add-variants <vcfFilesDirectory> <genomeDirectory>
+**Ubuntu installation guide:**
+- Open a terminal window
+- Paste this command to update the index repository:
+    ```
+    sudo apt-get update
+    ```
+- Paste this command to allow package installation over HTTPS:
+    ```
+    sudo apt-get install \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg-agent \
+    software-properties-common
+    ```
+- Paste this command to add the docker key:
+    ```
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+    ```
+- Paste this command to set the correct version of docker for your system:
+    ```
+    sudo add-apt-repository \
+    "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+    $(lsb_release -cs) \
+    Stable"
+    ```
+- Paste this command to update the index repository another time, to make sure everything is ready and set to install docker:
+    ```
+    sudo apt-get update
+    ```
+- Then paste this command to finally install docker:
+    ```
+    sudo apt-get install docker-ce docker-ce-cli containerd.io
+    ```
+- Paste this last command to check if the installation is complete and functional:
+    ```
+    sudo docker run hello-world
+    ```
+- If this message is printed, everything is perfectly installed
+![docker hello world](https://user-images.githubusercontent.com/40895152/63214349-769e3880-c117-11e9-8ee2-d754096b3aca.png)
+- Now, we need to do some more steps to complete the settings. Paste this command to create a user group for docker user:
+    ```
+    sudo groupadd docker
+    ```
+- Paste this command to add your current user to the created group:
+    ```
+    sudo usermod -aG docker $USER
+    ```
+- Now you need to restart your machine or the virtual environment, to re-evaluate the user groups.
+- One last command to test if the group is well configured. Paste this command:
+    ```
+    docker run hello-world
+    ```
+- If the previous “hello from docker” message is printed, everything is perfectly set.
 
-**INPUT**
-- <vcfFilesDirectory>, the directory containing the VCF files (.vcf or .vcf.gz).
-- <genomeDirectory>, the directory containing the genome FASTA files (.fa).
+## Post installation test (Phase <a name="phase2">2</a>):
+**Conda:**
+- Download and run this script if you have installed CRISPRitz with Conda:
+    ```
+    curl https://raw.githubusercontent.com/pinellolab/CRISPRitz/master/test_scripts/auto_test_crispritz_conda.sh --output auto_test_crispritz_conda.sh
+    ```
+- Write this command to execute the script:
+    ```
+    bash auto_test_crispritz_conda.sh
+    ```
+- Wait until this confirmation message appears:  
+“EVERY TEST PASSED!!! ENJOY CRISPRitz”
 
-**OUTPUT**
-- set of chromosomes with SNPs, copy of the original chromosomes with variants SNPs
-- set of chromosomes with INDELs, copy of the original chromosomes with variants INDELs
-```
+**Docker:**
+- Download and run this script if you have installed CRISPRitz with Docker:
+    ```
+    curl https://raw.githubusercontent.com/pinellolab/CRISPRitz/master/test_scripts/auto_test_crispritz_docker.sh --output auto_test_crispritz_docker.sh
+    ```
+- Write this command to execute the script:
+    ```
+    bash auto_test_crispritz_docker.sh
+    ```
+- Wait until this confirmation message appears:  
+“EVERY TEST PASSED!!! ENJOY CRISPRitz”
 
-**CREATE A GENOME INDEX (*index-genome*):**
-```
-crispritz.py index-genome <name_genome> <genomeDirectory> <pamFile> -bMax <Max bulges allowed>
+## Usage (Phase 3):
+Here is a brief guide to help use CRISPRitz, **if you already execute the post installation test
+(Phase [2](#phase2)), and you obtain a positive result, you have all the necessary file in the
+test_crispritz directory and you can skip this list of steps.**  
+If you did not execute the test, follow these few steps to download the necessary files to try
+CRISPRitz.  
+Download test files (ONE TIME STEP):
+- The script will download the chr22 from UCSC (hg19), the correspondent VCF file from
+the 1000 Genome Project, a directory containing some test guides, a directory
+containing some PAM sequences and a directory of pre-computed genomic annotations
+for the hg19 genome.
+- Download the script with this command:
+    ```
+    curl https://raw.githubusercontent.com/pinellolab/CRISPRitz/master/test_scripts/download_test_files.sh --output download_test_files.sh
+    ```
+- Write this command to execute the script:
+    ```
+    bash download_test_files.sh
+    ```
+- The script will download every necessary file to test the software, we download only one
+chromosome and one vcf file, to save time. All the examples can be run on an entire
+genome, if you want to use the entire hg19 genome, you only need to add chromosomes
+into the `hg19_ref` directory.
+- Write this command to enter the test directory:
+    ```
+    cd test_crispritz/
+    ```
+- Now you are ready to execute the following example functions.
 
-**INPUT**
-- <name_genome>, name of the directory that will contain all the .bin files
-- <genomeDirectory>, the directory containing the genome FASTA files (.fa).
-- <pamFile>, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNNNNNGG 3).
+**<a name="Add-Variant">3.1</a> CRISPRitz Add-Variant Tool**  
+This tool is created to insert variants in a fasta genome.  
+Input:
+- Directory containing a genome in fasta format, need to be separated into single
+chromosome files.
+- Directory containing VCF files, need to be separated into single chromosome files
+(multi-sample files will be collapsed into one fake individual).
 
-**OUTPUT**
-- index genome directory, directory containing the .bin files (one or more per input chromosome). Each file contains all the candidate targets found on the chrosome for the selected input PAM.
-```
+Output:
+- Directory containing a duplicate of the original genome in fasta format, separated into
+single chromosome files with added SNPs in IUPAC notation
+- Directory containing a duplicate of the original genome in fasta format, separated into
+single chromosome files with added INDELs.
 
-**SEARCH ON A GENOME INDEX WITH MISMATCHES AND BULGES (*search*):**
-```
-crispritz.py search <genomeDirectory> <pamFile> <guidesFile> <outputFile> {-index} (flag to search with index-genome, allow searching with bulges) -mm <mm_num> [-bRNA <bRNA_num> | -bDNA <bDNA_num>] [-th <num_thread>] {-r,-p,-t} (write only off-targets results, write only profiles, write both) [-var] (to activate search with IUPAC nomenclature)
+Example call:
+- Conda
+    ```
+    crispritz.py add-variants hg19_1000genomeproject_vcf/ hg19_ref/
+    ```
+- Docker
+    ```
+    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py add-variants hg19_1000genomeproject_vcf/ hg19_ref/
+    ```
 
-**INPUT**
-- <genomeDirectory>, the directory containing the genome FASTA files (.fa).
-- <pamFile>, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNNNNNGG 3).
-- <guidesFile>, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
-- <outputFile>, first name of all the output files generated by the tool.
-- index, flag set to perform search using the index genome (allow mismatches+bulges search).
-- -mm \<mm_num>, threshold of accepted mismatches (i.e., the number of mismatches accepted to save the target in result files).
-- -bRNA \<bRNA_num>, threshold of accepted RNA bulges (i.e., the number of RNA bulges accepted to save the target in result files).
-- -bDNA \<bDNA_num>, threshold of accepted DNA bulges (i.e., the number of DNA bulges accepted to save the target in result files).
-- -th <num_thread>, number of threads used by the tool (default uses all the available threads).
-- -r,-p,-t, select the output files (-r: write only off-targets results, -p: write only profiles, -t: write both).
+Detailed input:  
+`hg19_1000genomeproject_vcf/` is the directory containing the vcf files.  
+`hg19_ref/` is the directory containing the fasta files.
 
-**OUTPUT**
-- list of targets and off-targets, a text file containing all the targets and off-targets found on the genome with genomic coordinates.
-- set of profile files, set of files containing detailed profile of every input guide, with the count of bp/mismatches and a grouped representation of on/off-targets found per every mismatch count and bulges count.
-```
 
-**SEARCH ON A GENOME WITHOUT INDEXING WITH MISMATCHES ONLY (*search*):**
-```
-crispritz search <genomeDirectory> <pamFile> <guidesFile> <outputFile> -mm <mm_num> [-th <num_thread> (default: ALL)] {-r,-p,-t}
+**<a name="Index-Genome">3.2</a> CRISPRitz Index-Genome Tool**  
+This tool is created to generate an index genome (similar to the bwa-index step). This step is
+time consuming (from 30 to 60 minutes) but helps to save a lot of execution time while
+searching with lot of guides and with the support of bulges (DNA and RNA). If do not need to
+search with bulges, skip this passage.  
+Input:
+- Name of the genome to create (e.g. `hg19_ref`).
+- Directory containing a genome in fasta format, need to be separated into single
+chromosome files.
+- Text file containing the PAM (including a number of Ns equal to the guide length) and a
+space separated number indicating the length of the PAM sequence (e.g. Cas9 PAM is
+NNNNNNNNNNNNNNNNNNNNNGG 3). The sequence is composed by 20 Ns and
+NGG, followed by number 3, representing the length of the PAM sequence.
+- Number of bulges to include in the database to perform the following search (i.e. the max
+number bulges allowed for DNA and RNA when searching on the database)
 
-**INPUT**
-- <genomeDirectory>, the directory containing the genome FASTA files (.fa).
-- <pamFile>, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNNNNNGG 3).
-- <guidesFile>, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
-- <outputFile>, first name of all the output files generated by the tool.
-- -mm \<mm_num>, threshold of accepted mismatches (i.e., the number of mismatches accepted to save the target in result files).
-- -th <num_thread>, number of threads used by the tool (default uses all the available threads).
-- -r,-p,-t, select the output files (-r: write only off-targets results, -p: write only profiles, -t: write both).
+Output:
+- Directory containing an index genome in .bin format, separated into single chromosome
+files, containing all the candidate targets for a selected PAM, adding also characters to
+perform bulge search.
 
-**OUTPUT**
-- list of targets and off-targets, a text file containing all the targets and off-targets found on the genome with genomic coordinates.
-- set of profile files, set of files containing detailed profile of every input guide, with the count of bp/mismatches and a grouped representation of on/off-targets found per every mismatch count and bulges count.
-```
-**EXAMPLE OF OUTPUT LIST OF TARGETS AND OFF-TARGETS**
+Example call:
+- Conda
+    ```
+    crispritz.py index-genome hg19_ref hg19_ref/ pam/pamNGG.txt -bMax 2
+    ```
+- Docker
+    ```
+    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py index-genome hg19_ref hg19_ref/ pam/pamNGG.txt -bMax 2
+    ```
+Detailed input:  
+`hg19_ref` is the name of the output directory containing the index genome.  
+`hg19_ref/` is the directory containing the fasta files.  
+`pam/pamNGG.txt/` is a text file containing the PAM sequence.  
+`-bMax 2` is the max number of bulges to allow for following searches when creating the
+database (e.g if -bMax 2, all the following searches with the created index can be performed
+with max 2 RNA bulges and 2 DNA bulges)  
+
+**<a name="Search">3.3</a> CRISPRitz Search Tool**  
+This tool is created to search on a fasta genome or an index genome.
+There are two kinds of searches permitted with CRISPRitz;  
+The first and simplest one uses a common fasta genome and it’s developed to perform fast,
+on-the-fly searches with mismatches only.  
+The second search type, uses the before generated index genome (Phase [3.2](#Index-Genome)), to perform
+searches with lot of guides and also with bulges support.  
+
+**<a name="Search_mm">3.3.1</a> Mismatches only search:**  
+Input:
+- Directory containing a genome in fasta format, need to be separated into single
+chromosome files.
+- Text file containing the PAM sequence (including a number of Ns equal to the guide
+length) and a space separated number indicating the length of the PAM sequence (e.g.
+Cas9 PAM is NNNNNNNNNNNNNNNNNNNNNGG 3). The sequence is composed by
+20 Ns and NGG, followed by 3, representing the length of the PAM sequence.
+- Text file containing one or more guides (including a number of Ns equal to the length of
+the PAM sequence) (e.g. TCACCCAGGCTGGAATACAGNNN, the last 3 Ns represents
+the space occupied by the PAM in the real sequence)
+- Name of the output file (e.g. `emx1.hg19`)
+- Number of allowed mismatches (e.g. `-mm 4`)
+- Output type (-r off-targets list only, -p profile only, -t everything) (e.g `-t`)
+- Scores (-scores followed by the directory of the fasta genome, to perform the score after
+the search with score calculation based on Doench 2016 and CFD, the two scoring
+methods supports only NGG PAM and 23 long guides) (e.g `-scores hg19_ref/`)
+
+Output:
+- Set of result files, including:
+    - Targets file, containing all genomic targets for the guide set
+    - Profile file, containing a matrix-like representation of guides behaviour (bp/mm, total on-/off- target, targets per mismatch threshold)
+    - Extended profile file, containing the motif matrix for each guide and each mismatch threshold, useful to create visual analysis of the guides behaviour
+
+Example call:
+- Conda
+    ```
+    crispritz.py search hg19_ref/ pam/pamNGG.txt guides/EMX1.txt emx1.hg19 -mm 4 -t -scores hg19_ref/
+    ```
+- Docker
+    ```
+    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search hg19_ref/ pam/pamNGG.txt guides/EMX1.txt emx1.hg19 -mm 4 -t -scores hg19_ref/
+    ```
+
+Detailed input:  
+`hg19_ref/` is the directory containing the fasta files.  
+`pam/pamNGG.txt/` is a text file containing the PAM sequence.  
+`guides/EMX1.txt` is a text file containing the EXM1 guide  
+`emx1.hg19` is the output file name  
+`-mm 4` to select the mismatch threshold  
+`-t` to select the output type  
+`-scores hg19_ref/` to activate the calculation of score (Doench 2016 and CFD)  
+
+
+**<a name="Search_mm_bul">3.3.2</a> Mismatches + Bulges search:**  
+Input:
+- Directory containing an index genome in .bin format, separated into single chromosome
+files (Phase [3.2](#Index-Genome)).
+- Text file containing the PAM sequence (including a number of Ns equal to the guide
+length) and a space separated number indicating the length of the PAM sequence (e.g.
+Cas9 PAM is NNNNNNNNNNNNNNNNNNNNNGG 3). The sequence is composed by
+20 Ns and NGG, followed by 3, representing the length of the PAM sequence.
+- Text file containing one or more guides (including a number of Ns equal to the length of
+the PAM sequence) (e.g. TCACCCAGGCTGGAATACAGNNN, the last 3 Ns represents
+the space occupied by the PAM in the real sequence)
+- Name of output file (e.g. `emx1.hg19`)
+- Tag to activate index search (`-index`)
+- Number of allowed mismatches (e.g. `-mm 4`)
+- Size of DNA bulges and/or RNA bulges (e.g. `-bDNA 1 -bRNA 1`)
+- Output type (-r off-targets list only, -p profile only, -t everything) (e.g `-t`)
+- Scores (-scores followed by the directory of the fasta genome, to perform the score after
+the search with score calculation based on Doench 2016 and CFD, the two scoring
+methods supports only NGG PAM and 23 long guides) (e.g `-scores hg19_ref/`)
+
+Output:
+- Set of result files, including:
+    - Targets file, containing all genomic targets for the guides set
+    - Profile file, containing a matrix-like representation of guides behaviour (bp/mm, total on-/off- target, targets per mismatch threshold)
+    - Extended profile file, containing the motif matrix for each guide and each mismatch threshold, useful to create visual analysis of the guides behaviour
+    
+Example call:
+- Conda
+    ```
+    crispritz.py search genome_library/NGG_hg19_ref/ pam/pamNGG.txt guides/EMX1.txt emx1.hg19 -index -mm 4 -bDNA 1 -bRNA 1 -t -scores hg19_ref/
+    ```
+- Docker
+    ```
+    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search genome_library/NGG_hg19_ref/ pam/pamNGG.txt guides/EMX1.txt emx1.hg19 -index -mm 4 -bDNA 1 -bRNA 1 -t -scores hg19_ref/
+    ```
+
+Detailed input:  
+`genome_library/NGG_hg19_ref/` is the directory containing the fasta files.  
+`pam/pamNGG.txt/` is a text file containing the PAM sequence.  
+`guides/EMX1.txt` is a text file containing the EXM1 guide  
+`emx1.hg19` is the output file name  
+`-index` tag to activate the index search  
+`-bDNA 1` DNA bulges threshold  
+`-bRNA 1` RNA bulges threshold  
+`-mm 4` Mismatches threshold  
+`-t` to select the output type  
+`-scores hg19_ref/` to activate the calculation of score (Doench 2016 and CFD)  
+
+
+**<a name="Annotation">3.4</a> CRISPRitz Annotation Tool:**  
+This tool is created to perform genomic annotation on results obtained during the search phase.  
+Input:
+- Text file containing one or more guides, the same file used during the search phase
+(Phase [3.3.1](#Search_mm) / [3.3.2](#Search_mm_bul))
+- Targets file, containing all genomic targets for the guides set (Phase [3.3.1](#Search_mm) / [3.3.2](#Search_mm_bul))
+- Text file containing the path to bed files with the annotations
+- Name of output file
+
+Output:
+- Set of files, including:
+    - Targets file with annotation (identical file as the targets file in input) with an added column containing the annotations).
+    - One file per annotation (CTCF, DNase I, Promoter, Intron, Exon, etc) in a matrix-like format, counting the targets for each input guide and for each mismatch threshold.
+    - One summary file, counting all the annotations per mismatch number.
+    
+Example call:
+- Conda
+    ```
+    crispritz.py annotate-results guides/EMX1.txt emx1.hg19.targets.txt annotations_path.txt emx1.hg19.annotated
+    ```
+- Docker
+    ```
+    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py annotate-results guides/EMX1.txt emx1.hg19.targets.txt annotations_path.txt emx1.hg19.annotated
+    ```
+
+Detailed input:  
+`guides/EMX1.txt` is a text file containing the EMX1 guide  
+`emx1.hg19.targets.txt` is the text file containing targets from previous search  
+`chroms_bed/annotations_path.txt` is the text file containing the paths of bed files for the genomic annotations  
+`emx1.hg19.annotated` name of the output file  
+
+
+**<a name="Generate-Report">3.5</a> CRISPRitz Generate-Report Tool**  
+This tool is created to generate a visual representation of guide behaviour such as on-/off- target
+activity in specific genomic regions, total number of on-/off- targets in reference and
+variant genome and so on.  
+Input:
+- A guide present in the analyzed set (Phase [3.3.1](#Search_mm) / [3.3.2](#Search_mm_bul))
+(e.g. `GAGTCCGAGCAGAAGAAGAANNN`)
+- Number of mismatches to analyze (e.g. `-mm 4`)
+- Profile files, profile and extended profile file (Phase [3.3.1](#Search_mm) / [3.3.2](#Search_mm_bul))
+- Count files for genomic annotations (Phase [3.4](#Annotation))
+- Tag to activate gecko dataset comparison (e.g. `-gecko`)
+
+Output:
+- Pdf file containing the radar chart and motif logo for a guide, the radar chart shows how
+much the guide is similar, in terms of number of targets found, to all guides in its dataset
+(or the gecko dataset if selected).
+- Barplot with a distribution of on-/off- targets in each annotation and a comparison
+between variant and reference genome, in terms of total targets found.
+
+
+Example call:
+- Conda
+    ```
+    crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.hg19.profile.xls -extprofile emx1.hg19.extended_profile.xls -exons emx1.hg19.annotated.ExonsCount.txt -introns emx1.hg19.annotated.IntronsCount.txt -dnase emx1.hg19.annotated.DNAseCount.txt -ctcf emx1.hg19.annotated.CTCFCount.txt -promoters emx1.hg19.annotated.PromotersCount.txt -gecko
+    ```
+- Docker
+    ```
+    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.hg19.profile.xls -extprofile emx1.hg19.extended_profile.xls -exons emx1.hg19.annotated.ExonsCount.txt -introns emx1.hg19.annotated.IntronsCount.txt -dnase emx1.hg19.annotated.DNAseCount.txt -ctcf emx1.hg19.annotated.CTCFCount.txt -promoters emx1.hg19.annotated.PromotersCount.txt -gecko
+    ```
+
+Detailed input:  
+`GAGTCCGAGCAGAAGAAGAANNN` is a guide present in the result file, the one you want to analyze and print visualization files  
+`-mm 4` Mismatches threshold  
+`-profile emx1.hg19.profile.xls` is the xls file containing information for analyzed guides, as off-target per threshold count, bp/mm and so on  
+`-extprofile emx1.hg19.extended_profile.xls` is the xls file containing information detailed information about guides, used to construct the motif logo  
+`-exons emx1.hg19.annotated.ExonsCount.txt`  
+`-introns emx1.hg19.annotated.IntronsCount.txt`  
+`-dnase emx1.hg19.annotated.DNAseCount.txt`  
+`-ctcf emx1.hg19.annotated.CTCFCount.txt`  
+`-promoters emx1.hg19.annotated.PromotersCount.txt` Set of files containing all the count for each genomic annotation, every file is a matrix-like text file with row representing the guides and column representing a mismatch threshold  
+`-gecko` tag to activate the gecko dataset comparison, the results of your test guide, will be
+compared with results from a previous computed analysis on gecko library.  
+
+**Output examples:**
+- Targets file, containing all genomic targets for the guides set
 ![example_targets](https://user-images.githubusercontent.com/32717860/53101471-19d81180-352a-11e9-9ee3-69de580c5e3f.PNG)
-
-**EXAMPLE OF OUTPUT PROFILE FILE**
-![example_profile](https://user-images.githubusercontent.com/32717860/53101468-180e4e00-352a-11e9-9bfb-31428cee7475.PNG)
-
-**EXAMPLE OF OUTPUT MOTIF MATRIX FILE**
-![example_motif_matrix](https://user-images.githubusercontent.com/32717860/53101466-1775b780-352a-11e9-84e8-0013656ad163.PNG)
-
+- Profile file, containing a matrix-like representation of guides behaviour (bp/mm, total on-/off- target, targets per mismatch threshold)
+![profile](https://user-images.githubusercontent.com/40895152/63215013-866e4a80-c120-11e9-8855-c63c2a6e991a.png)
+- Extended profile file, containing the motif matrix for each guide and each mismatch
+threshold, useful to create visual analysis of the guides behaviour
+![ex_profile](https://user-images.githubusercontent.com/40895152/63215020-a30a8280-c120-11e9-98ed-10a6ab47bc54.png)
 
 
-**ANNOTATE RESULTS OBTAINED IN A PREVIOUS SEARCH PHASE (*annotate-results*):**
-```
-crispritz.py annotate-results <guidesFile> <resultsFile> <annotationsPathFile> <outputFile>
-
-**INPUT**
-- <guidesFile>, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
-- <resultsFile>, path to the text file containing on/off-targets generated by previous search phase.
-- <outputFile>, first name of all the output files generated by the tool.
-- -exons <exonsbedFile>, path to the .BED file containing intervals of exon regions in the genome.
-- -introns <intronsbedFile>, path to  the .BED file containing intervals of intron regions in the genome.
-- -ctcf <ctcfbedFile>, path to the .BED file containing intervals of ctcf regions in the genome.
-- -dnase <dnasebedFile>, path to the .BED file containing intervals of dnase regions in the genome.
-- -promoters <promotersbedFile>, path to the .BED file containing intervals of promoter regions in the genome.
-
-**OUTPUT**
-- annotated list of targets and off-targets, text file containing the annotated rows extracted from the input results file (if a row is not annotated, it will not be written in the file)
-- set of count files, set of files with counting information, one per genomic annotation, those files are formatted as a matrix, with guides as rows and mismatch as columns, every cell contain the number of annotated targets for the guide with that mismatch
-```
-
-**GENERATE REPORT FROM ANNOTATED RESULTS (*generate-report*):**
-```
-crispritz.py generate-report <guide> -mm <mm_num or range mm_min-mm_max> -profile <guideProfile> -extprofile <guideExtendedProfile> -exons <exonsCountFile> -introns <intronsCountFile> -ctcf <CTCFCountFile> -dnase <DNAseCountFile> -promoters <promotersCountFile> [-gecko (to use gecko pre-computed profile)] [-sumone <summaryReferenceCountFile>][-sumtwo <summaryEnrichedCountFile>]
-
-**INPUT**
-- <guide>, a string representing a guide (e.g., GAGTCCGAGCAGAAGAAGAANNN). MUST BE PRESENT IN THE PROFILE AND EXTENDED PROFILE FILE.
-- -mm <mm_num or range mm_min-mm_max>, an int number or an interval of int numbers, to select the mismatches to use to generate the graphical representation (e.g., - mm 4 or -mm 3-5).
-- -profile \<guideProfile>, path to the profile file containing the profile of sgRNA sequence(s) generated by previous search phase.
-- -extprofile \<guideExtendedProfile>, path to the extended profile file containing the motif matrix of sgRNA sequence(s) generated by previous search phase.
-- -exons \<exonsCountFile>, path to the ExonsCount file containing count of on/off-targets annotated as exon for each mismatch threshold.
-- -introns \<intronsCountFile>, path to the IntronsCount file containing count of on/off-targets annotated as introns for each mismatch threshold.
-- -ctcf \<CTCFCountFile>, path to the CTCFCount file containing count of on/off-targets annotated as ctcf for each mismatch threshold.
-- -dnase \<DNAseCountFile>, path to the DNAseCount file containing count of on/off-targets annotated as dnase for each mismatch threshold.
-- -promoters \<promotersCountFile>, path to the PromotersCount file containing count of on/off-targets annotated as promoter for each mismatch threshold.
-- -gecko, flag to use the pre-computed Gecko Library annotated results.
-- -sumone \<summaryReferenceCountFile>, path to the SummaryCount file created using a reference genome. USED WITH SUMTWO TO CREATE A BARPLOT TO SHOW THE PERCENTAGE GAIN OF ON/OFF-TARGETS FOR EACH ANNOTATION TYPE. 
-- -sumtwo \<summaryEnrichedCountFile>, path to the SummaryCount file created using a enriched genome (genome with variants). USED WITH SUMONE TO CREATE A BARPLOT TO SHOW THE PERCENTAGE GAIN OF ON/OFF-TARGETS FOR EACH ANNOTATION TYPE.
 
 
-**OUTPUT**
-- detailed graphical report for the input guide, an image to visualize the guide behaviour in terms of on/off-targets found in each genomic annotation and in general (total target count).
-- barplot with percentage increasing from Variant/Reference Genome, a barplot to visualize the percentage gain in terms of found targets, grouped by every genomic annotation used in the annotation phase [optional, generated only if sumone and sumtwo are present in input]
-```
-**EXAMPLE OF REPORT GENERATED WITH A GUIDE**
+
+- Pdf file containing the radar chart and motif logo for a guide, the radar chart shows how
+much the guide is similar, in terms of number of targets found, to all guides in its dataset
+(or the gecko dataset if selected).
 ![fig_medium_guide-1](https://user-images.githubusercontent.com/32717860/53101072-5b1bf180-3529-11e9-8c9a-cb5895f2c6c0.png)
 
-**EXAMPLE OF PERCENTAGE GAIN OBTAINED USING ENRICHED GENOME**
+- Barplot with a distribution of on-/off- targets in each annotation and a comparison
+between variant and reference genome, in terms of total targets found.
 <img width="645" alt="Capture" src="https://user-images.githubusercontent.com/32717860/62580929-e9055200-b8a7-11e9-8c6d-a83e229905b0.PNG">
-
-
-# USAGE EXAMPLE
-
-**INSTALL THE TOOL (CONDA (LINUX 64 or MAC OSX) or DOCKER (ALL-PLATFORMS))**
-```
-CONDA
-conda install crispritz
-
-IF YOU ENCOUNTER ANY PROBLEM USING CONDA, PLEASE USE THE DOCKER PACKAGE
-DOCKER
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py
-```
-
-**BEFORE START TESTING, YOU NEED TO DOWNLAOD SOME EXAMPLE FILE**
-```
-GO TO A LOCATION OF YOUR CHOICE AND EXECUTE THESE COMMANDS
-
-bash download_test_files.sh
-
-NOW YOU HAVE ALL THE TEST FILES YOU NEED TO TRY CRISPRitz
-
-```
-
-**CREATE A VARIANT GENOME (*add-variants*):**
-```
-CONDA:
-crispritz.py add-variants chr22_vcf/ chr22_hg19/
-
-DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py add-variants chr22_vcf/ chr22_hg19/
-
-**INPUT**
-- chr22_vcf/, the directory containing the VCF files (.vcf or .vcf.gz).
-- chr22_hg19/, the directory containing the genome FASTA files (.fa).
-
-**OUTPUT**
-- chr22.enriched.fa, copy of the original chromosomes with variants SNPs
-- chr22.indels.fa, copy of the original chromosomes with variants INDELs
-```
-
-**CREATE A GENOME INDEX (*index-genome*):**
-```
-CONDA:
-crispritz.py index-genome CHR22_HG19 chr22_hg19/ pam/pamNGG.txt
-
-DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py index-genome CHR22_HG19 chr22_hg19/ pam/pamNGG.txt
-
-**INPUT**
-- CHR22_HG19, name of the directory that will contain all the .bin files (.vcf or .vcf.gz).
-- chr22_hg19/, the directory containing the genome FASTA files (.fa).
-pam/pamNGG.txt, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNNNNNGG 3).
-
-**OUTPUT**
-- NGG_CHR22_HG19, directory containing the .bin files (one per input chromosome). Each file contains all the candidate targets found on the chrosome for the selected input PAM.
-```
-
-**SEARCH ON A GENOME INDEX WITH MISMATCHES AND BULGES (*search*):**
-```
-CONDA:
-crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
-
-DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search genome_library/NGG_CHR22_HG19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -index -mm 4 -bDNA 1 -bRNA 1 -th 2 -r
-
-**INPUT**
-- genome_library/NGG_CHR22_HG19/, the directory containing the genome FASTA files (.fa).
-pam/pamNGG.txt, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNNNNNGG 3).
-- emx1_guide/EMX1.txt, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
-- emx1.chr22, first name of all the output files generated by the tool.
-- index, flag set to perform search using the index genome (allow mismatches+bulges search).
-- -mm 4, threshold of accepted mismatches (i.e., the number of mismatches accepted to save the target in result files).
-- -bRNA 1, threshold of accepted RNA bulges (i.e., the number of RNA bulges accepted to save the target in result files).
-- -bDNA 1, threshold of accepted DNA bulges (i.e., the number of DNA bulges accepted to save the target in result files).
-- -th 2, number of threads used by the tool (default uses all the available threads).
-- -r, select the output files (-r: write only off-targets results).
-
-**OUTPUT**
-- emx1.chr22.targets.txt, a text file containing all the targets and off-targets found on the genome with genomic coordinates.
-- emx1.chr22.profile.xls and emx1.chr22.extendend_profile.xls, set of files containing detailed profile of every input guide, with the count of bp/mismatches and a grouped representation of on/off-targets found per every mismatch count and bulges count.
-```
-
-**SEARCH ON A GENOME WITHOUT INDEXING WITH MISMATCHES ONLY (*search*):**
-```
-CONDA:
-crispritz.py search chr22_hg19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -mm 4 -t
-
-DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search chr22_hg19/ pam/pamNGG.txt guides/EMX1.txt emx1.chr22 -mm 4 -t
-
-**INPUT**
-- chr22_hg19/, the directory containing the genome FASTA files (.fa).
-pam/pamNGG.txt, path to a text file containing the PAM (e.g., NNNNNNNNNNNNNNNNNNNNNGG 3).
-- emx1_guide/EMX1.txt, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
-- emx1.chr22, first name of all the output files generated by the tool.
-- -mm 4, threshold of accepted mismatches (i.e., the number of mismatches accepted to save the target in result files).
-- -th <num_thread>, number of threads used by the tool (default uses all the available threads). 
-- -t, select the output files (-r: write only off-targets results, -p: write only profiles, -t: write both).
-
-**OUTPUT**
-- emx1.chr22.targets.txt, a text file containing all the targets and off-targets found on the genome with genomic coordinates.
-- emx1.chr22.profile.xls and emx1.chr22.extended_profile.xls, set of files containing detailed profile of every input guide, with the count of bp/mismatches and a grouped representation of on/off-targets found per every mismatch count and bulges count.
-```
-
-**ANNOTATE RESULTS OBTAINED IN A PREVIOUS SEARCH PHASE (*annotate-results*):**
-```
-CONDA:
-crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt chroms_bed/annotations_path.txt emx1.chr22.annotated
-
-DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py annotate-results guides/EMX1.txt emx1.chr22.targets.txt chroms_bed/annotations_path.txt emx1.chr22.annotated
-
-**INPUT**
-- emx1_guide/EMX1.txt, path to a text file containing the sgRNA sequence(s). THE LENGTH OF GUIDE MUST BE EQUAL TO THE LENGTH OF PAM SEQUENCE.
-- emx1.chr22.targets.txt, path to the text file containing on/off-targets generated by previous search phase.
-- emx1.chr22.annotated, first name of all the output files generated by the tool.
-- -exons chroms_bed/hg19_exon.bed, path to the .BED file containing intervals of exon regions in the genome.
-- -introns chroms_bed/hg19_intron.bed, path to  the .BED file containing intervals of intron regions in the genome.
-- -ctcf chroms_bed/hg19_ctcf.bed, path to the .BED file containing intervals of ctcf regions in the genome.
-- -dnase chroms_bed/hg19_dnase.bed, path to the .BED file containing intervals of dnase regions in the genome.
-- -promoters chroms_bed/hg19_promoter.bed, path to the .BED file containing intervals of promoter regions in the genome.
-
-**OUTPUT**
-- emx1.chr22.annotated.txt, text file containing the annotated rows extracted from the input results file (if a row is not annotated, it will not be written in the file)
-- emx1.chr22.annotated.*Count.txt, set of files with counting information, one per genomic annotation, those files are formatted as a matrix, with guides as rows and mismatch as columns, every cell contain the number of annotated targets for the guide with that mismatch
-```
-
-**GENERATE REPORT FROM ANNOTATED RESULTS (*generate-report*):**
-```
-CONDA:
-crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko
-
-DOCKER:
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.chr22.profile.xls -extprofile emx1.chr22.extended_profile.xls -exons emx1.chr22.annotated.ExonsCount.txt -introns emx1.chr22.annotated.IntronsCount.txt -dnase emx1.chr22.annotated.DNAseCount.txt -ctcf emx1.chr22.annotated.CTCFCount.txt -promoters emx1.chr22.annotated.PromotersCount.txt -gecko
-
-**INPUT**
-- GAGTCCGAGCAGAAGAAGAANNN, a string representing a guide (e.g., GAGTCCGAGCAGAAGAAGAANNN). MUST BE PRESENT IN THE PROFILE AND EXTENDED PROFILE FILE.
-- -mm 3-5, an int number or an interval of int numbers, to select the mismatches to use to generate the graphical representation (e.g., - mm 4 or -mm 3-5).
-- -profile emx1.chr22.profile.xls, path to the profile file containing the profile of sgRNA sequence(s) generated by previous search phase.
-- -extprofile emx1.chr22.extended_profile.xls, path to the extended profile file containing the motif matrix of sgRNA sequence(s) generated by previous search phase.
-- -exons emx1.chr22.annotated.ExonsCount.txt, path to the ExonsCount file containing count of on/off-targets annotated as exon for each mismatch threshold.
-- -introns emx1.chr22.annotated.IntronsCount.txt, path to the IntronsCount file containing count of on/off-targets annotated as introns for each mismatch threshold.
-- -ctcf emx1.chr22.annotated.CTCFCount.txt, path to the CTCFCount file containing count of on/off-targets annotated as ctcf for each mismatch threshold.
-- -dnase emx1.chr22.annotated.DNAseCount.txt, path to the DNAseCount file containing count of on/off-targets annotated as dnase for each mismatch threshold.
-- -promoters emx1.chr22.annotated.PromotersCount.txt, path to the PromotersCount file containing count of on/off-targets annotated as promoter for each mismatch threshold.
-- -gecko, flag to use the pre-computed Gecko Library annotated results.
-
-**OUTPUT**
-- detailed graphical report for the input guide, an image to visualize the guide behaviour in terms of on/off-targets found in each genomic annotation and in general (total target count).
-- barplot with percentage increasing from Variant/Reference Genome, a barplot to visualize the percentage gain in terms of found targets, grouped by every genomic annotation used in the annotation phase [optional, generated only if sumone and sumtwo are present in input]
-```
