@@ -462,11 +462,15 @@ void guide_searching()
 			totalbuf += "\t";
 			totalbuf += to_string(respos[i]); //posizione del TARGET nel genoma
 			totalbuf += "\t";
+			totalbuf += to_string(respos[i]); //Cluster Position del TARGET nel genoma
+			totalbuf += "\t";
 			totalbuf += "+"; //strand
 			totalbuf += "\t";
 			totalbuf += to_string(tmp_mismatch); //mismatch per target
 			totalbuf += "\t";
 			totalbuf += "0"; //num bulge, sempre uguale 0
+			totalbuf += "\t";
+			totalbuf += to_string(tmp_mismatch); //total per target
 			totalbuf += "\n";
 		}
 
@@ -483,11 +487,15 @@ void guide_searching()
 			totalbuf += "\t";
 			totalbuf += to_string(resneg[i]);
 			totalbuf += "\t";
+			totalbuf += to_string(resneg[i]);	//Cluster Position
+			totalbuf += "\t";
 			totalbuf += "-";
 			totalbuf += "\t";
 			totalbuf += to_string(tmp_mismatch);
 			totalbuf += "\t";
 			totalbuf += "0";
+			totalbuf += "\t";
+			totalbuf += to_string(tmp_mismatch); //total per target
 			totalbuf += "\n";
 		}
 	}
@@ -505,11 +513,15 @@ void guide_searching()
 			totalbuf += "\t";
 			totalbuf += to_string(respos[i]); //posizione del TARGET nel genoma
 			totalbuf += "\t";
+			totalbuf += to_string(respos[i]); //Cluster Position del TARGET nel genoma
+			totalbuf += "\t";
 			totalbuf += "-"; //strand
 			totalbuf += "\t";
 			totalbuf += to_string(tmp_mismatch); //mismatch per target
 			totalbuf += "\t";
 			totalbuf += "0"; //num bulge, sempre uguale 0
+			totalbuf += "\t";
+			totalbuf += to_string(tmp_mismatch); //total per target
 			totalbuf += "\n";
 		}
 
@@ -526,11 +538,15 @@ void guide_searching()
 			totalbuf += "\t";
 			totalbuf += to_string(resneg[i]);
 			totalbuf += "\t";
+			totalbuf += to_string(resneg[i]);		//Cluster Position
+			totalbuf += "\t";
 			totalbuf += "+";
 			totalbuf += "\t";
 			totalbuf += to_string(tmp_mismatch);
 			totalbuf += "\t";
 			totalbuf += "0";
+			totalbuf += "\t";
+			totalbuf += to_string(tmp_mismatch); //total per target
 			totalbuf += "\n";
 		}
 	}

@@ -1,15 +1,58 @@
 #!/usr/bin/env python
 
+# Faster script + multiprocessing
+# Script that calculates cfd score for targets with bulge 'X', and save the accumulated cfd score for the input guide
+# Also calculates the Doench score if the targets has bulge 'X' and 0 mms (doench = 0 if no such target exists)
+
+#argv 1 = target file
+#argv 2 is genome_directory (eg ../../Genomes/hg19/)
+#argv 3 is pam file -> to check if len is 23 and pam is NGG
+#argv 4 is guide file
 import time
 import pickle
 import re
 import sys
 import os
-import azimuth.model_comparison
+from os import listdir
+from os.path import isfile, join
 import numpy as np
 import subprocess
+import azimuth.model_comparison
+import string
+import itertools
+import multiprocessing
+SIZE_DOENCH = 10000
+N_THR = 3
+# doench_string.append(seq)
+# doench_score =  azimuth.model_comparison.predict(np.asarray(doench_string), None, None, model= model, pam_audit=False)
+# doench_score = np.around(doench_score * 100)
 
-DOENCH_SIZE = 10000
+def doenchParallel(targets, model, result):
+  start_time = time.time()
+  doench_score =  azimuth.model_comparison.predict(targets,None, None, model= model, pam_audit=False)
+  doench_score = [np.around(i * 100) for i in doench_score]
+  max_doench = int(max(doench_score))
+  result.append(max_doench)
+
+
+def doenchForIupac(sequence_doench, guide_seq):
+  pos_iupac = []
+  var = []
+  for pos, c in enumerate(sequence_doench):
+    if c in iupac_code:
+      pos_iupac.append(pos)
+      var.append(iupac_code[c])
+  
+  if var:
+    for i in itertools.product(*var):
+        t = list(sequence_doench)
+        for p, el in enumerate(pos_iupac):
+            t[el] = i[p]
+        targets_for_doench[guide_seq].append(''.join(t))
+  else:
+    targets_for_doench[guide_seq].append(sequence_doench)
+
+
 def get_mm_pam_scores():
   try:
     mm_scores = pickle.load(open(os.path.dirname(os.path.realpath(__file__)) + '/mismatch_score.pkl', 'rb'))
@@ -51,89 +94,28 @@ def calc_cfd(guide_seq, sg, pam, mm_scores, pam_scores):
     
     return score
 
+tab = str.maketrans("ACTGRYSWMKHDBVactgryswmkhdbv", "TGACYRSWKMDHVBtgacyrswkmdhvb") 
 
+def reverse_complement_table(seq):
+    return seq.translate(tab)[::-1]
 #if __name__ == '__main__':
 
-#argv 1 = directory containing fasta files (input by user), absolute path
-#argv 2 = pam+guide length
-#argv 3 = target filename, absolute path
-#argv 4 = true if pam at start. 
-
-fasta_files = [f for f in os.listdir(sys.argv[1]) if os.path.isfile(os.path.join(sys.argv[1], f))]
-
-origin_path = os.path.dirname(os.path.realpath(__file__))
-
-target_name = sys.argv[3].split("/")[-1].split(".targets")[0]
-if (sys.argv[4] == "True"):
-  pam_at_start = True
-else:
-  pam_at_start = False
-
-#Check if unwanted files (.bed, .ordered, .seqs) are in the directory
-if (os.path.isfile(origin_path + "/" + target_name + ".order.txt")):
-  os.remove(origin_path + "/" + target_name + ".order.txt")
-if (os.path.isfile(origin_path + "/" + target_name + ".bed")):
-  os.remove(origin_path + "/" + target_name + ".bed")
-if (os.path.isfile(origin_path + "/" + target_name + ".seqs.txt")):
-  os.remove(origin_path + "/" + target_name + ".seqs.txt")
-
-
-#Check if target file has at least 1 target
-if (int(subprocess.run(["wc", "-l" , sys.argv[3]], stdout=subprocess.PIPE).stdout.decode('utf-8').split()[0]) == 1):
-  print("No targets were found. Skipping score calculation")
-  sys.exit()  
- 
-
-
-print("Preprocessing data...")
-#Sort target file and create an ordered by chr .bed 
-start_sort = time.time()
-subprocess.run(["sort", "-k4,4", sys.argv[3], "-o" , origin_path + "/" + target_name + ".order.txt"]) #salvato in CDF
-end_sort = time.time()
-#print("Sort: ", end_sort - start_sort)
-
-subprocess.run(["sed -i '/^#/ d' " + origin_path + "/" + target_name + ".order.txt"], shell=True)
-
-
-start_getseq = time.time()
-subprocess.run([origin_path+"/get_sequences.sh", origin_path + "/" + target_name + ".order.txt", sys.argv[2], origin_path + "/" + target_name, sys.argv[4]])  #.bed saved in Scores directory          
-end_getseq = time.time()
-#print("Get seq: ", end_getseq - start_getseq)
-
-#Order fasta_file and do bamtools getfasta
-start_bedtools = time.time()
-fasta_files.sort()
-for fasta in fasta_files:
-  if fasta.endswith(".fasta") or fasta.endswith(".fa") :
-    subprocess.run(["bedtools getfasta -fi " + sys.argv[1] + fasta + " -bed " + origin_path + "/" + target_name + ".bed" + " >> " + origin_path + "/" + target_name + ".seqs.txt"], shell= True, stderr=subprocess.DEVNULL)
-
-if (int(subprocess.run(["wc", "-l" , origin_path + "/" + target_name + ".seqs.txt"], stdout=subprocess.PIPE).stdout.decode('utf-8').split()[0]) == 0):
-  print("WARNING! No sequences extracted, check if chromosomes names are the same in the fasta file and in the targets file")
-  sys.exit()
-end_bedtools = time.time()
-#print("Bedtools: ", end_bedtools - start_bedtools)
-
-#Remove indices created by bedtools
-fasta_files = [f for f in os.listdir(sys.argv[1]) if os.path.isfile(os.path.join(sys.argv[1], f))]
-for fai in fasta_files:
-  if fai.endswith(".fai"):
-    os.remove(sys.argv[1] + fai)    
-
-start_sed = time.time()
-subprocess.run(["sed -i '1~2d' " + origin_path + "/" + target_name + ".seqs.txt"], shell = True) 
-end_sed = time.time()
-
-#print("Sed time: ", end_sed - start_sed)
-
-#Get number of lines of target file, to have a % of scores calculated
-num_lines = int(subprocess.run(["wc", "-l" , sys.argv[3]], stdout=subprocess.PIPE).stdout.decode('utf-8').split()[0])
-steps_end_calc = 0
-total_steps = np.ceil(num_lines / DOENCH_SIZE) #DOENCH_SIZE is size of batch for Doench score
-
-result = open( sys.argv[3].split('.targets')[0] + ".scores.txt",mode= "w")  #create a file with CDF score with name based on input file
-target_len = int(sys.argv[2])
 mm_scores, pam_scores = get_mm_pam_scores()
+guides_dict = dict()
+guides_dict_doench = dict()
+targets_for_doench = dict()
 
+score_filename = sys.argv[1].strip().split('.targets.txt')[0] + '.scores.txt'
+bedfile_tmp_name = sys.argv[1].strip().split('.targets.txt')[0] + '.bedfile_tmp.bed'
+remove_bedfile_tmp = False
+with open(sys.argv[3]) as pamfile:
+  line = pamfile.readline().strip().split(' ')
+  if len(line[0]) != 23 or 'NGG' not in line[0]:
+    with open(score_filename, 'w+') as result:
+      result.write('NO SCORES')
+      exit()
+
+N_THR = multiprocessing.cpu_count() // 2
 
 iupac_code = {
           "R":("A", "G"),
@@ -145,31 +127,71 @@ iupac_code = {
           "B":("C", "G", "T"),
           "D":("A", "G", "T"),
           "H":("A", "C", "T"),
-          "V":("A", "C", "G")
+          "V":("A", "C", "G"),
+          "r":("A", "G"),
+          "y":("C", "T"),
+          "s":("G", "C"),
+          "w":("A", "T"),
+          "k":("G", "T"),
+          "m":("A", "C"),
+          "b":("C", "G", "T"),
+          "d":("A", "G", "T"),
+          "h":("A", "C", "T"),
+          "v":("A", "C", "G"),
           }
 
 start = time.time()
 
-result.write("#Bulge type\tcrRNA\tDNA\tChromosome	Position\tDirection\tMismatches\tBulge Size\tCFD\tDoench 2016\n")
-n_of_acceptable_cfd = 0
+#Get list of chromosomes file to set enr_str
+chromosome_files = [f for f in listdir(sys.argv[2]) if isfile(join(sys.argv[2], f))]
+# enr = sys.argv[2].split('/')
+enr_str = ''
+chr_ext = '.fa'
+if '.enriched.' in chromosome_files[0]:
+  enr_str = '.enriched'
+elif '.indels.' in chromosome_files[0]:
+  enr_str = '.indels'
+if '.fasta' in chromosome_files[0]:
+  chr_ext = '.fasta'
+# if enr[-1]:
+#   if'+' in enr[-1]:
+#     enr_str = '.enriched'
+# else:
+#   if'+' in enr[-2]:
+#     enr_str = '.enriched'
 
-cfd_scores = []
-doench_string = []
-# doench_string_dna_1 = []
-# doench_string_dna_2 = []
-# doench_string_rna_1 = []
-# doench_string_rna_2 = []
-size_doe = 0
-all_word = []
-with open (origin_path + "/" + target_name + ".seqs.txt") as file_seqs, open(origin_path + "/" + target_name + '.order.txt') as file_order, open(origin_path + "/azimuth/saved_models/V3_model_nopos.pickle", 'rb') as f:
+with open( os.path.dirname(os.path.realpath(__file__)) + "/azimuth/saved_models/V3_model_nopos.pickle", 'rb') as f:
   model = pickle.load(f)
+max_doench = 0
+n_of_acceptable_cfd = 0
+sum_cfd = 0
+cfd_scores = []
+
+# NOTE uncomment for progress bas
+# process = subprocess.Popen(['wc', '-l', sys.argv[1]], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+# out, err = process.communicate()
+# total_line = int(out.decode('UTF-8').split(' ')[0])
+# if total_line < 2:
+#     print('WARNING! Input file has no targets')
+#     sys.exit()
+# if total_line < 10:
+#     mod_tot_line = 1
+# else:
+#     mod_tot_line = int(total_line/90)
+# lines_processed = 0
+
+
+all_word = []
+with open (sys.argv[1]) as result:
+  
   #Calc CDF score
-  for seq  in file_seqs:
-    word=file_order.readline().split("\t")
-    word[-1] = word[-1].strip()
-    seq = seq.upper().strip()
-    guide_seq = word[1]
-    off = seq.upper()
+  for target  in result:
+    target = target.strip().split('\t')
+    if 'X' not in target[0]:
+      continue
+    
+    guide_seq = target[1]
+    off = target[2].upper()
     m_guide_seq = re.search('[^ATCGN-]', guide_seq)
     m_off = re.search('[^ATCG-]', off)  
     iup_off = []
@@ -177,45 +199,71 @@ with open (origin_path + "/" + target_name + ".seqs.txt") as file_seqs, open(ori
     start_iup_off = 1
     
     if (m_guide_seq is None) and (m_off is None):
-      size_doe = size_doe + 1
-      # gap_pos = [None]
-      # if "DNA" in word[0]:    #gap in guide
-      #   gap_pos = [i for i, letter in enumerate(word[1]) if letter == "-"]
-      #   guide_seq = guide_seq.replace('-', '')
-      #   for g in gap_pos:
-      #     off = off[0:g] + off[g+1:]
-      # if "RNA" in word[0]:    #gap in target
-      #   gap_pos = [i for i, letter in enumerate(word[2]) if letter == "-"]
-      #   #off = off.replace('-', '')
-      #   for g in gap_pos:
-      #     guide_seq = guide_seq[0:g] + guide_seq[g+1:]
-      #     off = off[0:g] + off[g + 1 :]
-      
+       
       #Calc CFD
-      if pam_at_start:
-        off = off[::-1]
-        seq = seq[::-1]
-      
+          
       
       pam = off[-2:]  
-      sg = off[4:-6]
+      sg = off[:-3]
       #print("off. ", off)
       #print ("sg: ", sg)
       #print ("guide_seq: ", guide_seq)
       
       cfd_score = calc_cfd(guide_seq, sg, pam, mm_scores, pam_scores)
-      # print (cfd_score)
-      
+      if (target[7] == '0'):    #TODO se cambio inserendo pos cluister, devo cambiareanche qui, da 6 a 7 (con colonna pos cluster)
+        #estraggo sequenza
+        with open(bedfile_tmp_name, 'w+') as bedfile:
+          remove_bedfile_tmp = True
+          if target[6] == '+':
+            bedfile.write(target[3] + '\t' + str(int(target[4]) - 4 ) + '\t' + str(int(target[4]) + 23 + 3 ))
+          else:
+            bedfile.write(target[3] + '\t' + str(int(target[4]) - 3 ) + '\t' + str(int(target[4]) + 23 + 4 ))
+        
+        extr = subprocess.Popen(['bedtools getfasta -fi ' + sys.argv[2] + '/' + target[3] +  enr_str + chr_ext + ' -bed ' + bedfile_tmp_name], shell = True, stdout=subprocess.PIPE) 
+        extr.wait()
+        out, err = extr.communicate()
+        out = out.decode('UTF-8')
+        if target[6] == '+':
+          sequence_doench = out.strip().split('\n')[-1].upper()
+        else:
+          sequence_doench = reverse_complement_table(out.strip().split('\n')[-1].upper())
+        
+        if target[1] not in targets_for_doench:
+          targets_for_doench[target[1]] = []
+        doenchForIupac(sequence_doench, target[1])  #Get all possible targets with iupac itertools for doench
+
+      sum_cfd = sum_cfd + cfd_score
+      try:
+        guides_dict[target[1]] = guides_dict[target[1]] + cfd_score
+      except:
+        guides_dict[target[1]] = cfd_score
       if cfd_score > 0.023:
-        n_of_acceptable_cfd = n_of_acceptable_cfd +1
-      
-      all_word.append(word)
-      cfd_scores.append(cfd_score)
-      doench_string.append(seq)    
+        n_of_acceptable_cfd = n_of_acceptable_cfd +1  
       
     else:
       if "N" in off:
         continue
+      if (target[7] == '0'):  #NOTE change from 6 to 7 if input file has cluster position column
+        with open(bedfile_tmp_name, 'w+') as bedfile:
+          remove_bedfile_tmp = True
+          if target[6] == '+':
+            bedfile.write(target[3] + '\t' + str(int(target[4]) - 4 ) + '\t' + str(int(target[4]) + 23 + 3 ))
+          else:
+            bedfile.write(target[3] + '\t' + str(int(target[4]) - 3 ) + '\t' + str(int(target[4]) + 23 + 4 ))
+        
+        extr = subprocess.Popen(['bedtools getfasta -fi ' + sys.argv[2] + '/' + target[3] + enr_str + chr_ext + ' -bed ' + bedfile_tmp_name], shell = True, stdout=subprocess.PIPE) 
+        extr.wait()
+        out, err = extr.communicate()
+        out = out.decode('UTF-8')
+        if target[6] == '+':
+          sequence_doench = out.strip().split('\n')[-1].upper()
+        else:
+          sequence_doench = reverse_complement_table(out.strip().split('\n')[-1].upper())
+        
+        if target[1] not in targets_for_doench:
+          targets_for_doench[target[1]] = []
+        doenchForIupac(sequence_doench, target[1])  #Get all possible targets with iupac itertools for doench
+
       i = 0
       for char in off:
         if char in iupac_code:
@@ -235,89 +283,70 @@ with open (origin_path + "/" + target_name + ".seqs.txt") as file_seqs, open(ori
       dna_gap_removal = True
       for no_iup_str in range(len(iup_off) - start_iup_off, len(iup_off)):
         
-        size_doe = size_doe + 1
-        # gap_pos = [None]
-        no_iup_gap_srt = iup_off[no_iup_str] #se non ci sono gap passo la stringa non modificata al calc_cfd
-        # if "DNA" in word[0]:    #gap in guide
-        #   gap_pos = [i for i, letter in enumerate(word[1]) if letter == "-"]
-        #   guide_seq = guide_seq.replace('-', '')
-        #   for g in gap_pos:
-        #     no_iup_gap_srt = iup_off[no_iup_str][0:g] + iup_off[no_iup_str][g+1:]
-
-        # if "RNA" in word[0]:    #gap in target
-        #   gap_pos = [i for i, letter in enumerate(word[2]) if letter == "-"]
-        #   for g in gap_pos:
-        #     if dna_gap_removal:
-        #       guide_seq = guide_seq[0:g] + guide_seq[g+1:]
-        #       dna_gap_removal = False
-        #     no_iup_gap_srt = iup_off[no_iup_str][0:g] + iup_off[no_iup_str][g+1:]
         
+        no_iup_gap_srt = iup_off[no_iup_str] #se non ci sono gap passo la stringa non modificata al calc_cfd
+      
         #Calc CFD
-        if pam_at_start:
-          off = no_iup_gap_srt[::-1]
-          iup_off[no_iup_str] = iup_off[no_iup_str][::-1]
+    
 
         pam = no_iup_gap_srt[-2:]   
-        sg = no_iup_gap_srt[4:-6]
+        sg = no_iup_gap_srt[:-3]
         
         cfd_score = calc_cfd(guide_seq, sg, pam, mm_scores, pam_scores)
+        sum_cfd = sum_cfd + cfd_score
+        try:
+          guides_dict[target[1]] = guides_dict[target[1]] + cfd_score
+        except:
+          guides_dict[target[1]] = cfd_score
+    
+    #NOTE decomment for progress bar
+    # lines_processed +=1
+    # if lines_processed % (mod_tot_line) == 0:
+    #     print('Scoring: Total progress ' + str(round(lines_processed /total_line *100, 2)) + '%')
 
-        temp_word = word.copy()
-        cfd_scores.append(cfd_score)
-        all_word.append(temp_word)
-        doench_string.append(iup_off[no_iup_str])
+job_id = sys.argv[1].split('/')[-1].split('.')[0]
 
-
-        #Restore lowercase letters
-        for count, c in enumerate(all_word[-1][2], 4):
-          if c.islower():
-            iup_off[no_iup_str] = iup_off[no_iup_str][:count] + iup_off[no_iup_str][count].lower() + iup_off[no_iup_str][count + 1 :]  
+all_scores = []
+with open( score_filename, 'w+') as res, open(sys.argv[4], 'r') as guides:
+  man = multiprocessing.Manager()
+  shared_doench = man.list() #list containing max doech for each thread
+  guides = guides.read().strip().split('\n')
+  for g in guides:
+    guides_dict_doench[g] = 0
+    if g not in guides_dict:
+      guides_dict[g] = 0    
+  #for k in guides_dict.keys():
+    if g not in targets_for_doench:
+      guides_dict_doench[g] = 0
+    else:
+      if len (targets_for_doench[g]) > SIZE_DOENCH:
+        jobs = []
+        remaining_splits = (len(targets_for_doench[g])//SIZE_DOENCH) + 1
+        for i in range ((len(targets_for_doench[g])//SIZE_DOENCH) + 1):
+          for thr in range (min(N_THR, remaining_splits)):
+            p = multiprocessing.Process(target = doenchParallel, args=(np.asarray(targets_for_doench[g][i*N_THR*SIZE_DOENCH + thr*SIZE_DOENCH : min( i*N_THR*SIZE_DOENCH + (thr+1)*SIZE_DOENCH,len(targets_for_doench[g]))]), model, shared_doench,) )
+            remaining_splits -= 1
+            p.start()
+            jobs.append(p)
+          for i in jobs:
+            i.join()
           
+        guides_dict_doench[g] = max(shared_doench)
+        shared_doench =  man.list()
+      else:
+        start_time = time.time()
+        doench_score =  azimuth.model_comparison.predict(np.asarray(targets_for_doench[g]), None, None, model= model, pam_audit=False)
+        doench_score = [np.around(i * 100) for i in doench_score]
+        guides_dict_doench[g] =  int(max(doench_score))
+    if guides_dict[g] == 0:   #NO CFD WAS CALCULATED
+      all_scores.append([g, 0, str(guides_dict_doench[g]) ])
+    else:  
+      all_scores.append([g, int(round((100/(100 + guides_dict[g]))*100)), str(guides_dict_doench[g]) ])
+  all_scores.sort(key = lambda x: x[1], reverse = True)
+  res.write('#crRNA\tCFD\tDoench 2016\n')
+  for guide_scored in all_scores:  
+    res.write('\t'.join([str(el) for el in guide_scored]) + '\n') 
 
-        all_word[-1][2] = iup_off[no_iup_str][4:-3]
-        
-
-    if size_doe >= DOENCH_SIZE:
-      start_doench = time.time()
-      doench_score =  azimuth.model_comparison.predict(np.asarray(doench_string), None, None, model= model, pam_audit=False)
-      doench_score = np.around(doench_score * 100)
-      end_doench = time.time()
-      #print("Doench: ", end_doench - start_doench)
-      steps_end_calc = steps_end_calc + 1
-      print("Calculating scores: " + str(np.around((steps_end_calc/total_steps) * 100, decimals= 1)) + "%")
-
-      #save to file
-      for kk in range (size_doe):
-        result.write(all_word[kk][0] + "\t" + all_word[kk][1] + "\t" + all_word[kk][2] + "\t" + all_word[kk][3 ] + "\t" + all_word[kk][4] + "\t" 
-          + all_word[kk][5] + "\t" + all_word[kk][6] + "\t" + all_word[kk][7] + "\t" + str(cfd_scores[kk]) + "\t" + str(doench_score[kk]) + "\n" )
-      size_doe = 0
-      cfd_scores = []
-      all_word = []
-      doench_string = []
-  if doench_string:
-  #eof, calculate doench for remaining string in all the lists
-    doench_score =  azimuth.model_comparison.predict(np.asarray(doench_string), None, None, model= model, pam_audit=False)
-    doench_score = np.around(doench_score * 100)
-    print("Calculating scores: " +  "100%")
-
-    #save to file
-    for kk in range (size_doe):
-      result.write(all_word[kk][0] + "\t" + all_word[kk][1] + "\t" + all_word[kk][2] + "\t" + all_word[kk][3 ] + "\t" + all_word[kk][4] + "\t" 
-        + all_word[kk][5] + "\t" + all_word[kk][6] + "\t" + all_word[kk][7] + "\t" + str(cfd_scores[kk]) + "\t" + str(doench_score[kk]) + "\n" )
-    cfd_scores = []
-    all_word = []
-    doench_string = []
-  else:
-    print("Calculating scores: " +  "100%")
-
-
-
+if remove_bedfile_tmp:
+  os.remove(bedfile_tmp_name)
 end = time.time()
-#print ("CFD score time: ", end-start)
-#print ("CFD acceptable: ", n_of_acceptable_cfd)
-
-result.close()
-#Remove tmp file
-os.remove(origin_path + "/" + target_name + ".order.txt")
-os.remove(origin_path + "/" + target_name + ".bed")
-os.remove(origin_path + "/" + target_name + ".seqs.txt")

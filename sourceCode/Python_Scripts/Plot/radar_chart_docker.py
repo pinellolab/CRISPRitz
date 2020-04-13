@@ -129,8 +129,17 @@ if summaryCountOne != "no" and summaryCountTwo != "no":
     #                     (intergenicGainTwo[0, uppermm-1]/intergenicGainOne[0, uppermm-1])))
 
     ind = np.arange(0, 6, 1)
-    y_range = np.arange(0, max(arraySummaryCountTwo[:, uppermm]) + math.ceil(max(
-        arraySummaryCountTwo[:, uppermm])/10), math.ceil(max(arraySummaryCountTwo[:, uppermm])/5))
+    
+
+
+
+    no_result = False
+    try:
+        y_range = np.arange(0, max(arraySummaryCountTwo[:, uppermm]) + math.ceil(max(
+            arraySummaryCountTwo[:, uppermm])/10), math.ceil(max(arraySummaryCountTwo[:, uppermm])/5))
+    except:
+        y_range = np.arange(0,1,1)
+        no_result = True
     width = 0.5
 
     p1 = plt.bar(
@@ -146,10 +155,13 @@ if summaryCountOne != "no" and summaryCountTwo != "no":
     plt.title('Relative Increase Enriched/Reference Genome with ' +
               str(uppermm) + ' Mismatches', size=25)
     # plt.xlabel('Annotations')
-    for k in range(0, 6):
-        plt.annotate('%.2fx' % percentageGain[k, uppermm], [
-                     k+0.05, arraySummaryCountTwo[k, uppermm]+(max(arraySummaryCountTwo[:, uppermm])/100)], size=22)
-    # plt.ylim([0, max(arraySummaryCountTwo[:, uppermm])+2000],size=25)
+    if no_result:
+        plt.annotate('No targets found with ' + str(missmatch)  + ' mismatches', [1.35,0], size = 22) #NOTE with 0-mm print only the mm pdf; 1.35 modificare se cambia la str
+    else:
+        for k in range(0, 6):
+            plt.annotate('%.2fx' % percentageGain[k, uppermm], [
+                        k+0.05, arraySummaryCountTwo[k, uppermm]+(max(arraySummaryCountTwo[:, uppermm])/100)], size=22)
+        # plt.ylim([0, max(arraySummaryCountTwo[:, uppermm])+2000],size=25)
 
     plt.xticks(ind+0.25, ['Off-targets', 'Exons',
                           'Introns', 'CTCF', 'DNAse', 'Promoters'], size=25)
@@ -158,8 +170,10 @@ if summaryCountOne != "no" and summaryCountTwo != "no":
     plt.tight_layout()
     plt.subplots_adjust(top=0.95, bottom=0.06, left=0.1, right=0.99)
 
-    plt.savefig("summary_histogram_" + str(uppermm) +
+    plt.savefig("summary_histogram_" + str(guide) + '_' + str(uppermm) + 
                 "mm" + ".pdf", format="pdf")
+    # plt.savefig("summary_histogram_" + str(guide) + '_' + str(uppermm) +
+    #             "mm" + ".png", format="png")
     # plt.show()
 
 if guidesExtendedProfileFile != "no":
@@ -187,6 +201,7 @@ if guidesExtendedProfileFile != "no":
                         break
             break
     arrayguidesExtendedProfile = np.array(guidesExtendedProfile, dtype=int)
+    
     arrayguidesExtendedProfile.shape = (7*((uppermm-0)+1), 20)
 
 
@@ -529,6 +544,8 @@ if guidesProfileFile != "no":
 
         plt.savefig("summary_single_guide_" + str(guide) +
                     "_"+str(uppermm) + "mm" + ".pdf", format="pdf")
+        # plt.savefig("summary_single_guide_" + str(guide) +
+        #             "_"+str(uppermm) + "mm" + ".png", format="png")
         # plt.show()
 
     else:
@@ -661,4 +678,6 @@ if guidesProfileFile != "no":
 
         plt.savefig("summary_multiple_guides_" + str(guide) + "_" +
                     str(lowermm) + "-" + str(uppermm) + "mm" + ".pdf", format="pdf")
+        # plt.savefig("summary_multiple_guides_" + str(guide) + "_" +
+        #             str(lowermm) + "-" + str(uppermm) + "mm" + ".png", format="png")
         # plt.show()
