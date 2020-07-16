@@ -37,7 +37,7 @@ echo "DOWNLOADING CHR22_VCF (TIME DEPENDING ON YOUR INTERNET CONNECTION)"
 #CHR22 VCF DOWNLOAD
 mkdir hg38_1000genomeproject_vcf
 cd hg38_1000genomeproject_vcf/
-curl http://hgdownload.cse.ucsc.edu/gbdb/hg19/1000Genomes/phase3/ALL.chr22.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz --output ALL.chr22.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz
+curl http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/release/20181203_biallelic_SNV/ALL.chr22.shapeit2_integrated_v1a.GRCh38.20181129.phased.vcf.gz --output ALL.chr22.shapeit2_integrated_v1a.GRCh38.20181129.phased.vcf.gz
 cd ..
 echo "CHR22_VCF DOWNLOADED AND EXTRACTED"
 echo "-------------------------------------------------------------------------"
