@@ -197,16 +197,16 @@ single chromosome files with added INDELs.
 Example call:
 - Conda
     ```
-    crispritz.py add-variants hg19_1000genomeproject_vcf/ hg19_ref/
+    crispritz.py add-variants hg38_1000genomeproject_vcf/ hg38_ref/
     ```
 - Docker
     ```
-    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py add-variants hg19_1000genomeproject_vcf/ hg19_ref/
+    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py add-variants hg38_1000genomeproject_vcf/ hg38_ref/
     ```
 
 Detailed input:  
-`hg19_1000genomeproject_vcf/` is the directory containing the vcf files.  
-`hg19_ref/` is the directory containing the fasta files.
+`hg38_1000genomeproject_vcf/` is the directory containing the vcf files.  
+`hg38_ref/` is the directory containing the fasta files.
 
 
 **<a name="Index-Genome">3.2</a> CRISPRitz Index-Genome Tool**  
@@ -233,16 +233,16 @@ perform bulge search.
 Example call:
 - Conda
     ```
-    crispritz.py index-genome hg19_ref hg19_ref/ pam/pamNGG.txt -bMax 2
+    crispritz.py index-genome hg38_ref hg38_ref/ 20bp-NGG-SpCas9.txt -bMax 2
     ```
 - Docker
     ```
-    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py index-genome hg19_ref hg19_ref/ pam/pamNGG.txt -bMax 2
+    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py index-genome hg38_ref hg38_ref/ 20bp-NGG-SpCas9.txt -bMax 2
     ```
 Detailed input:  
-`hg19_ref` is the name of the output directory containing the index genome.  
-`hg19_ref/` is the directory containing the fasta files.  
-`pam/pamNGG.txt/` is a text file containing the PAM sequence.  
+`hg38_ref` is the name of the output directory containing the index genome.  
+`hg38_ref/` is the directory containing the fasta files.  
+`20bp-NGG-SpCas9.txt` is a text file containing the PAM sequence.  
 `-bMax 2` is the max number of bulges to allow for following searches when creating the
 database (e.g if -bMax 2, all the following searches with the created index can be performed
 with max 2 RNA bulges and 2 DNA bulges)  
@@ -282,21 +282,21 @@ Output:
 Example call:
 - Conda
     ```
-    crispritz.py search hg19_ref/ pam/pamNGG.txt guides/EMX1.txt emx1.hg19 -mm 4 -t -scores hg19_ref/
+    crispritz.py search hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38 -mm 4 -t -scores hg38_ref/
     ```
 - Docker
     ```
-    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search hg19_ref/ pam/pamNGG.txt guides/EMX1.txt emx1.hg19 -mm 4 -t -scores hg19_ref/
+    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38 -mm 4 -t -scores hg38_ref/
     ```
 
 Detailed input:  
-`hg19_ref/` is the directory containing the fasta files.  
-`pam/pamNGG.txt/` is a text file containing the PAM sequence.  
-`guides/EMX1.txt` is a text file containing the EXM1 guide  
-`emx1.hg19` is the output file name  
+`hg38_ref/` is the directory containing the fasta files.  
+`20bp-NGG-SpCas9.txt` is a text file containing the PAM sequence.  
+`EMX1.sgRNA.txt` is a text file containing the EXM1 guide  
+`emx1.hg38` is the output file name  
 `-mm 4` to select the mismatch threshold  
 `-t` to select the output type  
-`-scores hg19_ref/` to activate the calculation of score (Doench 2016 and CFD)  
+`-scores hg38_ref/` to activate the calculation of score (Doench 2016 and CFD)  
 
 
 **<a name="Search_mm_bul">3.3.2</a> Mismatches + Bulges search:**  
@@ -328,33 +328,32 @@ Output:
 Example call:
 - Conda
     ```
-    crispritz.py search genome_library/NGG_hg19_ref/ pam/pamNGG.txt guides/EMX1.txt emx1.hg19 -index -mm 4 -bDNA 1 -bRNA 1 -t -scores hg19_ref/
+    crispritz.py search genome_library/NGG_2_hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38.bulges -index -mm 4 -bDNA 1 -bRNA 1 -t -scores hg38_ref
     ```
 - Docker
     ```
-    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search genome_library/NGG_hg19_ref/ pam/pamNGG.txt guides/EMX1.txt emx1.hg19 -index -mm 4 -bDNA 1 -bRNA 1 -t -scores hg19_ref/
+    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search genome_library/NGG_2_hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38.bulges -index -mm 4 -bDNA 1 -bRNA 1 -t -scores hg38_ref
     ```
 
 Detailed input:  
-`genome_library/NGG_hg19_ref/` is the directory containing the fasta files.  
-`pam/pamNGG.txt/` is a text file containing the PAM sequence.  
-`guides/EMX1.txt` is a text file containing the EXM1 guide  
-`emx1.hg19` is the output file name  
+`genome_library/NGG_2_hg38_ref/` is the directory containing the fasta files.  
+`20bp-NGG-SpCas9.txt` is a text file containing the PAM sequence.  
+`EMX1.sgRNA.txt` is a text file containing the EXM1 guide  
+`emx1.hg38.bulges` is the output file name  
 `-index` tag to activate the index search  
 `-bDNA 1` DNA bulges threshold  
 `-bRNA 1` RNA bulges threshold  
 `-mm 4` Mismatches threshold  
 `-t` to select the output type  
-`-scores hg19_ref/` to activate the calculation of score (Doench 2016 and CFD)  
+`-scores hg38_ref` to activate the calculation of score (Doench 2016 and CFD)  
 
 
 **<a name="Annotation">3.4</a> CRISPRitz Annotation Tool:**  
 This tool is created to perform genomic annotation on results obtained during the search phase.  
 Input:
-- Text file containing one or more guides, the same file used during the search phase
 (Phase [3.3.1](#Search_mm) / [3.3.2](#Search_mm_bul))
 - Targets file, containing all genomic targets for the guides set (Phase [3.3.1](#Search_mm) / [3.3.2](#Search_mm_bul))
-- Text file containing the path to bed files with the annotations
+- Text file containing the annotations in bed format
 - Name of output file
 
 Output:
@@ -366,18 +365,17 @@ Output:
 Example call:
 - Conda
     ```
-    crispritz.py annotate-results guides/EMX1.txt emx1.hg19.targets.txt annotations_path.txt emx1.hg19.annotated
+    crispritz.py annotate-results emx1.hg38.targets.txt hg38Annotation.bed emx1.hg38
     ```
 - Docker
     ```
-    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py annotate-results guides/EMX1.txt emx1.hg19.targets.txt annotations_path.txt emx1.hg19.annotated
+    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py annotate-results emx1.hg38.targets.txt hg38Annotation.bed emx1.hg38
     ```
 
 Detailed input:  
-`guides/EMX1.txt` is a text file containing the EMX1 guide  
-`emx1.hg19.targets.txt` is the text file containing targets from previous search  
-`chroms_bed/annotations_path.txt` is the text file containing the paths of bed files for the genomic annotations  
-`emx1.hg19.annotated` name of the output file  
+`emx1.hg38.targets.txt` is the text file containing targets from previous search  
+`hg38Annotation.bed` is the text file containing the paths of bed files for the genomic annotations  
+`emx1.hg38` name of the output file  
 
 
 **<a name="Generate-Report">3.5</a> CRISPRitz Generate-Report Tool**  
@@ -403,25 +401,18 @@ between variant and reference genome, in terms of total targets found.
 Example call:
 - Conda
     ```
-    crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.hg19.profile.xls -extprofile emx1.hg19.extended_profile.xls -exons emx1.hg19.annotated.ExonsCount.txt -introns emx1.hg19.annotated.IntronsCount.txt -dnase emx1.hg19.annotated.DNAseCount.txt -ctcf emx1.hg19.annotated.CTCFCount.txt -promoters emx1.hg19.annotated.PromotersCount.txt -gecko
+    crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -annotation emx1.hg38.Annotation.summary.txt -extprofile emx1.hg38.extended_profile.xls
     ```
 - Docker
     ```
-    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -profile emx1.hg19.profile.xls -extprofile emx1.hg19.extended_profile.xls -exons emx1.hg19.annotated.ExonsCount.txt -introns emx1.hg19.annotated.IntronsCount.txt -dnase emx1.hg19.annotated.DNAseCount.txt -ctcf emx1.hg19.annotated.CTCFCount.txt -promoters emx1.hg19.annotated.PromotersCount.txt -gecko
+    docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -annotation emx1.hg38.Annotation.summary.txt -extprofile emx1.hg38.extended_profile.xls
     ```
 
 Detailed input:  
 `GAGTCCGAGCAGAAGAAGAANNN` is a guide present in the result file, the one you want to analyze and print visualization files  
-`-mm 4` Mismatches threshold  
-`-profile emx1.hg19.profile.xls` is the xls file containing information for analyzed guides, as off-target per threshold count, bp/mm and so on  
+`-mm 4` Mismatches threshold
+`-annotation emx1.hg38.Annotation.summary.txt` is the txt file containing information about the annotation of all the guides in the set for each annotation (CTCF,DNaseI,...)
 `-extprofile emx1.hg19.extended_profile.xls` is the xls file containing information detailed information about guides, used to construct the motif logo  
-`-exons emx1.hg19.annotated.ExonsCount.txt`  
-`-introns emx1.hg19.annotated.IntronsCount.txt`  
-`-dnase emx1.hg19.annotated.DNAseCount.txt`  
-`-ctcf emx1.hg19.annotated.CTCFCount.txt`  
-`-promoters emx1.hg19.annotated.PromotersCount.txt` Set of files containing all the count for each genomic annotation, every file is a matrix-like text file with row representing the guides and column representing a mismatch threshold  
-`-gecko` tag to activate the gecko dataset comparison, the results of your test guide, will be
-compared with results from a previous computed analysis on gecko library.  
 
 **Output examples:**
 - Targets file, containing all genomic targets for the guides set
