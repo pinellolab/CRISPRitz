@@ -49,32 +49,32 @@ echo "STARTING THE AUTO TEST SCRIPT"
 echo "THIS SCRIPT WILL NOW TEST ALL THE CRISPRitz FUNCTION TO CHECK THE INSTALLATION"
 echo ""
 echo "TESTING ADD-VARIANTS"
-crispritz.py add-variants hg38_1000genomeproject_vcf/ hg38_ref/ > output.redirect.out
+crispritz.py add-variants hg38_1000genomeproject_vcf/ hg38_ref/ &> output.redirect.out
 echo -e "ADD-VARIANTS \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING INDEX-GENOME"
-crispritz.py index-genome hg38_ref hg38_ref/ 20bp-NGG-SpCas9.txt -bMax 2 > output.redirect.out
+crispritz.py index-genome hg38_ref hg38_ref/ 20bp-NGG-SpCas9.txt -bMax 2 &> output.redirect.out
 echo -e "INDEX-GENOME \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING SEARCH WITH ONLY MISMATCHES"
-crispritz.py search hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38 -mm 4 -t -scores hg38_ref/ > output.redirect.out
+crispritz.py search hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38 -mm 4 -t -scores hg38_ref/ &> output.redirect.out
 echo -e "SEARCH WITH ONLY MISMATCHES \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING SEARCH WITH MISMATCHES AND BULGES"
-crispritz.py search genome_library/NGG_2_hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38.bulges -index -mm 4 -bDNA 1 -bRNA 1 -t > output.redirect.out
+crispritz.py search genome_library/NGG_2_hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38.bulges -index -mm 4 -bDNA 1 -bRNA 1 -t &> output.redirect.out
 echo -e "SEARCH WITH MISMATCHES AND BULGES \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING ANNOTATE-RESULTS"
-crispritz.py annotate-results emx1.hg38.targets.txt hg38Annotation.bed emx1.hg38 > output.redirect.out
+crispritz.py annotate-results emx1.hg38.targets.txt hg38Annotation.bed emx1.hg38 &> output.redirect.out
 echo -e "ANNOTATE-RESULTS \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING GENERATE-REPORT"
-crispritz.py GAGTCCGAGCAGAAGAAGAANNN -mm 4 -annotation .Annotation.summary.txt -extprofile emx1.hg38.extended_profile.xls
+crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -annotation .Annotation.summary.txt -extprofile emx1.hg38.extended_profile.xls
 echo -e "GENERATE-REPORT \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
