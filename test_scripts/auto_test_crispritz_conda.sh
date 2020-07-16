@@ -74,7 +74,7 @@ echo -e "ANNOTATE-RESULTS \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING GENERATE-REPORT"
-crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -annotation .Annotation.summary.txt -extprofile emx1.hg38.extended_profile.xls &> output.redirect.out
+crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -annotation emx1.hg38.Annotation.summary.txt -extprofile emx1.hg38.extended_profile.xls &> output.redirect.out
 echo -e "GENERATE-REPORT \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
