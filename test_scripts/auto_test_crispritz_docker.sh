@@ -44,6 +44,8 @@ echo "-------------------------------------------------------------------------"
 
 echo "EVERYTHING DOWNLOADED AND READY TO USE"
 
+#move to correct folder to test_crispritz
+cd test_crispritz/
 echo ""
 echo "STARTING THE AUTO TEST SCRIPT"
 echo "THIS SCRIPT WILL NOW TEST ALL THE CRISPRitz FUNCTION TO CHECK THE INSTALLATION"
