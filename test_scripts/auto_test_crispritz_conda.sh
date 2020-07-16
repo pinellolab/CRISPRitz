@@ -54,17 +54,17 @@ echo -e "ADD-VARIANTS \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING INDEX-GENOME"
-crispritz.py index-genome hg38_ref hg38_ref/ pam/20bp-NGG-SpCas9.txt -bMax 2 > output.redirect.out
+crispritz.py index-genome hg38_ref hg38_ref/ 20bp-NGG-SpCas9.txt -bMax 2 > output.redirect.out
 echo -e "INDEX-GENOME \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING SEARCH WITH ONLY MISMATCHES"
-crispritz.py search hg38_ref/ pam/20bp-NGG-SpCas9.txt guides/EMX1.sgRNA.txt emx1.hg38 -mm 4 -t -scores hg38_ref/ > output.redirect.out
+crispritz.py search hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38 -mm 4 -t -scores hg38_ref/ > output.redirect.out
 echo -e "SEARCH WITH ONLY MISMATCHES \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING SEARCH WITH MISMATCHES AND BULGES"
-crispritz.py search genome_library/NGG_2_hg38_ref/ pam/20bp-NGG-SpCas9.txt guides/EMX1.sgRNA.txt emx1.hg38.bulges -index -mm 4 -bDNA 1 -bRNA 1 -t > output.redirect.out
+crispritz.py search genome_library/NGG_2_hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38.bulges -index -mm 4 -bDNA 1 -bRNA 1 -t > output.redirect.out
 echo -e "SEARCH WITH MISMATCHES AND BULGES \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
