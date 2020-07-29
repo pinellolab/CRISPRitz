@@ -46,12 +46,12 @@ Here we summarize the steps to install CRISPRitz with Docker and Conda.
     (base) user@nameofPC:~$
     ```
     If you read the "(base)" like this, conda is loaded correctly and you can start using it.
-- Now you need to set the channels to allow conda to access different repositories and set the default version of python to version 3.6, so paste these commands into the terminal you just opened:
+- Now you need to set the channels to allow conda to access different repositories and set the default version of python to version 3.8, so paste these commands into the terminal you just opened:
     ```
     conda config --add channels defaults
     conda config --add channels bioconda
     conda config --add channels conda-forge
-    conda install python=3.6
+    conda install python=3.8
     ```
 - Now, you can install CRISPRitz by typing the command:
     ```
