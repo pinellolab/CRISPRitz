@@ -1,0 +1,9 @@
+-cluster.dict.py
+Delete creation of guides_error.txt, add argv[6] as result_name
+-annotator
+Equal to web app
+-summary_by_guide_position
+Change to_pickle to to_csv, adding:
+	 , index = False, sep = '\t'
+-summary_by_samples
+Remove firs line when saving, add header

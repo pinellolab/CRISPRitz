@@ -9,6 +9,7 @@
 //#include <algorithm>
 //#include <algorithm>
 #include <unistd.h>
+#include <thread>
 
 /***************************************
  * -18/02/2020
@@ -446,6 +447,7 @@ int main(int argc, char **argv)
 	vector<int> pamIndices;									  // vector of target indices of pam RNA on DNA
 	ifstream fasta(argv[1]);								  // input fasta file
 	ifstream pamfile(argv[2]);								  // input pam.txt
+	int par_thr = stoi(argv[3]);							//thread to use in parallel algorithm
 	int max_bulges = stoi(argv[4]);							//max allowed bulges
 	pam_at_start = false;
 	globalstart = omp_get_wtime(); // start global time
@@ -724,6 +726,20 @@ int main(int argc, char **argv)
 	
 	cout << "Sorting:\t";
 	start = omp_get_wtime(); // sorting the strings before inserting into the tree
+
+	// Set the number of thrs for the sorting phase
+	const auto processor_count = std::thread::hardware_concurrency();
+
+	if (par_thr == 0){			// the user did not set a thr number, se it to half available (or to 4 if it's not possible to see the available thrs)
+		if (processor_count != 0){
+			par_thr = int(processor_count/2);
+		}else{					//cannot see the number of available thrs
+			par_thr = 4;
+		}
+	}
+	
+	omp_set_num_threads(par_thr);
+
 	__gnu_parallel::sort(targetOnDNA.begin(), targetOnDNA.begin() + counter_index, compareFunc);
 	//sort(targetOnDNA.begin(), targetOnDNA.begin() + counter_index, compareFunc);
 
