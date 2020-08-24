@@ -1,4 +1,4 @@
-# Set the base image to anaconda python 3.6
+# Set the base image to anaconda python 3.8
 FROM continuumio/miniconda3
 
 # File Author / Maintainer
@@ -16,9 +16,9 @@ RUN apt-get update && apt-get install gsl-bin libgsl0-dev -y && apt-get install 
 
 #Install crispritz package (change the dafault version of python to 3.6)
 RUN conda update -n base -c defaults conda
-RUN conda install python=3.6 -y
+RUN conda install python=3.8 -y
 RUN conda install crispritz -y && conda clean --all -y
 
 #Update base environment
-COPY environment_droplet.yml /home/environment_droplet.yml
-RUN conda env update --name base --file /home/environment_droplet.yml
+#COPY environment_droplet.yml /home/environment_droplet.yml
+#RUN conda env update --name base --file /home/environment_droplet.yml
