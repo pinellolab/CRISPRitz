@@ -43,10 +43,16 @@ guide = sys.argv[1]
 mm = int(sys.argv[2])
 # annotation_var = sys.argv[3] #sostituito da lettura automatica del file summary
 
-# utilizato per calcolare la 'bontà' della guida usata in comparazione con il suo set (opzionale quello delle popolazioni)
+# utilizzato per calcolare la 'bontà' della guida usata in comparazione con il suo set (opzionale quello delle popolazioni)
+# annotation delle guide ref, tutte le guide usate nella ricerca
 annotation_ref = sys.argv[3]
 inAnnotation_ref = open(annotation_ref, 'r').readlines()
-extended_profile = sys.argv[4]  # utilizzato per motif logo
+# utilizzato per motif logo
+extended_profile = sys.argv[4]
+# annotation delle popolazioni, un file per guida
+annotation_population = sys.argv[5]
+inAnnotation_population = open(annotation_population, 'r').readlines()
+
 
 # gecko_summary = sys.argv[6]
 # gecko_exon = sys.argv[7]
@@ -66,37 +72,88 @@ if web_server:
 if '-pop' is sys.argv[:]:
     population = True
 
-dataDict = {}
+dictRef = {}
+dictPop = {}
 extractGuide = ''
+pop = ''
+populationSet = set()
+populationDataFrame = pd.DataFrame()
+annotation_type = set()
 
 for line in inAnnotation_ref:
     split = line.lower().strip().split('\t')
     if 'Summary' in line:
         extractGuide = line.strip().split('_')[1]
-        dataDict[extractGuide] = {}
+        dictRef[extractGuide+'_REF'] = {}
     else:
-        dataDict[extractGuide][split[0]] = int(split[mm+1])
+        dictRef[extractGuide+'_REF'][split[0]] = int(split[mm+1])
+        annotation_type.add(split[0].upper())
 
-dataDict.pop('Total', None)
-print(dataDict)
+dictRef.pop('Total_REF', None)
+# print(dictRef)
 
-df = pd.DataFrame.from_dict(dataDict, orient='index')
-# print(df)
+referenceDataFrame = pd.DataFrame.from_dict(dictRef, orient='index')
+# print(referenceDataFrame)
 
-for col in df:
-    df[str(col)+'_rank'] = df[col].rank(method='first', pct=True)
 
-print(df)
-df.to_csv('test.tsv', sep='\t')
+for col in referenceDataFrame:
+    referenceDataFrame[str(
+        col)+'_rank'] = referenceDataFrame[col].rank(method='first', pct=True)
+
+for line in inAnnotation_population:
+    split = line.lower().strip().split('\t')
+    if 'Guide' in line:
+        extractGuide = line.strip().split('_')[2]
+        dictPop[extractGuide] = {}
+    elif 'Summary' in line and 'Guide' not in line:
+        pop = line.strip().split('_')[1]
+        populationSet.add(pop.upper())
+        dictPop[extractGuide][pop] = {}
+    else:
+        dictPop[extractGuide][pop][split[0]] = int(split[mm+1])
+
+for key in dictPop:
+    dictPop[key].pop('Total', None)
+
+populationSet.remove('TOTAL')
+
+tempDict = {}
+for elem in populationSet:
+    for key in dictPop:
+        # print('chiave', key, 'pop', elem)
+        # for elem in dictPop[key]:
+        #     print('elem', elem)
+        tempDict[key+'_'+elem] = {}
+        tempDict[key+'_'+elem] = dictPop[key][elem]
+    tempDataFrame = pd.DataFrame.from_dict(tempDict, orient='index')
+    for col in tempDataFrame:
+        tempDataFrame[str(
+            col)+'_rank'] = tempDataFrame[col].rank(method='first', pct=True)
+    populationDataFrame = pd.concat([populationDataFrame, tempDataFrame])
+    tempDict = {}
+
+# print(referenceDataFrame)
+# print(populationDataFrame)
+
+# print(annotation_type)
+
+totalDataFrame = pd.concat([referenceDataFrame, populationDataFrame])
+# totalDataFrame.to_csv('total.tsv', sep='\t')
+
+totalDataFrame = totalDataFrame.T
+
+print(totalDataFrame)
 # Create data for radarchart
-# data_for_df = {'group': ['A'], 'General': dataDict['targets'][0]}
-# data_for_table_df = [dataDict['targets']]
+dictForChart = {}
+
+data_for_df = {'Populations': populationSet, 'General': annotation_type}
+# data_for_table_df = [dictRef['targets']]
 # rows = ['General']
-# for elem in dataDict:
+# for elem in dictRef:
 #     if elem == 'targets':
 #         continue
-#     data_for_df[elem] = dataDict[elem][0]
-#     data_for_table_df.append(dataDict[elem])
+#     data_for_df[elem] = dictRef[elem][0]
+#     data_for_table_df.append(dictRef[elem])
 #     rows.append(elem)
 
 # df = pd.DataFrame(data_for_df)
