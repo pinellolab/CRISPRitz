@@ -37,6 +37,7 @@ warnings.filterwarnings("ignore")
 plt.style.use('seaborn-poster')
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.rcParams["figure.figsize"] = [10, 8].
 SIZE_GECKO = 123411  # NOTE modify if new gecko annotations are done
 SIZE_GECKO = 111671
 random.seed(a=None, version=2)
@@ -78,8 +79,8 @@ dictPop = {}
 extractGuide = ''
 pop = ''
 populationSet = set()
-populationDataFrame = pd.DataFrame()
 annotationSet = set()
+populationDataFrame = pd.DataFrame()
 
 for line in inAnnotation_ref:
     split = line.lower().strip().split('\t')
@@ -149,6 +150,7 @@ annotationSet = sorted(annotationSet)
 # print(totalDataFrame)
 # Create data for radarchart
 dataForChart = {'Populations': populationSet}
+dataForTable = []
 
 for annot in annotationSet:
     if 'rank' in annot:
@@ -158,12 +160,16 @@ for annot in annotationSet:
 # data_for_table_df = [dictRef['targets']]
 # rows = ['General']
 # listForChart = []
+templist = []
 for pop in populationSet:
     for col in totalDataFrame:
         if pop in col and guide in col:
             for annot in annotationSet:
+                templist.append(totalDataFrame.loc[annot, col])
                 if 'rank' in annot:
                     dataForChart[annot].append(totalDataFrame.loc[annot, col])
+            dataForTable.append(templist)
+            templist = []
 
 # print(dataForChart)
 df = pd.DataFrame.from_dict(dataForChart, orient='index')
@@ -184,7 +190,7 @@ angles += angles[:1]
 
 # # Initialise the spider plot
 # ax = plt.subplot(111, polar=True)
-ax = plt.subplot(1, 1, 1, polar=True)
+ax = plt.subplot(2, 2, 1, polar=True)
 # plt.title('RADAR CHART')
 
 labels = list(df.columns.values[1:])
@@ -228,8 +234,6 @@ for count, pop in enumerate(populationSet):
 # Add legend
 # plt.legend(bbox_to_anchor=(0.1, 0.1))
 
-plt.savefig("summary_single_guide_" + str(guide) + "_"+str(mm) +
-            "mm" + "." + file_extension, format=file_extension)
 
 # # Plot data
 # ax.plot(angles, values, linewidth=1, linestyle='solid')
@@ -239,14 +243,19 @@ plt.savefig("summary_single_guide_" + str(guide) + "_"+str(mm) +
 
 # columns = ('Position', '# Targets')
 
-# # Create table plot
-# plt.subplot(2, 2, 2)
-# table = plt.table(cellText=data_for_table_df, rowLabels=rows,
-#                   colLabels=columns, loc='center', colWidths=[0.35 for x in columns])
+print(dataForTable)
+# Create table plot
+plt.subplot(2, 2, 2)
+table = plt.table(cellText=dataForTable, rowLabels=populationSet,
+                  colLabels=annotationSet, loc='center', colWidths=[0.40 for x in annotationSet])
 # table.auto_set_font_size(False)
 # table.set_fontsize(18)
 # table.scale(1, 3)
-# plt.axis('off')
+plt.axis('off')
+
+
+plt.savefig("summary_single_guide_" + str(guide) + "_"+str(mm) +
+            "mm" + "." + file_extension, format=file_extension)
 
 # # Calculate motif logo
 # if extended_profile != 'no':
