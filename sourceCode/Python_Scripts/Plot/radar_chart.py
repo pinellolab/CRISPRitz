@@ -17,11 +17,11 @@ from matplotlib import patches as mpatches
 from matplotlib import pyplot as plt
 import math
 import matplotlib
+import random
 # matplotlib.use("TkAgg")
 matplotlib.use('Agg')
 
 warnings.filterwarnings("ignore")
-
 
 # argv 1 is Guide
 # argv 2 is mm value
@@ -39,6 +39,7 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 SIZE_GECKO = 123411  # NOTE modify if new gecko annotations are done
 SIZE_GECKO = 111671
+random.seed(a=None, version=2)
 guide = sys.argv[1]
 mm = int(sys.argv[2])
 # annotation_var = sys.argv[3] #sostituito da lettura automatica del file summary
@@ -78,7 +79,7 @@ extractGuide = ''
 pop = ''
 populationSet = set()
 populationDataFrame = pd.DataFrame()
-annotation_type = set()
+annotationSet = set()
 
 for line in inAnnotation_ref:
     split = line.lower().strip().split('\t')
@@ -86,8 +87,10 @@ for line in inAnnotation_ref:
         extractGuide = line.strip().split('_')[1]
         dictRef[extractGuide+'_REF'] = {}
     else:
-        dictRef[extractGuide+'_REF'][split[0]] = int(split[mm+1])
-        annotation_type.add(split[0].upper())
+        # dictRef[extractGuide+'_REF'][split[0]] = int(split[mm+1])
+        dictRef[extractGuide+'_REF'][split[0]] = random.randint(200, 123456)
+        annotationSet.add(split[0].lower())
+        annotationSet.add(split[0].lower()+'_rank')
 
 dictRef.pop('Total_REF', None)
 # print(dictRef)
@@ -110,7 +113,8 @@ for line in inAnnotation_population:
         populationSet.add(pop.upper())
         dictPop[extractGuide][pop] = {}
     else:
-        dictPop[extractGuide][pop][split[0]] = int(split[mm+1])
+        # dictPop[extractGuide][pop][split[0]] = int(split[mm+1])
+        dictPop[extractGuide][pop][split[0]] = random.randint(200, 123456)
 
 for key in dictPop:
     dictPop[key].pop('Total', None)
@@ -120,9 +124,6 @@ populationSet.remove('TOTAL')
 tempDict = {}
 for elem in populationSet:
     for key in dictPop:
-        # print('chiave', key, 'pop', elem)
-        # for elem in dictPop[key]:
-        #     print('elem', elem)
         tempDict[key+'_'+elem] = {}
         tempDict[key+'_'+elem] = dictPop[key][elem]
     tempDataFrame = pd.DataFrame.from_dict(tempDict, orient='index')
@@ -135,70 +136,100 @@ for elem in populationSet:
 # print(referenceDataFrame)
 # print(populationDataFrame)
 
-# print(annotation_type)
+# print(annotationSet)
 
 totalDataFrame = pd.concat([referenceDataFrame, populationDataFrame])
 # totalDataFrame.to_csv('total.tsv', sep='\t')
 
 totalDataFrame = totalDataFrame.T
 
-print(totalDataFrame)
+populationSet = sorted(populationSet)
+populationSet.append('REF')
+annotationSet = sorted(annotationSet)
+# print(totalDataFrame)
 # Create data for radarchart
-dictForChart = {}
+dataForChart = {'Populations': populationSet}
 
-data_for_df = {'Populations': populationSet, 'General': annotation_type}
+for annot in annotationSet:
+    if 'rank' in annot:
+        dataForChart[annot] = []
+
+# print(dataForChart)
 # data_for_table_df = [dictRef['targets']]
 # rows = ['General']
-# for elem in dictRef:
-#     if elem == 'targets':
-#         continue
-#     data_for_df[elem] = dictRef[elem][0]
-#     data_for_table_df.append(dictRef[elem])
-#     rows.append(elem)
+# listForChart = []
+for pop in populationSet:
+    for col in totalDataFrame:
+        if pop in col and guide in col:
+            for annot in annotationSet:
+                if 'rank' in annot:
+                    dataForChart[annot].append(totalDataFrame.loc[annot, col])
 
-# df = pd.DataFrame(data_for_df)
-
-# # number of variable
-# categories = list(df)[1:]
-# N = len(categories)
+# print(dataForChart)
+df = pd.DataFrame.from_dict(dataForChart, orient='index')
+df = df.T
+print(df)
+# number of variable
+categories = list(df)[1:]
+N = len(categories)
 
 # # We are going to plot the first line of the data frame.
 # # But we need to repeat the first value to close the circular graph:
-# values = df.loc[0].drop('group').values.flatten().tolist()
+# values = df.loc[0].drop('').values.flatten().tolist()
 # values += values[:1]
 
 # # What will be the angle of each axis in the plot? (we divide the plot / number of variable)
-# angles = [n / float(N) * 2 * pi for n in range(N)]
-# angles += angles[:1]
+angles = [n / float(N) * 2 * pi for n in range(N)]
+angles += angles[:1]
 
 # # Initialise the spider plot
-# ax = plt.subplot(2, 2, 1, polar=True)
-# # ax=plt.subplot(1, 1, 1, polar=True)
-# # plt.title('RADAR CHART')
+# ax = plt.subplot(111, polar=True)
+ax = plt.subplot(1, 1, 1, polar=True)
+# plt.title('RADAR CHART')
 
-# labels = list(df.columns.values[1:])
-# # Draw one axe per variable + add labels labels yet
-# plt.xticks(angles[:-1], labels, color='black', size=18)
+labels = list(df.columns.values[1:])
+# Draw one axe per variable + add labels labels yet
+plt.xticks(angles[:-1], labels, color='black', size=14)
 
-# for label, rot in zip(ax.get_xticklabels(), angles):
-#     if (rot == 0):
-#         label.set_horizontalalignment("center")
-#     if (rot > 0):
-#         label.set_horizontalalignment("left")
-#     if (rot > 3):
-#         label.set_horizontalalignment("center")
-#     if (rot > 4):
-#         label.set_horizontalalignment("right")
+for label, rot in zip(ax.get_xticklabels(), angles):
+    if (rot == 0):
+        label.set_horizontalalignment("center")
+    if (rot > 0):
+        label.set_horizontalalignment("left")
+    if (rot > 3):
+        label.set_horizontalalignment("center")
+    if (rot > 4):
+        label.set_horizontalalignment("right")
 
 # # offset posizione y-axis
-# ax.set_theta_offset(pi / 2)
-# ax.set_theta_direction(-1)
+ax.set_theta_offset(pi / 2)
+ax.set_theta_direction(-1)
 
 # # Draw ylabels
-# ax.set_rlabel_position(0)
-# plt.yticks([0, 0.25, 0.50, 0.75, 1], ["0", "0.25",
-#                                       "0.50", "0.75"], color="black", size=18)
-# plt.ylim(0, 1)
+ax.set_rlabel_position(0)
+plt.yticks([0, 0.25, 0.50, 0.75], ["0", "0.25",
+                                   "0.50", "0.75"], color="black", size=10)
+plt.ylim(0, 1)
+
+# listPop = list(populationSet)
+for count, pop in enumerate(populationSet):
+    values = df.loc[count].drop('Populations').values.flatten().tolist()
+    values += values[:1]
+    ax.plot(angles, values, linewidth=0.1,
+            linestyle='solid', label=str(pop))
+    ax.fill(angles, values, alpha=0.1)
+
+# # Ind2
+# values = df.loc[1].drop('Populations').values.flatten().tolist()
+# values += values[:1]
+# ax.plot(angles, values, linewidth=1, linestyle='solid', label=str(listPop[1]))
+# ax.fill(angles, values, 'r', alpha=0.1)
+
+# Add legend
+# plt.legend(bbox_to_anchor=(0.1, 0.1))
+
+plt.savefig("summary_single_guide_" + str(guide) + "_"+str(mm) +
+            "mm" + "." + file_extension, format=file_extension)
 
 # # Plot data
 # ax.plot(angles, values, linewidth=1, linestyle='solid')
