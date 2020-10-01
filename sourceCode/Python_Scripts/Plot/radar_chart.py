@@ -37,7 +37,7 @@ warnings.filterwarnings("ignore")
 plt.style.use('seaborn-poster')
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.rcParams["figure.figsize"] = [10, 8].
+matplotlib.rcParams["figure.figsize"] = [50, 40]
 SIZE_GECKO = 123411  # NOTE modify if new gecko annotations are done
 SIZE_GECKO = 111671
 random.seed(a=None, version=2)
@@ -190,7 +190,7 @@ angles += angles[:1]
 
 # # Initialise the spider plot
 # ax = plt.subplot(111, polar=True)
-ax = plt.subplot(2, 2, 1, polar=True)
+ax = plt.subplot(3, 3, 1, polar=True)
 # plt.title('RADAR CHART')
 
 labels = list(df.columns.values[1:])
@@ -243,10 +243,22 @@ for count, pop in enumerate(populationSet):
 
 # columns = ('Position', '# Targets')
 
-print(dataForTable)
+# print(dataForTable)
+print(dataForChart)
+
+numpy_array = np.array(dataForTable)
+transpose = numpy_array.T
+transpose_list = transpose.tolist()
+# print(transpose_list)
+
+tableAnnotation = []
+for annot in annotationSet:
+    if 'rank' not in annot:
+        tableAnnotation.append(annot)
+
 # Create table plot
-plt.subplot(2, 2, 2)
-table = plt.table(cellText=dataForTable, rowLabels=populationSet,
+plt.subplot(3, 3, (4, 6))
+table = plt.table(cellText=transpose_list, rowLabels=tableAnnotation,
                   colLabels=annotationSet, loc='center', colWidths=[0.40 for x in annotationSet])
 # table.auto_set_font_size(False)
 # table.set_fontsize(18)
