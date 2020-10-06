@@ -172,16 +172,16 @@ for pop in populationSet:
             templist = []
 
 # print(dataForChart)
-df = pd.DataFrame.from_dict(dataForChart, orient='index')
-df = df.T
-print(df)
+dataFrameForChart = pd.DataFrame.from_dict(dataForChart, orient='index')
+dataFrameForChart = dataFrameForChart.T
+# print(dataFrameForChart)
 # number of variable
-categories = list(df)[1:]
+categories = list(dataFrameForChart)[1:]
 N = len(categories)
 
 # # We are going to plot the first line of the data frame.
 # # But we need to repeat the first value to close the circular graph:
-# values = df.loc[0].drop('').values.flatten().tolist()
+# values = dataFrameForChart.loc[0].drop('').values.flatten().tolist()
 # values += values[:1]
 
 # # What will be the angle of each axis in the plot? (we divide the plot / number of variable)
@@ -190,10 +190,10 @@ angles += angles[:1]
 
 # # Initialise the spider plot
 # ax = plt.subplot(111, polar=True)
-ax = plt.subplot(3, 3, 1, polar=True)
+ax = plt.subplot(1, 1, 1, polar=True)
 # plt.title('RADAR CHART')
 
-labels = list(df.columns.values[1:])
+labels = list(dataFrameForChart.columns.values[1:])
 # Draw one axe per variable + add labels labels yet
 plt.xticks(angles[:-1], labels, color='black', size=14)
 
@@ -219,14 +219,15 @@ plt.ylim(0, 1)
 
 # listPop = list(populationSet)
 for count, pop in enumerate(populationSet):
-    values = df.loc[count].drop('Populations').values.flatten().tolist()
+    values = dataFrameForChart.loc[count].drop(
+        'Populations').values.flatten().tolist()
     values += values[:1]
     ax.plot(angles, values, linewidth=0.1,
             linestyle='solid', label=str(pop))
     ax.fill(angles, values, alpha=0.1)
 
 # # Ind2
-# values = df.loc[1].drop('Populations').values.flatten().tolist()
+# values = dataFrameForChart.loc[1].drop('Populations').values.flatten().tolist()
 # values += values[:1]
 # ax.plot(angles, values, linewidth=1, linestyle='solid', label=str(listPop[1]))
 # ax.fill(angles, values, 'r', alpha=0.1)
@@ -244,7 +245,7 @@ for count, pop in enumerate(populationSet):
 # columns = ('Position', '# Targets')
 
 # print(dataForTable)
-print(dataForChart)
+# print(dataForChart)
 
 numpy_array = np.array(dataForTable)
 transpose = numpy_array.T
@@ -256,14 +257,15 @@ for annot in annotationSet:
     if 'rank' not in annot:
         tableAnnotation.append(annot)
 
+# print(tableAnnotation)
+
 # Create table plot
-plt.subplot(3, 3, (4, 6))
-table = plt.table(cellText=transpose_list, rowLabels=tableAnnotation,
-                  colLabels=annotationSet, loc='center', colWidths=[0.40 for x in annotationSet])
+# plt.subplot(1, 1, 1)
+# table = plt.table(cellText=transpose_list, rowLabels=annotationSet, colLabels = annotationSet, loc = 'center', colWidths = [0.40 for x in annotationSet])
 # table.auto_set_font_size(False)
 # table.set_fontsize(18)
 # table.scale(1, 3)
-plt.axis('off')
+# plt.axis('off')
 
 
 plt.savefig("summary_single_guide_" + str(guide) + "_"+str(mm) +
@@ -537,15 +539,15 @@ plt.savefig("summary_single_guide_" + str(guide) + "_"+str(mm) +
 #         data_for_table_df.append(table_dict[elem])
 #         rows.append(elem)
 
-#     df = pd.DataFrame(data_for_df)
+#     dataFrameForChart = pd.DataFrame(data_for_df)
 
 #     # number of variable
-#     categories = list(df)[1:]
+#     categories = list(dataFrameForChart)[1:]
 #     N = len(categories)
 
 #     # We are going to plot the first line of the data frame.
 #     # But we need to repeat the first value to close the circular graph:
-#     values = df.loc[0].drop('group').values.flatten().tolist()
+#     values = dataFrameForChart.loc[0].drop('group').values.flatten().tolist()
 #     values += values[:1]
 
 #     # What will be the angle of each axis in the plot? (we divide the plot / number of variable)
@@ -557,7 +559,7 @@ plt.savefig("summary_single_guide_" + str(guide) + "_"+str(mm) +
 #     # ax=plt.subplot(1, 1, 1, polar=True)
 #     # plt.title('RADAR CHART')
 
-#     labels = list(df.columns.values[1:])
+#     labels = list(dataFrameForChart.columns.values[1:])
 #     # Draw one axe per variable + add labels labels yet
 #     plt.xticks(angles[:-1], labels, color='black', size=18)
 #     for label, rot in zip(ax.get_xticklabels(), angles):
