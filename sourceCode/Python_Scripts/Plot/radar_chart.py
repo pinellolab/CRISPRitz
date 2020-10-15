@@ -37,7 +37,7 @@ warnings.filterwarnings("ignore")
 plt.style.use('seaborn-poster')
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.rcParams["figure.figsize"] = [50, 40]
+matplotlib.rcParams["figure.figsize"] = [100, 80]
 SIZE_GECKO = 123411  # NOTE modify if new gecko annotations are done
 SIZE_GECKO = 111671
 random.seed(a=None, version=2)
@@ -195,7 +195,7 @@ ax = plt.subplot(1, 1, 1, polar=True)
 
 labels = list(dataFrameForChart.columns.values[1:])
 # Draw one axe per variable + add labels labels yet
-plt.xticks(angles[:-1], labels, color='black', size=14)
+plt.xticks(angles[:-1], labels, color='black', size=18)
 
 for label, rot in zip(ax.get_xticklabels(), angles):
     if (rot == 0):
@@ -214,7 +214,7 @@ ax.set_theta_direction(-1)
 # # Draw ylabels
 ax.set_rlabel_position(0)
 plt.yticks([0, 0.25, 0.50, 0.75], ["0", "0.25",
-                                   "0.50", "0.75"], color="black", size=10)
+                                   "0.50", "0.75"], color="black", size=12)
 plt.ylim(0, 1)
 
 # listPop = list(populationSet)
@@ -260,12 +260,13 @@ for annot in annotationSet:
 # print(tableAnnotation)
 
 # Create table plot
-# plt.subplot(1, 1, 1)
-# table = plt.table(cellText=transpose_list, rowLabels=annotationSet, colLabels = annotationSet, loc = 'center', colWidths = [0.40 for x in annotationSet])
-# table.auto_set_font_size(False)
-# table.set_fontsize(18)
-# table.scale(1, 3)
-# plt.axis('off')
+plt.subplot(1, 1, 1)
+table = plt.table(cellText=transpose_list, rowLabels=annotationSet,
+                  colLabels=annotationSet, loc='center', colWidths=[0.30 for x in annotationSet])
+table.auto_set_font_size(False)
+table.set_fontsize(18)
+table.scale(1, 3)
+plt.axis('off')
 
 
 plt.savefig("summary_single_guide_" + str(guide) + "_"+str(mm) +
