@@ -563,8 +563,13 @@ def genomeEnrichment():
 
     print("Variants Extraction START")
     start_time = time.time()
-    subprocess.run([corrected_origin_path +
-                    'Python_Scripts/Enrichment/bcf_query.sh', dirVCFFiles+'/'])
+    for elem in listChrs:
+        chrom = ""
+        for cut in elem.split('.'):
+            if 'chr' in cut:
+                chrom = cut
+        subprocess.run([corrected_origin_path +
+                        'Python_Scripts/Enrichment/bcf_query.sh', dirVCFFiles+"/"+elem, chrom])
     print("Variants Extraction END")
     print("Runtime: %s seconds" % (time.time() - start_time))
 
@@ -1190,12 +1195,14 @@ def callHelp():
           "\ncrispritz scores FUNCTION TO CALCULATE THE CFD SCORE FOR A LIST OF TARGETS",
           "\ncrispritz annotate-results FUNCTION TO ADD GENOMIC INFORMATION TO TARGETS RESULTS",
           "\ncrispritz generate-report FUNCTION TO GENERATE GRAPHICAL REPORT FOR A SPECIFIC GUIDE",
-          "\ncrispritz process-data FUNCTION TO ANALYZE RESULTS TO GENERATE VARIANT ANALYSIS AND SAMPLE CLASSIFICATION (beta)",
+          #   "\ncrispritz process-data FUNCTION TO ANALYZE RESULTS TO GENERATE VARIANT ANALYSIS AND SAMPLE CLASSIFICATION (beta)",
           "\n\nADD help TO ANY FUNCTION TO VISUALIZE A BRIEF HELP PAGE (example: crispritz index-genome help)\n")
 
 
 if len(sys.argv) < 2:
     callHelp()
+elif sys.argv[1] == "version":
+    version()
 elif sys.argv[1] == "index-genome":
     indexGenome()
 elif sys.argv[1] == "search" and ("-bDNA" in sys.argv[1:] or "-bRNA" in sys.argv[1:]):
