@@ -452,6 +452,15 @@ int main(int argc, char **argv)
 	pam_at_start = false;
 	globalstart = omp_get_wtime(); // start global time
 
+	if (par_thr > std::thread::hardware_concurrency() || par_thr == 0)
+	{
+		omp_set_num_threads(std::thread::hardware_concurrency());
+	}
+	else
+	{
+		omp_set_num_threads(par_thr);
+	}
+
 	// ----------------------- READ INPUT FASTA ---------------------------
 	//Read chromosome name
 	getline(fasta, chrName);
@@ -728,17 +737,17 @@ int main(int argc, char **argv)
 	start = omp_get_wtime(); // sorting the strings before inserting into the tree
 
 	// Set the number of thrs for the sorting phase
-	const auto processor_count = std::thread::hardware_concurrency();
+	// const auto processor_count = std::thread::hardware_concurrency();
 
-	if (par_thr == 0){			// the user did not set a thr number, se it to half available (or to 4 if it's not possible to see the available thrs)
-		if (processor_count != 0){
-			par_thr = int(processor_count/2);
-		}else{					//cannot see the number of available thrs
-			par_thr = 4;
-		}
-	}
+	// if (par_thr == 0){			// the user did not set a thr number, se it to half available (or to 4 if it's not possible to see the available thrs)
+	// 	if (processor_count != 0){
+	// 		par_thr = int(processor_count/2);
+	// 	}else{					//cannot see the number of available thrs
+	// 		par_thr = 4;
+	// 	}
+	// }
 	
-	omp_set_num_threads(par_thr);
+	// omp_set_num_threads(par_thr);
 
 	__gnu_parallel::sort(targetOnDNA.begin(), targetOnDNA.begin() + counter_index, compareFunc);
 	//sort(targetOnDNA.begin(), targetOnDNA.begin() + counter_index, compareFunc);

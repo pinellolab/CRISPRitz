@@ -83,7 +83,7 @@ def indexGenome():
     # 	variant = 1
 
     # read number of threads
-    th = 0
+    th = 1000
     if "-th" in sys.argv[1:]:
         try:
             th = (sys.argv).index("-th") + 1
@@ -1179,7 +1179,7 @@ def graphicalInterface():
 
 
 def version():
-    print("CRISPRitz v2.3.3")
+    print("CRISPRitz v2.3.5")
 
 
 # HELP FUNCTION
