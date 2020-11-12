@@ -1179,7 +1179,7 @@ def graphicalInterface():
 
 
 def version():
-    print("CRISPRitz v2.3.5")
+    print("CRISPRitz v2.3.6")
 
 
 # HELP FUNCTION
