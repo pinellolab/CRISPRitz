@@ -18,7 +18,4 @@ RUN apt-get update && apt-get install gsl-bin libgsl0-dev -y && apt-get install 
 RUN conda update -n base -c defaults conda
 RUN conda install python=3.7 -y
 RUN conda install crispritz -y && conda clean --all -y
-
-#Update base environment
-#COPY environment_droplet.yml /home/environment_droplet.yml
-#RUN conda env update --name base --file /home/environment_droplet.yml
+RUN conda update crispritz -y
