@@ -212,7 +212,7 @@ with open(sys.argv[1]) as result, open(targets_score_file, 'w+') as save_targ_sc
     # Calc CDF score
     for target in result:
         target = target.strip().split('\t')
-        print(target)
+        # print(target)
 
         guide_seq = target[1]
         off = target[2].upper()
@@ -232,8 +232,8 @@ with open(sys.argv[1]) as result, open(targets_score_file, 'w+') as save_targ_sc
             #print ("sg: ", sg)
             #print ("guide_seq: ", guide_seq)
             if target[0] == 'DNA':
-                print('tests', guide_seq[int(target[bulge_pos]):], off[int(
-                    target[bulge_pos]):-3])
+                # print('tests', guide_seq[int(target[bulge_pos]):], off[int(
+                # target[bulge_pos]):-3])
                 cfd_score = calc_cfd(guide_seq[int(target[bulge_pos]):], off[int(
                     target[bulge_pos]):-3], pam, mm_scores, pam_scores)
             else:
