@@ -16,6 +16,6 @@ RUN apt-get update && apt-get install gsl-bin libgsl0-dev -y && apt-get install 
 
 #Install crispritz package (change the dafault version of python to 3.8)
 RUN conda update -n base -c defaults conda
-RUN conda install python=3.7 -y
+RUN conda install python=3.8 -y
 RUN conda install crispritz -y && conda clean --all -y
 RUN conda update crispritz -y
