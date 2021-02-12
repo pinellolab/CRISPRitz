@@ -77,11 +77,6 @@ def indexGenome():
 
     print(TSTgenome, "Indexing generation:")
 
-    # # variant
-    # variant = 0
-    # if "-var" in sys.argv[1:]:
-    # 	variant = 1
-
     # read number of threads
     th = 1000
     if "-th" in sys.argv[1:]:
@@ -101,6 +96,8 @@ def indexGenome():
     # run buildTST
     start_time = time.time()
     for f in listChrs:
+        if f.strip().split('.')[-1] != 'fa':
+            continue
         print("Indexing:", f)
         subprocess.run([corrected_origin_path+"buildTST",
                         str(dirGenome)+"/"+str(f), str(dirPAM), str(th), max_bulges])
@@ -230,21 +227,12 @@ def searchTST():
                 "ERROR! Please select the directory containing the fasta files of the genome")
             sys.exit()
 
-        # pam_len = int(open(PAM).readline().split(" ")[1])
-        # if (pam_len < 0):
-        # 	pam_begin = True
-        # else:
-        # 	pam_begin = False
+        
         pam_guide = len(open(PAM).readline().split(" ")[0])
         pam_at_beginning = int(open(PAM).readline().split(" ")[1])
         if (pam_guide != 23 or pam_at_beginning < 0):  # Also block scoring pam at beginning
-            print("WARNING: The CFD score and the Doench score can be calculated only for guides with 20bp and a 3bp PAM")
-            # sys.exit()
-        # pam_seq_check_ngg = open(PAM).readline().split(" ")[0].upper()
-        # if ("NGG" not in pam_seq_check_ngg):
-        # 	# print("WARNING: The model used for the CFD and Doench scores are based on the NGG PAM, the scores may not be valid for other PAMs")
-        # 	print("WARNING: The model used for the CFD and Doench scores are based on the NGG PAM")
-        # 	sys.exit()
+            print("WARNING: The CFD score and the Doench score can be calculated only for guides with 20bp and a 3bp PAM (SpCas9)")
+
         target_filename = os.path.realpath(nameResult)
         subprocess.run([corrected_origin_path+'Python_Scripts/Scores/scores.py',
                         target_filename + '.targets.txt', idx_genome_fasta + "/", str(PAM), str(fileGuide)])
@@ -284,7 +272,7 @@ def searchBruteForce():
             sys.exit()
 
     # read number of mismatches
-    th = 10000000
+    th = 1000
     if "-th" in sys.argv[1:]:
         try:
             th = (sys.argv).index("-th") + 1
@@ -308,8 +296,6 @@ def searchBruteForce():
 
     # variant
     variant = 1  # always search with IUPAC variant
-    # if "-var" in sys.argv[1:]:
-    #     variant = 1
 
     # Check '-scores' directory
     if "-scores" in sys.argv[1:]:
@@ -351,22 +337,11 @@ def searchBruteForce():
                 "ERROR! Please select the directory containing the fasta files of the genome")
             sys.exit()
 
-        # pam_len = int(open(filePAM).readline().split(" ")[1])
-        # if (pam_len < 0):
-        # 	pam_begin = True
-        # else:
-        # 	pam_begin = False
-
         pam_guide = len(open(filePAM).readline().split(" ")[0])
         pam_at_beginning = int(open(filePAM).readline().split(" ")[1])
         if (pam_guide != 23 or pam_at_beginning < 0):  # Also block scoring pam at beginning
-            print("WARNING: The CFD score and the Doench score can be calculated only for guides with 20bp and a 3bp PAM")
-            sys.exit()
-        # pam_seq_check_ngg = open(filePAM).readline().split(" ")[0].upper()
-        # if ("NGG" not in pam_seq_check_ngg):
-        # 	# print("WARNING: The model used for the CFD and Doench scores are based on the NGG PAM, the scores may not be valid for other PAMs")
-        # 	print("WARNING: The model used for the CFD and Doench scores are based on the NGG PAM")
-        # 	sys.exit()
+            print("WARNING: The CFD score and the Doench score can be calculated only for guides with 20bp and a 3bp PAM (SpCas9)")
+
         target_filename = os.path.realpath(result)
         subprocess.run([corrected_origin_path+'Python_Scripts/Scores/scores.py', target_filename +
                         '.targets.txt', idx_genome_fasta + "/", str(filePAM), str(fileGuide)])
@@ -397,7 +372,7 @@ def scores():
     pam_at_beginning = int(open(filePAM).readline().split(" ")[1])
 
     if (pam_guide != 23 or pam_at_beginning < 0):  # Also block scoring pam at beginning
-        print("WARNING: The CFD score and the Doench score can be calculated only for guides with 20bp and a 3bp PAM")
+        print("WARNING: The CFD score and the Doench score can be calculated only for guides with 20bp and a 3bp PAM (SpCas9)")
         # sys.exit()
     subprocess.run([corrected_origin_path+'Python_Scripts/Scores/scores.py',
                     resultFile, genomeDir, str(filePAM), str(fileGuide)])
@@ -407,10 +382,8 @@ def annotateResults():
     if (len(sys.argv) < 5 or 'help' in sys.argv[1:]):  # was 6
         print("WARNING: Too few arguments to function annotate-results. Please provide:\n",
               "\nEXAMPLE CALL: crispritz.py annotate-results resultsFile.txt annotationsFile.bed outputFile\n",
-              #"\n<profileFile>: Profile File containing all information grouped by guide",
               "\n<resultsFile>: Targets file containing all genomic targets for the guides set",
-              # -> Bed file containing annotation
-              "\n<annotationsFile>: Text file containing the annotations in .bed format",
+              "\n<annotationsFile>: Text file containing the annotations in .bed format", # Bed file containing annotation
               "\n<outputFile>: Name of output file",
               "\n--change-ID <sampleIDfile> : (Optional) Change the samples, population and superpopulation IDs. DEFAULT: the default IDs are taken from the 1000 genome project (used for Human Genome hg19 and hg38)"
               )
@@ -447,81 +420,6 @@ def annotateResults():
         print("Annotation runtime: %s seconds" % (time.time() - start_time))
 
 
-def genomeEnrichmentWithBedtools():
-    '''
-    Enrich the genome using the bedtools program. Not used since genomeEnrichment() is now compatible with indels
-    '''
-    if (len(sys.argv) < 4 or 'help' in sys.argv[1:]):
-        print("WARNING: Too few arguments to function add-variants. Please provide:\n",
-              "\nEXAMPLE CALL: crispritz.py add-variants vcfFilesDirectory/ genomeDirectory/\n",
-              "\n<vcfFilesDirectory>: Directory containing VCF files, MUST BE separated into single chromosome files",
-              "\n<genomeDirectory>: Directory containing a genome in .fa or .fasta format, MUST BE separated into single chromosome files\n")
-        sys.exit()
-    # VCF files must contain .chrN. where N is the chr name in their filename
-    dirVCFFiles = os.path.realpath(sys.argv[2])
-    # Chromosomes filename must be chrN
-    dirGenome = os.path.realpath(sys.argv[3])
-    listChrs = os.listdir(dirVCFFiles)
-
-    checkExistance(dirVCFFiles, 'd')
-    checkExistance(dirGenome, 'd')
-    genomeName = dirGenome.split('/')
-    genomeName = genomeName[-1]
-
-    vcfList = glob.glob(dirVCFFiles+'/*.vcf.gz')
-
-    print('Variant Extraction START')
-    start_time = time.time()
-
-    cmds_list = [[corrected_origin_path+'Python_Scripts/Enrichment/index_vcf.sh', file_name]
-                 for file_name in vcfList]
-    procs_list = [Popen(cmd, stdout=PIPE, stderr=PIPE) for cmd in cmds_list]
-
-    for proc in procs_list:
-        proc.wait()
-
-    print('Variant Extraction END')
-    print("Runtime: %s seconds" % (time.time() - start_time))
-
-    dirEnrichedGenome = genomeName+"_variants"
-
-    if (os.path.isdir(dirEnrichedGenome)):
-        shutil.rmtree(dirEnrichedGenome)
-        os.makedirs(dirEnrichedGenome)
-    else:
-        os.makedirs(dirEnrichedGenome)
-
-    os.chdir(dirEnrichedGenome)
-
-    chrList = []
-    vcfNameList = []
-
-    print("Variants Adding START")
-    start_time = time.time()
-
-    for vcf_file in vcfList:
-        if vcf_file.endswith('.csi'):
-            continue
-        vcfName = vcf_file.split('/')[-1]
-        vcfNameList.append(vcfName)
-        chr_name_start = vcf_file.find('.chr')
-        chr_name_end = vcf_file.find('.', chr_name_start + 1)
-        chr_name = vcf_file[chr_name_start + 1: chr_name_end]
-        chrList.append(chr_name)
-
-    cmds_list = [[corrected_origin_path+'Python_Scripts/Enrichment/add_variants.sh', dirVCFFiles+'/' +
-                  vcfNameList[count], dirGenome + '/' + chrName + '.fa', chrName] for count, chrName in enumerate(chrList)]
-    procs_list = [Popen(cmd, stdout=PIPE, stderr=PIPE) for cmd in cmds_list]
-
-    for proc in procs_list:
-        proc.wait()
-
-    print("Variants Adding END")
-    print("Runtime: %s seconds" % (time.time() - start_time))
-
-    os.chdir("../..")
-
-
 def genomeEnrichment():
     '''
     Enrich the genome by parsing the vcf files and then replacing the nucleotides in the reference genome sequence. Compatible with indels
@@ -532,6 +430,7 @@ def genomeEnrichment():
               "\n\n<vcfFilesDirectory> : Directory containing VCF files, need to be separated into single chromosome files (multi-sample files will be collapsed into one fake individual)",
               "\n\n<genomeDirectory> : Directory containing a genome in .fa or .fasta format, need to be separated into single chromosome files.")
         sys.exit()
+
     dirVCFFiles = os.path.realpath(sys.argv[2])
     dirGenome = os.path.realpath(sys.argv[3])
     checkExistance(dirVCFFiles, 'd')
@@ -620,7 +519,6 @@ def generateReport():
               "\n-mm <mm_num>: Number of mismatches to analyze",
               "\n-annotation <annotationSummaryFile>: Count files for genomic annotations",
               "\n-extprofile <guideExtendedProfile>: Extended profile file",
-              #"\n-annotation <annotationFile>: Count files for genomic annotations",
               "\n-gecko: (Optional) Tag to activate gecko dataset comparison",
               "\n-sumref <referenceAnnotationSummaryFile>: (Optional) Create a barplot comparing reference genome results with enriched genome results. If the <guide> option is used, the barplot will take into account only the targets found with that specific guide\n")
         sys.exit()
@@ -663,27 +561,11 @@ def generateReport():
     summaryTwo = countdir
 
     geckoProfile = "no"
-    # geckoExonsCount = "no"
-    # geckoIntronsCount = "no"
-    # geckoPromotersCount = "no"
-    # geckoDNAseCount = "no"
-    # geckoCTCFCount = "no"
 
     if "-gecko" in sys.argv[1:]:
         geckoProfile = corrected_origin_path + \
             'Python_Scripts/Plot/gecko.summary.total.Annotation.summary.txt'
-        # geckoProfile = corrected_origin_path + \
-        # 		'Python_Scripts/Plot/gecko/gecko.reference.profile.xls'
-        # geckoExonsCount = corrected_origin_path + \
-        # 		'Python_Scripts/Plot/gecko/gecko.Exons.Count.txt'
-        # geckoIntronsCount = corrected_origin_path + \
-        # 		'Python_Scripts/Plot/gecko/gecko.Introns.Count.txt'
-        # geckoPromotersCount = corrected_origin_path + \
-        # 		'Python_Scripts/Plot/gecko/gecko.Promoters.Count.txt'
-        # geckoDNAseCount = corrected_origin_path + \
-        # 		'Python_Scripts/Plot/gecko/gecko.DNAse.Count.txt'
-        # geckoCTCFCount = corrected_origin_path + \
-        # 		'Python_Scripts/Plot/gecko/gecko.CTCF.Count.txt'
+
     if '-ws' in sys.argv[:]:
         web_server = '-ws'
     else:
@@ -695,8 +577,7 @@ def generateReport():
     else:
         sample_name = ''
         sample_opt = ''
-    # subprocess.run([corrected_origin_path + 'Python_Scripts/Plot/radar_chart.py', str(guide), str(mm), str(profileFile), str(extProfileFile), str(countdir), str(summaryOne), str(summaryTwo),
-    # 				str(geckoProfile), str(geckoExonsCount), str(geckoIntronsCount), str(geckoPromotersCount), str(geckoDNAseCount), str(geckoCTCFCount)])
+
     subprocess.run([corrected_origin_path + 'Python_Scripts/Plot/radar_chart.py', str(guide), str(mm), str(summaryTwo), str(extProfileFile), str(summaryOne),
                     str(geckoProfile), web_server, sample_opt, sample_name])
 
@@ -711,475 +592,475 @@ def removeFile(to_remove):
         pass
 
 
-def processData():
-    '''
-    Function used to post-process the obtained data. Input files are the targets file obtained from the searches done one the reference and variant genomes.
-    For the REF search, the targets are clustered and the top_1 are annotated, producing summaries for guide and positions.
-    For VAR and VAR/REF search, the targets are also associated with events of pam creation, and the corresponding samples are written for each
-    target.
-    The -sample option is needed to indicate the directory containing the dictionaries for the sample extraction 
-    The option --sample-create creates the dictionaries from the vcf directory given in input (heavy task) and then executes the -sample option.
-    Example call:
-    -For REF
-    crispritz.py process-data -reftarget REFsearch.targets.txt pamfile.txt guidesfile.txt hg38Annotations.bed output.name -refgenome hg38_ref
-    -For VAR
-    crispritz.py process-data -vartarget VARsearch.targets.txt pamfile.txt guidesfile.txt hg38Annotations.bed output.name -sample dictionary_directory -refgenome hg38_var
-    -For VAR/REF
-    crispritz.py process-data -reftarget REFsearch.targets.txt -vartarget VARsearch.targets.txt pamfile.txt guidesfile.txt hg38Annotations.bed output.name -sample dictionary_directory -refgenome hg38_ref
-    To create dictionary, change -sample dictionary_directory to --sample-create vcf_directory
-    '''
-    if (len(sys.argv) < 9 or 'help' in sys.argv[1:]):
-        print("WARNING: Too few arguments to function process-data. Please provide:",
-              "\nEXAMPLE CALL: crispritz.py process-data -reftarget resultsReferenceTargets.txt -vartarget resultsVariantTargets.txt pamFile.txt guidesFile.txt annotationsFile.bed outputFile -sample dictionaryDirectory/ -refgenome genomeReferenceDirectory/\n",
-              "\n-reftarget <refTargetsFile> : Targets file, containing all genomic targets found in the reference genome",
-              "\n-vartarget <varTargetsFile> : Targets file, containing all genomic targets found in the variant genome",
-              "\n<pamFile> : Text file containing the PAM sequence (including a number of Ns equal to the guide length) and a space separated number indicating the length of the PAM sequence",
-              "\n<guidesFile>: Text file containing one or more guides (including a number of Ns equal to the length of the PAM sequence)",
-              "\n<annotationsFile> : Text file containing the annotations in .bed format",
-              "\n<outputFile> : Name of output file",
-              "\n-sample <dictionariesDirectory> : Add samples information and annotations to the generated file. Must be provided if -vartarget option is selected",
-              "\n--sample-create <vcfFileDirectory> : (Optional) Creates samples dictionaries starting from the variant files (Heavy task), and add samples information to the generated file.",
-              "\n-refgenome <genomeDirectory> : Directory of reference Genome",
-              "\n--change-ID <sampleIDfile> : (Optional) Change the samples, population and superpopulation IDs. DEFAULT: the default IDs are taken from the 1000 genome project (used for Human Genome hg19 and hg38)"
-              )
-        sys.exit()
+# def processData():
+#     '''
+#     Function used to post-process the obtained data. Input files are the targets file obtained from the searches done one the reference and variant genomes.
+#     For the REF search, the targets are clustered and the top_1 are annotated, producing summaries for guide and positions.
+#     For VAR and VAR/REF search, the targets are also associated with events of pam creation, and the corresponding samples are written for each
+#     target.
+#     The -sample option is needed to indicate the directory containing the dictionaries for the sample extraction 
+#     The option --sample-create creates the dictionaries from the vcf directory given in input (heavy task) and then executes the -sample option.
+#     Example call:
+#     -For REF
+#     crispritz.py process-data -reftarget REFsearch.targets.txt pamfile.txt guidesfile.txt hg38Annotations.bed output.name -refgenome hg38_ref
+#     -For VAR
+#     crispritz.py process-data -vartarget VARsearch.targets.txt pamfile.txt guidesfile.txt hg38Annotations.bed output.name -sample dictionary_directory -refgenome hg38_var
+#     -For VAR/REF
+#     crispritz.py process-data -reftarget REFsearch.targets.txt -vartarget VARsearch.targets.txt pamfile.txt guidesfile.txt hg38Annotations.bed output.name -sample dictionary_directory -refgenome hg38_ref
+#     To create dictionary, change -sample dictionary_directory to --sample-create vcf_directory
+#     '''
+#     if (len(sys.argv) < 9 or 'help' in sys.argv[1:]):
+#         print("WARNING: Too few arguments to function process-data. Please provide:",
+#               "\nEXAMPLE CALL: crispritz.py process-data -reftarget resultsReferenceTargets.txt -vartarget resultsVariantTargets.txt pamFile.txt guidesFile.txt annotationsFile.bed outputFile -sample dictionaryDirectory/ -refgenome genomeReferenceDirectory/\n",
+#               "\n-reftarget <refTargetsFile> : Targets file, containing all genomic targets found in the reference genome",
+#               "\n-vartarget <varTargetsFile> : Targets file, containing all genomic targets found in the variant genome",
+#               "\n<pamFile> : Text file containing the PAM sequence (including a number of Ns equal to the guide length) and a space separated number indicating the length of the PAM sequence",
+#               "\n<guidesFile>: Text file containing one or more guides (including a number of Ns equal to the length of the PAM sequence)",
+#               "\n<annotationsFile> : Text file containing the annotations in .bed format",
+#               "\n<outputFile> : Name of output file",
+#               "\n-sample <dictionariesDirectory> : Add samples information and annotations to the generated file. Must be provided if -vartarget option is selected",
+#               "\n--sample-create <vcfFileDirectory> : (Optional) Creates samples dictionaries starting from the variant files (Heavy task), and add samples information to the generated file.",
+#               "\n-refgenome <genomeDirectory> : Directory of reference Genome",
+#               "\n--change-ID <sampleIDfile> : (Optional) Change the samples, population and superpopulation IDs. DEFAULT: the default IDs are taken from the 1000 genome project (used for Human Genome hg19 and hg38)"
+#               )
+#         sys.exit()
 
-    # Since pam is after -ref or -var, get the last one of them to know the pamfile position
-    last_target_pos = 0
-    ref_result = "no"
-    if "-reftarget" in sys.argv[1:]:
-        ref_result = (sys.argv).index("-reftarget") + 1
-        if ref_result > last_target_pos:
-            last_target_pos = ref_result
-        ref_result = os.path.realpath(sys.argv[ref_result])
-        checkExistance(ref_result, 'f')
+#     # Since pam is after -ref or -var, get the last one of them to know the pamfile position
+#     last_target_pos = 0
+#     ref_result = "no"
+#     if "-reftarget" in sys.argv[1:]:
+#         ref_result = (sys.argv).index("-reftarget") + 1
+#         if ref_result > last_target_pos:
+#             last_target_pos = ref_result
+#         ref_result = os.path.realpath(sys.argv[ref_result])
+#         checkExistance(ref_result, 'f')
 
-    var_result = "no"
-    if "-vartarget" in sys.argv[1:]:
-        var_result = (sys.argv).index("-vartarget") + 1
-        if var_result > last_target_pos:
-            last_target_pos = var_result
-        var_result = os.path.realpath(sys.argv[var_result])
-        checkExistance(var_result, 'f')
-    if last_target_pos == 0:
-        print("Warning! Please provide al least one target file (-reftarget or -vartarget options)")
-        sys.exit()
+#     var_result = "no"
+#     if "-vartarget" in sys.argv[1:]:
+#         var_result = (sys.argv).index("-vartarget") + 1
+#         if var_result > last_target_pos:
+#             last_target_pos = var_result
+#         var_result = os.path.realpath(sys.argv[var_result])
+#         checkExistance(var_result, 'f')
+#     if last_target_pos == 0:
+#         print("Warning! Please provide al least one target file (-reftarget or -vartarget options)")
+#         sys.exit()
 
-    pam = 'no'
-    try:
-        pam = os.path.realpath(sys.argv[last_target_pos + 1])
-    except:
-        print('Warning! Missing pam file')
-        sys.exit()
-    checkExistance(pam, 'f')
+#     pam = 'no'
+#     try:
+#         pam = os.path.realpath(sys.argv[last_target_pos + 1])
+#     except:
+#         print('Warning! Missing pam file')
+#         sys.exit()
+#     checkExistance(pam, 'f')
 
-    guides = 'no'
-    try:
-        guides = os.path.realpath(sys.argv[last_target_pos + 2])
-    except:
-        print('Warning! Missing guides file')
-        sys.exit()
-    checkExistance(guides, 'f')
-    annotationFile = 'no'
-    try:
-        annotationFile = os.path.realpath(sys.argv[last_target_pos + 3])
-    except:
-        print('Warning! Missing annotation file')
-        sys.exit()
-    checkExistance(annotationFile, 'f')
+#     guides = 'no'
+#     try:
+#         guides = os.path.realpath(sys.argv[last_target_pos + 2])
+#     except:
+#         print('Warning! Missing guides file')
+#         sys.exit()
+#     checkExistance(guides, 'f')
+#     annotationFile = 'no'
+#     try:
+#         annotationFile = os.path.realpath(sys.argv[last_target_pos + 3])
+#     except:
+#         print('Warning! Missing annotation file')
+#         sys.exit()
+#     checkExistance(annotationFile, 'f')
 
-    result = ''
-    try:
-        result = os.path.realpath(sys.argv[last_target_pos + 4])
-    except:
-        print('Warning! Missing output filename')
-        sys.exit()
+#     result = ''
+#     try:
+#         result = os.path.realpath(sys.argv[last_target_pos + 4])
+#     except:
+#         print('Warning! Missing output filename')
+#         sys.exit()
 
-    sampleIDfile = corrected_origin_path + \
-        'Python_Scripts/ProcessData/samples_1000genomeproject.txt'
-    if "--change-ID" in sys.argv[1:]:
-        sampleIDfile = (sys.argv).index("--change-ID") + 1
-        try:
-            sampleIDfile = os.path.realpath(sys.argv[sampleIDfile])
-        except:
-            print('Warning! Missing sampleID file')
-            sys.exit()
-        checkExistance(sampleIDfile, 'f')
+#     sampleIDfile = corrected_origin_path + \
+#         'Python_Scripts/ProcessData/samples_1000genomeproject.txt'
+#     if "--change-ID" in sys.argv[1:]:
+#         sampleIDfile = (sys.argv).index("--change-ID") + 1
+#         try:
+#             sampleIDfile = os.path.realpath(sys.argv[sampleIDfile])
+#         except:
+#             print('Warning! Missing sampleID file')
+#             sys.exit()
+#         checkExistance(sampleIDfile, 'f')
 
-    samples = False
-    create_dict = False
-    vcf_file_directory = 'no'
-    if "--sample-create" in sys.argv[1:]:
-        if "-vartarget" not in sys.argv[1:]:
-            print(
-                'Warning! The sample analysis can only be performed when the -vartarget option is selected')
-        vcf_file_directory = (sys.argv).index("--sample-create") + 1
-        vcf_file_directory = os.path.realpath(sys.argv[vcf_file_directory])
-        checkExistance(vcf_file_directory, 'd')
-        samples = True
-        create_dict = True
+#     samples = False
+#     create_dict = False
+#     vcf_file_directory = 'no'
+#     if "--sample-create" in sys.argv[1:]:
+#         if "-vartarget" not in sys.argv[1:]:
+#             print(
+#                 'Warning! The sample analysis can only be performed when the -vartarget option is selected')
+#         vcf_file_directory = (sys.argv).index("--sample-create") + 1
+#         vcf_file_directory = os.path.realpath(sys.argv[vcf_file_directory])
+#         checkExistance(vcf_file_directory, 'd')
+#         samples = True
+#         create_dict = True
 
-    dict_directory = 'no'
-    if "-sample" in sys.argv[1:]:
-        if "-vartarget" not in sys.argv[1:]:
-            print(
-                'Warning! The sample analysis can only be performed when the -vartarget option is selected')
-        dict_directory = (sys.argv).index("-sample") + 1
-        dict_directory = os.path.realpath(sys.argv[dict_directory])
-        checkExistance(dict_directory, 'd')
-        samples = True
+#     dict_directory = 'no'
+#     if "-sample" in sys.argv[1:]:
+#         if "-vartarget" not in sys.argv[1:]:
+#             print(
+#                 'Warning! The sample analysis can only be performed when the -vartarget option is selected')
+#         dict_directory = (sys.argv).index("-sample") + 1
+#         dict_directory = os.path.realpath(sys.argv[dict_directory])
+#         checkExistance(dict_directory, 'd')
+#         samples = True
 
-    # -varresult selected but no dictionary provided
-    if var_result != 'no' and ("--sample-create" not in sys.argv[1:] and "-sample" not in sys.argv[1:]):
-        print('Warning! If the option -vartarget is selected, the option -sample <dictionariesDirectory> must be provided')
-        sys.exit()
+#     # -varresult selected but no dictionary provided
+#     if var_result != 'no' and ("--sample-create" not in sys.argv[1:] and "-sample" not in sys.argv[1:]):
+#         print('Warning! If the option -vartarget is selected, the option -sample <dictionariesDirectory> must be provided')
+#         sys.exit()
 
-    # Check for -refgenome
-    reference_genome_dir = 'no'
-    if "-refgenome" in sys.argv[1:]:
-        reference_genome_dir = (sys.argv).index("-refgenome") + 1
-        try:
-            reference_genome_dir = os.path.realpath(
-                sys.argv[reference_genome_dir])
-        except:
-            print('Warning! Missing <genomeDir> value for option -refgenome')
-            sys.exit()
-        checkExistance(reference_genome_dir, 'd')
-    else:
-        print('Error! Missing -refgenome option')
-        sys.exit()
+#     # Check for -refgenome
+#     reference_genome_dir = 'no'
+#     if "-refgenome" in sys.argv[1:]:
+#         reference_genome_dir = (sys.argv).index("-refgenome") + 1
+#         try:
+#             reference_genome_dir = os.path.realpath(
+#                 sys.argv[reference_genome_dir])
+#         except:
+#             print('Warning! Missing <genomeDir> value for option -refgenome')
+#             sys.exit()
+#         checkExistance(reference_genome_dir, 'd')
+#     else:
+#         print('Error! Missing -refgenome option')
+#         sys.exit()
 
-    process = subprocess.Popen(
-        ['wc', '-l', guides], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, err = process.communicate()
-    num_guides = int(out.decode('UTF-8').split(' ')[0])
+#     process = subprocess.Popen(
+#         ['wc', '-l', guides], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#     out, err = process.communicate()
+#     num_guides = int(out.decode('UTF-8').split(' ')[0])
 
-    # Create dictionaries
-    if create_dict:
-        print('Warning! Option --sample-create was selected. CRISPRitz will generate dictionaries that will be used to perform the sample analysis.\n',
-              'This heavy task will require about 20 minutes for each vcf file in the input directory, and will require about 80 Gb of space. Only SNP will be extracted from the vcf files.\n',
-              'Please verify that the fasta files and the associated \"#CHROM\" column of the vcf file have the same name', sep='')
-        overwrite_dict = 'yes'
-        dict_dir_name = vcf_file_directory.split('/')[-1]
-        if not dict_dir_name:
-            dict_dir_name = vcf_file_directory.split('/')[-2]
-        if not os.path.isdir('dictionary_' + dict_dir_name):
-            os.mkdir('dictionary_' + dict_dir_name)
-        else:
-            print('Directory', 'dictionary_' + dict_dir_name,
-                  'already exists. Do you want to overwrite it? (yes/no)')
-            overwrite_dict = input()
-            while True:
-                if overwrite_dict == 'yes':
-                    break
-                elif overwrite_dict == 'no':
-                    break
-                else:
-                    print('Please insert yes or no')
-                    overwrite_dict = input()
-        if overwrite_dict == 'yes':
-            vcf_files = [join(vcf_file_directory, f) for f in listdir(
-                vcf_file_directory) if isfile(join(vcf_file_directory, f))]
-            for vcf in vcf_files:
-                # 'chr21.something'
-                dictionary_name = vcf[vcf.index('.chr') + 1:]
-                dictionary_name = dictionary_name[: dictionary_name.index('.')]
-                print('Creating my_dict_' + dictionary_name + '.json')
-                subprocess.run([corrected_origin_path+'Python_Scripts/ProcessData/dictionary_creation.py',
-                                vcf, dictionary_name, 'dictionary_' + dict_dir_name])
-            dict_directory = os.path.realpath(
-                'dictionary_' + dict_dir_name)  # UPDATE dict_directory
-        else:
-            if '-vartarget' in sys.argv[:]:
-                print('Warning! If the option -vartarget is selected, a dictionary must be provided.',
-                      'Please provide a dictionary directory using the option -sample <dictionariesDirectory> or create a new dictionary directory using the option --sample-create <vcfFileDirectory>', sep='\n')
-                exit()
-    start_time_processdata = time.time()
-    print('Processing Data START')
-    if ref_result != 'no' and var_result == 'no':  # Process data for REFERENCE only result
-        # Clustering
-        print('Step [1/5] - Clustering Targets', end='\r')
-        step = 'Step [1/5] - Clustering Targets'
-        start_time = time.time()
-        subprocess.run([corrected_origin_path+'Python_Scripts/ProcessData/cluster.dict.py',
-                        ref_result, 'no', 'True', 'False', guides, result, step])
-        print('Step [1/5] - Clustering Targets DONE: %.2f seconds' %
-              round(time.time() - start_time, 2))
+#     # Create dictionaries
+#     if create_dict:
+#         print('Warning! Option --sample-create was selected. CRISPRitz will generate dictionaries that will be used to perform the sample analysis.\n',
+#               'This heavy task will require about 20 minutes for each vcf file in the input directory, and will require about 80 Gb of space. Only SNP will be extracted from the vcf files.\n',
+#               'Please verify that the fasta files and the associated \"#CHROM\" column of the vcf file have the same name', sep='')
+#         overwrite_dict = 'yes'
+#         dict_dir_name = vcf_file_directory.split('/')[-1]
+#         if not dict_dir_name:
+#             dict_dir_name = vcf_file_directory.split('/')[-2]
+#         if not os.path.isdir('dictionary_' + dict_dir_name):
+#             os.mkdir('dictionary_' + dict_dir_name)
+#         else:
+#             print('Directory', 'dictionary_' + dict_dir_name,
+#                   'already exists. Do you want to overwrite it? (yes/no)')
+#             overwrite_dict = input()
+#             while True:
+#                 if overwrite_dict == 'yes':
+#                     break
+#                 elif overwrite_dict == 'no':
+#                     break
+#                 else:
+#                     print('Please insert yes or no')
+#                     overwrite_dict = input()
+#         if overwrite_dict == 'yes':
+#             vcf_files = [join(vcf_file_directory, f) for f in listdir(
+#                 vcf_file_directory) if isfile(join(vcf_file_directory, f))]
+#             for vcf in vcf_files:
+#                 # 'chr21.something'
+#                 dictionary_name = vcf[vcf.index('.chr') + 1:]
+#                 dictionary_name = dictionary_name[: dictionary_name.index('.')]
+#                 print('Creating my_dict_' + dictionary_name + '.json')
+#                 subprocess.run([corrected_origin_path+'Python_Scripts/ProcessData/dictionary_creation.py',
+#                                 vcf, dictionary_name, 'dictionary_' + dict_dir_name])
+#             dict_directory = os.path.realpath(
+#                 'dictionary_' + dict_dir_name)  # UPDATE dict_directory
+#         else:
+#             if '-vartarget' in sys.argv[:]:
+#                 print('Warning! If the option -vartarget is selected, a dictionary must be provided.',
+#                       'Please provide a dictionary directory using the option -sample <dictionariesDirectory> or create a new dictionary directory using the option --sample-create <vcfFileDirectory>', sep='\n')
+#                 exit()
+#     start_time_processdata = time.time()
+#     print('Processing Data START')
+#     if ref_result != 'no' and var_result == 'no':  # Process data for REFERENCE only result
+#         # Clustering
+#         print('Step [1/5] - Clustering Targets', end='\r')
+#         step = 'Step [1/5] - Clustering Targets'
+#         start_time = time.time()
+#         subprocess.run([corrected_origin_path+'Python_Scripts/ProcessData/cluster.dict.py',
+#                         ref_result, 'no', 'True', 'False', guides, result, step])
+#         print('Step [1/5] - Clustering Targets DONE: %.2f seconds' %
+#               round(time.time() - start_time, 2))
 
-        # Extract Top1
-        print('Step [2/5] - Top1 Extraction', end='\r')
-        start_time = time.time()
-        subprocess.run(
-            [corrected_origin_path+'Python_Scripts/ProcessData/extract_top.py', result + '.cluster.txt', result])
-        # Get max mismatch, bulge dna and rna
-        max_values = subprocess.Popen(['awk', 'BEGIN{m_m=0; b_d=0; b_r=0} NR>1 {if ($8>m_m) m_m=$8; if ($1=="DNA" && $9>b_d) b_d=$9; else if ($1=="RNA" && $9>b_r) b_r=$9} END{print m_m","b_d","b_r}',
-                                       result + '.top_1.txt'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out, err = max_values.communicate()
-        # Get number of max mm, dna and rna bulge
-        max_values = out.decode('UTF-8').strip().split(',')
-        max_bulge = max_values[1]
-        if int(max_values[2]) > int(max_values[1]):
-            max_bulge = max_values[2]
-        # Scores
-        subprocess.call([corrected_origin_path+'Python_Scripts/Scores/scores.py',
-                         result + '.top_1.txt', reference_genome_dir, pam, guides])
-        subprocess.call(
-            ['mv', result + '.top_1.txt.scores.txt', result + '.scores.txt'])
-        subprocess.call(
-            ['mv', result + '.top_1.txt.targets.CFD.txt', result + '.targets.CFD.txt'])
-        print('Step [2/5] - Top1 Extraction DONE: %.2f seconds' %
-              round(time.time() - start_time, 2))
+#         # Extract Top1
+#         print('Step [2/5] - Top1 Extraction', end='\r')
+#         start_time = time.time()
+#         subprocess.run(
+#             [corrected_origin_path+'Python_Scripts/ProcessData/extract_top.py', result + '.cluster.txt', result])
+#         # Get max mismatch, bulge dna and rna
+#         max_values = subprocess.Popen(['awk', 'BEGIN{m_m=0; b_d=0; b_r=0} NR>1 {if ($8>m_m) m_m=$8; if ($1=="DNA" && $9>b_d) b_d=$9; else if ($1=="RNA" && $9>b_r) b_r=$9} END{print m_m","b_d","b_r}',
+#                                        result + '.top_1.txt'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#         out, err = max_values.communicate()
+#         # Get number of max mm, dna and rna bulge
+#         max_values = out.decode('UTF-8').strip().split(',')
+#         max_bulge = max_values[1]
+#         if int(max_values[2]) > int(max_values[1]):
+#             max_bulge = max_values[2]
+#         # Scores
+#         subprocess.call([corrected_origin_path+'Python_Scripts/Scores/scores.py',
+#                          result + '.top_1.txt', reference_genome_dir, pam, guides])
+#         subprocess.call(
+#             ['mv', result + '.top_1.txt.scores.txt', result + '.scores.txt'])
+#         subprocess.call(
+#             ['mv', result + '.top_1.txt.targets.CFD.txt', result + '.targets.CFD.txt'])
+#         print('Step [2/5] - Top1 Extraction DONE: %.2f seconds' %
+#               round(time.time() - start_time, 2))
 
-        # Annotation of REF file
-        print('Step [3/5] - Annotation', end='\r')
-        step = 'Step [3/5] - Annotation'
-        start_time = time.time()
-        subprocess.run(['crispritz.py', 'annotate-results',
-                        result + '.top_1.txt', annotationFile, result, step])
-        print('\033[KStep [3/5] - Annotation DONE: %.2f seconds' %
-              round(time.time() - start_time, 2))
+#         # Annotation of REF file
+#         print('Step [3/5] - Annotation', end='\r')
+#         step = 'Step [3/5] - Annotation'
+#         start_time = time.time()
+#         subprocess.run(['crispritz.py', 'annotate-results',
+#                         result + '.top_1.txt', annotationFile, result, step])
+#         print('\033[KStep [3/5] - Annotation DONE: %.2f seconds' %
+#               round(time.time() - start_time, 2))
 
-        # Summary by guide - pos
-        print(
-            'Step [4/5] - Creating Summaries : Summary by Guide and by Position', end='\r')
-        start_time = time.time()
-        subprocess.run([corrected_origin_path+'Python_Scripts/ProcessData/summary_by_guide_position.py',
-                        result + '.cluster.txt', max_values[0], max_values[1], max_values[2], guides, result, 'No'])
-        print('\033[KStep [4/5] - Creating Summaries DONE: %.2f seconds' %
-              round(time.time() - start_time, 2))
+#         # Summary by guide - pos
+#         print(
+#             'Step [4/5] - Creating Summaries : Summary by Guide and by Position', end='\r')
+#         start_time = time.time()
+#         subprocess.run([corrected_origin_path+'Python_Scripts/ProcessData/summary_by_guide_position.py',
+#                         result + '.cluster.txt', max_values[0], max_values[1], max_values[2], guides, result, 'No'])
+#         print('\033[KStep [4/5] - Creating Summaries DONE: %.2f seconds' %
+#               round(time.time() - start_time, 2))
 
-        # Create final file
-        print('Step [5/5] - Generating Report', end='\r')
-        start_time = time.time()
-        # GUIDE -> [target reference, off target reference]
-        general_table = dict()
-        current_guide = 0
-        with open(guides) as all_guides:
-            for g in all_guides:
-                g = g.strip()
-                current_guide += 1
-                print('\033Step [5/5] - Generating Report: Guide ' +
-                      str(current_guide) + '/' + str(num_guides), end='\r')
-                with open(result + '.targets.' + g + '.txt', 'w+') as final_result:
-                    subprocess.run(
-                        ['head', '-1', result + '.Annotation.targets.txt'], stdout=final_result)  # Put header
-                subprocess.run(['LC_ALL=C grep ' + g + ' ' + result + '.Annotation.targets.txt >> ' +
-                                result + '.targets.' + g + '.txt'], shell=True)  # NOTE shell = True
-                # Generate file for general table
-                general_table[g] = []
-                df_profile = pd.read_csv(
-                    result + '.summary_by_guide.' + g + '.txt', sep='\t')
-                general_table[g].append(str(int(df_profile[(df_profile.Mismatches == 0) & (
-                    df_profile['Bulge Type'] == 'X')].iloc[0]['Targets in Reference'])))
-                one_to_n_mms = []
-                for i in range(1, int(max_values[0]) + 1 + int(max_bulge)):
-                    one_to_n_mms.append(sum(df_profile[(
-                        (df_profile['Mismatches'] + df_profile['Bulge Size']) == i)]['Targets in Reference'].to_list()))
-                general_table[g].append(str(int(sum(
-                    one_to_n_mms[1:]))) + ' (' + ' - '.join(str(int(x)) for x in one_to_n_mms) + ')')
-        with open(result + '.general_target_count.txt', 'w+') as res_gen:
-            res_gen.write('#Guide\tOn-Targets Reference\tOff-Targets Reference (' + ' - '.join(
-                [str(x) for x in range(int(max_values[0]) + 1 + int(max_bulge))]) + ' Mismatches + Bulges)\n')
-            for g in general_table:
-                res_gen.write(g + '\t' + '\t'.join(general_table[g]) + '\n')
-        # Remove intermediate files
-        removeFile(result + '.top_1.txt')
-        removeFile(result + '.Annotation.targets.txt')
-        print('Step [5/5] - Generating Report DONE: %.2f seconds' %
-              round(time.time() - start_time, 2))
+#         # Create final file
+#         print('Step [5/5] - Generating Report', end='\r')
+#         start_time = time.time()
+#         # GUIDE -> [target reference, off target reference]
+#         general_table = dict()
+#         current_guide = 0
+#         with open(guides) as all_guides:
+#             for g in all_guides:
+#                 g = g.strip()
+#                 current_guide += 1
+#                 print('\033Step [5/5] - Generating Report: Guide ' +
+#                       str(current_guide) + '/' + str(num_guides), end='\r')
+#                 with open(result + '.targets.' + g + '.txt', 'w+') as final_result:
+#                     subprocess.run(
+#                         ['head', '-1', result + '.Annotation.targets.txt'], stdout=final_result)  # Put header
+#                 subprocess.run(['LC_ALL=C grep ' + g + ' ' + result + '.Annotation.targets.txt >> ' +
+#                                 result + '.targets.' + g + '.txt'], shell=True)  # NOTE shell = True
+#                 # Generate file for general table
+#                 general_table[g] = []
+#                 df_profile = pd.read_csv(
+#                     result + '.summary_by_guide.' + g + '.txt', sep='\t')
+#                 general_table[g].append(str(int(df_profile[(df_profile.Mismatches == 0) & (
+#                     df_profile['Bulge Type'] == 'X')].iloc[0]['Targets in Reference'])))
+#                 one_to_n_mms = []
+#                 for i in range(1, int(max_values[0]) + 1 + int(max_bulge)):
+#                     one_to_n_mms.append(sum(df_profile[(
+#                         (df_profile['Mismatches'] + df_profile['Bulge Size']) == i)]['Targets in Reference'].to_list()))
+#                 general_table[g].append(str(int(sum(
+#                     one_to_n_mms[1:]))) + ' (' + ' - '.join(str(int(x)) for x in one_to_n_mms) + ')')
+#         with open(result + '.general_target_count.txt', 'w+') as res_gen:
+#             res_gen.write('#Guide\tOn-Targets Reference\tOff-Targets Reference (' + ' - '.join(
+#                 [str(x) for x in range(int(max_values[0]) + 1 + int(max_bulge))]) + ' Mismatches + Bulges)\n')
+#             for g in general_table:
+#                 res_gen.write(g + '\t' + '\t'.join(general_table[g]) + '\n')
+#         # Remove intermediate files
+#         removeFile(result + '.top_1.txt')
+#         removeFile(result + '.Annotation.targets.txt')
+#         print('Step [5/5] - Generating Report DONE: %.2f seconds' %
+#               round(time.time() - start_time, 2))
 
-    elif var_result != 'no':  # Process data for VARIANTS only result and VARIANTS/REFERENCE results
-        file_to_cluster = result + '.total.txt'
-        only_cluster = 'False'
-        sum_guide_type = 'no'
-        annotator_script_file = 'annotator_for_onlyvar.py'
-        total_steps = '5'
-        current_step = 1
-        if ref_result != 'no':  # Steps for VARIANTS/REFERENCE analysis
-            total_steps = '6'
-            only_cluster = 'True'
-            sum_guide_type = 'Uniq'
-            annotator_script_file = 'annotator_cal_sample.py'
-            # Extract Common, Semicommon and Unique
-            print('Step [' + str(current_step) + '/' +
-                  total_steps + '] - Processing Search Results', end='\r')
-            start_time = time.time()
-            subprocess.run(
-                [corrected_origin_path+'Python_Scripts/ProcessData/./extraction.sh', ref_result, var_result, result])
-            print('Step [' + str(current_step) + '/' + total_steps +
-                  '] - Processing Search Results DONE: %.2f seconds' % round(time.time() - start_time, 2))
-            current_step += 1
+#     elif var_result != 'no':  # Process data for VARIANTS only result and VARIANTS/REFERENCE results
+#         file_to_cluster = result + '.total.txt'
+#         only_cluster = 'False'
+#         sum_guide_type = 'no'
+#         annotator_script_file = 'annotator_for_onlyvar.py'
+#         total_steps = '5'
+#         current_step = 1
+#         if ref_result != 'no':  # Steps for VARIANTS/REFERENCE analysis
+#             total_steps = '6'
+#             only_cluster = 'True'
+#             sum_guide_type = 'Uniq'
+#             annotator_script_file = 'annotator_cal_sample.py'
+#             # Extract Common, Semicommon and Unique
+#             print('Step [' + str(current_step) + '/' +
+#                   total_steps + '] - Processing Search Results', end='\r')
+#             start_time = time.time()
+#             subprocess.run(
+#                 [corrected_origin_path+'Python_Scripts/ProcessData/./extraction.sh', ref_result, var_result, result])
+#             print('Step [' + str(current_step) + '/' + total_steps +
+#                   '] - Processing Search Results DONE: %.2f seconds' % round(time.time() - start_time, 2))
+#             current_step += 1
 
-            # Pam Analysis and creation
-            print('Step [' + str(current_step) + '/' +
-                  total_steps + '] - PAM Analysis', end='\r')
-            start_time = time.time()
-            print('Step [' + str(current_step) + '/' + total_steps +
-                  '] - PAM Analysis: Reference Targets', end='\r')
-            with open(result + '.semi_common_targets.minmaxdisr.txt', 'w+') as targ_result:
-                subprocess.run(['awk', '{real_guide=$2; gsub("-","",real_guide); print $0"\tn\tn\tn\tn\t"real_guide}',
-                                result + '.semi_common_targets.txt'], stdout=targ_result)
+#             # Pam Analysis and creation
+#             print('Step [' + str(current_step) + '/' +
+#                   total_steps + '] - PAM Analysis', end='\r')
+#             start_time = time.time()
+#             print('Step [' + str(current_step) + '/' + total_steps +
+#                   '] - PAM Analysis: Reference Targets', end='\r')
+#             with open(result + '.semi_common_targets.minmaxdisr.txt', 'w+') as targ_result:
+#                 subprocess.run(['awk', '{real_guide=$2; gsub("-","",real_guide); print $0"\tn\tn\tn\tn\t"real_guide}',
+#                                 result + '.semi_common_targets.txt'], stdout=targ_result)
 
-            print('\033[KStep [' + str(current_step) + '/' +
-                  total_steps + '] - PAM Analysis: Enriched Targets', end='\r')
-            with open(result + '.unique_targets.pamcreation.txt', 'w+') as targ_result:
-                subprocess.run(['awk', '{real_guide=$2; gsub("-","",real_guide); print $0"\tn\ty\tn\tn\t"real_guide}',
-                                result + '.unique_targets.txt'], stdout=targ_result)
+#             print('\033[KStep [' + str(current_step) + '/' +
+#                   total_steps + '] - PAM Analysis: Enriched Targets', end='\r')
+#             with open(result + '.unique_targets.pamcreation.txt', 'w+') as targ_result:
+#                 subprocess.run(['awk', '{real_guide=$2; gsub("-","",real_guide); print $0"\tn\ty\tn\tn\t"real_guide}',
+#                                 result + '.unique_targets.txt'], stdout=targ_result)
 
-            with open(result + '.total.txt', 'w+') as targ_result:
-                subprocess.run(['cat', result + '.unique_targets.pamcreation.txt',
-                                result + '.semi_common_targets.minmaxdisr.txt'], stdout=targ_result)
-            print('Step [' + str(current_step) + '/' + total_steps +
-                  '] - PAM Analysis DONE: %.2f seconds' % round(time.time() - start_time, 2))
-            current_step += 1
-        else:
-            # Pam Analysis and creation for VAR
-            print('Step [' + str(current_step) + '/' +
-                  total_steps + '] - PAM Analysis', end='\r')
-            start_time = time.time()
-            with open(result + '.total.txt', 'w+') as targ_result:
-                subprocess.run(
-                    ['awk', '{real_guide=$2; gsub("-","",real_guide); print $0"\tn\tn\tn\tn\t"real_guide}', var_result], stdout=targ_result)
-            print('Step [' + str(current_step) + '/' + total_steps +
-                  '] - PAM Analysis DONE: %.2f seconds' % round(time.time() - start_time, 2))
-            current_step += 1
+#             with open(result + '.total.txt', 'w+') as targ_result:
+#                 subprocess.run(['cat', result + '.unique_targets.pamcreation.txt',
+#                                 result + '.semi_common_targets.minmaxdisr.txt'], stdout=targ_result)
+#             print('Step [' + str(current_step) + '/' + total_steps +
+#                   '] - PAM Analysis DONE: %.2f seconds' % round(time.time() - start_time, 2))
+#             current_step += 1
+#         else:
+#             # Pam Analysis and creation for VAR
+#             print('Step [' + str(current_step) + '/' +
+#                   total_steps + '] - PAM Analysis', end='\r')
+#             start_time = time.time()
+#             with open(result + '.total.txt', 'w+') as targ_result:
+#                 subprocess.run(
+#                     ['awk', '{real_guide=$2; gsub("-","",real_guide); print $0"\tn\tn\tn\tn\t"real_guide}', var_result], stdout=targ_result)
+#             print('Step [' + str(current_step) + '/' + total_steps +
+#                   '] - PAM Analysis DONE: %.2f seconds' % round(time.time() - start_time, 2))
+#             current_step += 1
 
-        # Clustering
-        print('Step [' + str(current_step) + '/' +
-              total_steps + '] - Clustering Targets', end='\r')
-        step = 'Step [' + str(current_step) + '/' + \
-            total_steps + '] - Clustering Targets'
-        start_time = time.time()
-        subprocess.run([corrected_origin_path+'Python_Scripts/ProcessData/cluster.dict.py', file_to_cluster,
-                        'no', 'True', only_cluster, guides, result + '.total', 'total', 'orderChr', step])
-        # Get max mm, bulge dna and rna
-        max_values = subprocess.Popen(['awk', 'BEGIN{m_m=0; b_d=0; b_r=0} NR>1 {if ($8>m_m) m_m=$8; if ($1=="DNA" && $9>b_d) b_d=$9; else if ($1=="RNA" && $9>b_r) b_r=$9} END{print m_m","b_d","b_r}',
-                                       result + '.total.cluster.txt'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out, err = max_values.communicate()
-        # Get number of max mm, dna and rna bulge
-        max_values = out.decode('UTF-8').strip().split(',')
-        max_bulge = max_values[1]
-        if int(max_values[2]) > int(max_values[1]):
-            max_bulge = max_values[2]
-        print('Step [' + str(current_step) + '/' + total_steps +
-              '] - Clustering Targets DONE: %.2f seconds' % round(time.time() - start_time, 2))
-        current_step += 1
+#         # Clustering
+#         print('Step [' + str(current_step) + '/' +
+#               total_steps + '] - Clustering Targets', end='\r')
+#         step = 'Step [' + str(current_step) + '/' + \
+#             total_steps + '] - Clustering Targets'
+#         start_time = time.time()
+#         subprocess.run([corrected_origin_path+'Python_Scripts/ProcessData/cluster.dict.py', file_to_cluster,
+#                         'no', 'True', only_cluster, guides, result + '.total', 'total', 'orderChr', step])
+#         # Get max mm, bulge dna and rna
+#         max_values = subprocess.Popen(['awk', 'BEGIN{m_m=0; b_d=0; b_r=0} NR>1 {if ($8>m_m) m_m=$8; if ($1=="DNA" && $9>b_d) b_d=$9; else if ($1=="RNA" && $9>b_r) b_r=$9} END{print m_m","b_d","b_r}',
+#                                        result + '.total.cluster.txt'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#         out, err = max_values.communicate()
+#         # Get number of max mm, dna and rna bulge
+#         max_values = out.decode('UTF-8').strip().split(',')
+#         max_bulge = max_values[1]
+#         if int(max_values[2]) > int(max_values[1]):
+#             max_bulge = max_values[2]
+#         print('Step [' + str(current_step) + '/' + total_steps +
+#               '] - Clustering Targets DONE: %.2f seconds' % round(time.time() - start_time, 2))
+#         current_step += 1
 
-        # Get sample and annotations and scores
-        print('Step [' + str(current_step) + '/' + total_steps +
-              '] - Samples Extraction and Annotation', end='\r')
-        step = 'Step [' + str(current_step) + '/' + total_steps + \
-            '] - Samples Extraction and Annotation'
-        start_time = time.time()
-        subprocess.run([corrected_origin_path+'Python_Scripts/ProcessData/' + annotator_script_file, annotationFile, result + '.total.cluster.txt',
-                        result, dict_directory, pam, max_values[0], reference_genome_dir, guides, max_values[1], max_values[2], sampleIDfile, step])
-        subprocess.run(['mv', result + '.cluster.tmp.txt',
-                        result + '.total.cluster.txt'])
-        print('\033[KStep [' + str(current_step) + '/' + total_steps +
-              '] - Samples Extraction and Annotation DONE: %.2f seconds' % round(time.time() - start_time, 2))
-        current_step += 1
+#         # Get sample and annotations and scores
+#         print('Step [' + str(current_step) + '/' + total_steps +
+#               '] - Samples Extraction and Annotation', end='\r')
+#         step = 'Step [' + str(current_step) + '/' + total_steps + \
+#             '] - Samples Extraction and Annotation'
+#         start_time = time.time()
+#         subprocess.run([corrected_origin_path+'Python_Scripts/ProcessData/' + annotator_script_file, annotationFile, result + '.total.cluster.txt',
+#                         result, dict_directory, pam, max_values[0], reference_genome_dir, guides, max_values[1], max_values[2], sampleIDfile, step])
+#         subprocess.run(['mv', result + '.cluster.tmp.txt',
+#                         result + '.total.cluster.txt'])
+#         print('\033[KStep [' + str(current_step) + '/' + total_steps +
+#               '] - Samples Extraction and Annotation DONE: %.2f seconds' % round(time.time() - start_time, 2))
+#         current_step += 1
 
-        # Summary position
-        print('Step [' + str(current_step) + '/' + total_steps +
-              '] - Creating Summaries: Summary by Position', end='\r')
-        start_time = time.time()
-        subprocess.run([corrected_origin_path + 'Python_Scripts/ProcessData/summary_by_guide_position.py',
-                        result + '.total.cluster.txt', max_values[0], max_values[1], max_values[2], guides, result, 'Uniq'])
+#         # Summary position
+#         print('Step [' + str(current_step) + '/' + total_steps +
+#               '] - Creating Summaries: Summary by Position', end='\r')
+#         start_time = time.time()
+#         subprocess.run([corrected_origin_path + 'Python_Scripts/ProcessData/summary_by_guide_position.py',
+#                         result + '.total.cluster.txt', max_values[0], max_values[1], max_values[2], guides, result, 'Uniq'])
 
-        # Summary guide
-        print('\033[KStep [' + str(current_step) + '/' + total_steps +
-              '] - Creating Summaries: Summary by Guide', end='\r')
-        subprocess.run([corrected_origin_path + 'Python_Scripts/ProcessData/summary_by_guide.py', result +
-                        '.samples.annotation.txt', max_values[0], max_values[1], max_values[2], guides, result, sum_guide_type])
+#         # Summary guide
+#         print('\033[KStep [' + str(current_step) + '/' + total_steps +
+#               '] - Creating Summaries: Summary by Guide', end='\r')
+#         subprocess.run([corrected_origin_path + 'Python_Scripts/ProcessData/summary_by_guide.py', result +
+#                         '.samples.annotation.txt', max_values[0], max_values[1], max_values[2], guides, result, sum_guide_type])
 
-        # Summary of samples
-        print('\033[KStep [' + str(current_step) + '/' + total_steps +
-              '] - Creating Summaries: Summary by Samples', end='\r')
-        subprocess.run([corrected_origin_path+'Python_Scripts/ProcessData/summary_by_samples.py',
-                        result + '.samples.annotation.txt', result, 'both', guides, sampleIDfile])
-        print('\033[KStep [' + str(current_step) + '/' + total_steps +
-              '] - Creating Summaries DONE: %.2f seconds' % round(time.time() - start_time, 2))
-        current_step += 1
+#         # Summary of samples
+#         print('\033[KStep [' + str(current_step) + '/' + total_steps +
+#               '] - Creating Summaries: Summary by Samples', end='\r')
+#         subprocess.run([corrected_origin_path+'Python_Scripts/ProcessData/summary_by_samples.py',
+#                         result + '.samples.annotation.txt', result, 'both', guides, sampleIDfile])
+#         print('\033[KStep [' + str(current_step) + '/' + total_steps +
+#               '] - Creating Summaries DONE: %.2f seconds' % round(time.time() - start_time, 2))
+#         current_step += 1
 
-        # Generate population distributions
-        current_guide = 0
-        print('Step [' + str(current_step) + '/' +
-              total_steps + '] - Generating Report', end='\r')
-        start_time = time.time()
-        with open(guides) as all_guides:
-            for g in all_guides:
-                g = g.strip()
-                for i in range(int(max_bulge) + int(max_values[0]) + 1):
-                    subprocess.run([corrected_origin_path + 'Python_Scripts/ProcessData/populations_distribution.py',
-                                    result + '.PopulationDistribution.txt', str(i), g])
+#         # Generate population distributions
+#         current_guide = 0
+#         print('Step [' + str(current_step) + '/' +
+#               total_steps + '] - Generating Report', end='\r')
+#         start_time = time.time()
+#         with open(guides) as all_guides:
+#             for g in all_guides:
+#                 g = g.strip()
+#                 for i in range(int(max_bulge) + int(max_values[0]) + 1):
+#                     subprocess.run([corrected_origin_path + 'Python_Scripts/ProcessData/populations_distribution.py',
+#                                     result + '.PopulationDistribution.txt', str(i), g])
 
-        # Create Final file for each guide
-        with open(guides) as all_guides:
-            for g in all_guides:
-                g = g.strip()
-                current_guide += 1
-                print('\033Step [' + str(current_step) + '/' + total_steps +
-                      '] - Generating Report: Guide ' + str(current_guide) + '/' + str(num_guides), end='\r')
-                # NOTE attenzione che qui viene usato shell = True
-                subprocess.run(['LC_ALL=C grep ' + g + ' ' + result +
-                                '.samples.annotation.txt > ' + result + '.targets.' + g + '.txt'], shell=True)
-                subprocess.run([corrected_origin_path + 'Python_Scripts/ProcessData/cluster.dict.py', result + '.targets.' +
-                                g + '.txt', 'no', 'True', 'True', guides, result + '.targets.' + g, 'total', 'addForFinal'])
-                subprocess.run(['mv', result + '.targets.' + g +
-                                '.cluster.txt', result + '.targets.' + g + '.txt'])
+#         # Create Final file for each guide
+#         with open(guides) as all_guides:
+#             for g in all_guides:
+#                 g = g.strip()
+#                 current_guide += 1
+#                 print('\033Step [' + str(current_step) + '/' + total_steps +
+#                       '] - Generating Report: Guide ' + str(current_guide) + '/' + str(num_guides), end='\r')
+#                 # NOTE attenzione che qui viene usato shell = True
+#                 subprocess.run(['LC_ALL=C grep ' + g + ' ' + result +
+#                                 '.samples.annotation.txt > ' + result + '.targets.' + g + '.txt'], shell=True)
+#                 subprocess.run([corrected_origin_path + 'Python_Scripts/ProcessData/cluster.dict.py', result + '.targets.' +
+#                                 g + '.txt', 'no', 'True', 'True', guides, result + '.targets.' + g, 'total', 'addForFinal'])
+#                 subprocess.run(['mv', result + '.targets.' + g +
+#                                 '.cluster.txt', result + '.targets.' + g + '.txt'])
 
-        # Remove intermediate files
-        file_to_remove = ['.total', '.common_targets', '.semi_common_targets', '.semi_common_targets.minmaxdisr', '.unique_targets',
-                          '.unique_targets.pamcreation', '.addToGeneralTable', '.SampleClasses', '.samples.annotation']
-        for i in file_to_remove:
-            removeFile(result + i + '.txt')
-        print('Step [' + str(current_step) + '/' + total_steps +
-              '] - Generating Report DONE: %.2f seconds' % round(time.time() - start_time, 2))
-    print('Processing Data END')
-    print("Runtime: %s seconds" % (time.time() - start_time_processdata))
+#         # Remove intermediate files
+#         file_to_remove = ['.total', '.common_targets', '.semi_common_targets', '.semi_common_targets.minmaxdisr', '.unique_targets',
+#                           '.unique_targets.pamcreation', '.addToGeneralTable', '.SampleClasses', '.samples.annotation']
+#         for i in file_to_remove:
+#             removeFile(result + i + '.txt')
+#         print('Step [' + str(current_step) + '/' + total_steps +
+#               '] - Generating Report DONE: %.2f seconds' % round(time.time() - start_time, 2))
+#     print('Processing Data END')
+#     print("Runtime: %s seconds" % (time.time() - start_time_processdata))
 
 
-def graphicalInterface():
-    # start graphical interface
-    if ('help' in sys.argv[1:]):  # TODO completare
-        print('Open the Graphical Interface for CRISPRitz.',
-              "\nEXAMPLE CALL: crispritz.py graphical-interface <serverDirectory>\n",
-              '\n<serverDirectory>: (Optional) directory where to start the server for the graphical interface. If not provided, the current directory will be used\n',
-              'Please note that the <serverDirectory> must be structured as such:\n',
-              '-annotations\n\t-<annotationsFile>: One or more text files containing the annotations in .bed format\n',
-              '-assets\n',
-              '-dictionaries\n\t-dictionary_name\n',
-              '-genome_library\n',
-              '-Genomes\n',
-              '-pam\n',
-              '-Results')
-        sys.exit()
-    try:
-        launch_dir = os.path.realpath(sys.argv[2])
-    except:
-        launch_dir = os.path.realpath('./')
-    if not os.path.isdir(launch_dir):
-        print('Directory not found. Creating...')
-        os.mkdir(launch_dir)
-    os.chdir(launch_dir)
-    check_directories = ['annotations', 'assets', 'dictionaries',
-                         'genome_library', 'Genomes', 'pam', 'Results']
-    for d in check_directories:
-        if not os.path.isdir(os.path.realpath(d)):
-            print(d + ' directory not found. Creating...')
-            os.mkdir(os.getcwd() + '/' + d)
+# def graphicalInterface():
+#     # start graphical interface
+#     if ('help' in sys.argv[1:]):  # TODO completare
+#         print('Open the Graphical Interface for CRISPRitz.',
+#               "\nEXAMPLE CALL: crispritz.py graphical-interface <serverDirectory>\n",
+#               '\n<serverDirectory>: (Optional) directory where to start the server for the graphical interface. If not provided, the current directory will be used\n',
+#               'Please note that the <serverDirectory> must be structured as such:\n',
+#               '-annotations\n\t-<annotationsFile>: One or more text files containing the annotations in .bed format\n',
+#               '-assets\n',
+#               '-dictionaries\n\t-dictionary_name\n',
+#               '-genome_library\n',
+#               '-Genomes\n',
+#               '-pam\n',
+#               '-Results')
+#         sys.exit()
+#     try:
+#         launch_dir = os.path.realpath(sys.argv[2])
+#     except:
+#         launch_dir = os.path.realpath('./')
+#     if not os.path.isdir(launch_dir):
+#         print('Directory not found. Creating...')
+#         os.mkdir(launch_dir)
+#     os.chdir(launch_dir)
+#     check_directories = ['annotations', 'assets', 'dictionaries',
+#                          'genome_library', 'Genomes', 'pam', 'Results']
+#     for d in check_directories:
+#         if not os.path.isdir(os.path.realpath(d)):
+#             print(d + ' directory not found. Creating...')
+#             os.mkdir(os.getcwd() + '/' + d)
 
-    print("LAUNCHING GRAPHICAL SERVER...")
-    subprocess.run(
-        [corrected_origin_path + 'Python_Scripts/CrispritzWebApp/app_v6.py'])
-    time.sleep(1)
-    print("COPY THE FOLLOWING LINK INTO ANY BROWSER: http//:localhost")
+#     print("LAUNCHING GRAPHICAL SERVER...")
+#     subprocess.run(
+#         [corrected_origin_path + 'Python_Scripts/CrispritzWebApp/app_v6.py'])
+#     time.sleep(1)
+#     print("COPY THE FOLLOWING LINK INTO ANY BROWSER: http//:localhost")
 
 # RETURN VERSION FUNCTION
 
 
 def version():
-    print("CRISPRitz v2.3.6")
+    print("CRISPRitz v2.3.8")
 
 
 # HELP FUNCTION
@@ -1187,7 +1068,7 @@ def callHelp():
 
     print("help:\n",
           "\nALL FASTA FILEs USED BY THE SOFTWARE MUST BE UNZIPPED AND CHROMOSOME SEPARATED, ALL VCFs USED BY THE SOFTWARE MUST BE ZIPPED AND CHROMOSOME SEPARATED",
-          # "\ncrispritz graphical-interface FUNCTION TO START LOCAL SERVER AND ACTIVATE USER GRAPHICAL INTERFACE"
+          "\n"
           "\ncrispritz version FUNCTION RETURNING THE VERSION OF CRISPRitz INSTALLED",
           "\ncrispritz add-variants FUNCTION TO ADD VARIANTS DATA TO A FASTA GENOME",
           "\ncrispritz index-genome FUNCTION TO CREATE GENOME INDEX TO PERFORM FAST SEARCHES WITH BULGES",
@@ -1195,8 +1076,8 @@ def callHelp():
           "\ncrispritz scores FUNCTION TO CALCULATE THE CFD SCORE FOR A LIST OF TARGETS",
           "\ncrispritz annotate-results FUNCTION TO ADD GENOMIC INFORMATION TO TARGETS RESULTS",
           "\ncrispritz generate-report FUNCTION TO GENERATE GRAPHICAL REPORT FOR A SPECIFIC GUIDE",
-          #   "\ncrispritz process-data FUNCTION TO ANALYZE RESULTS TO GENERATE VARIANT ANALYSIS AND SAMPLE CLASSIFICATION (beta)",
-          "\n\nADD help TO ANY FUNCTION TO VISUALIZE A BRIEF HELP PAGE (example: crispritz index-genome help)\n")
+          "\n",
+          "\nADD help TO ANY FUNCTION TO VISUALIZE A BRIEF HELP PAGE (example: crispritz index-genome help)\n")
 
 
 if len(sys.argv) < 2:
@@ -1217,9 +1098,5 @@ elif sys.argv[1] == "annotate-results":
     annotateResults()
 elif sys.argv[1] == "generate-report":
     generateReport()
-elif sys.argv[1] == 'process-data':
-    processData()
-elif sys.argv[1] == 'graphical-interface':
-    graphicalInterface()
 else:
     print("ERROR! \"" + sys.argv[1] + "\" is not an allowed!")
