@@ -17,12 +17,15 @@ dir_enr_name = sys.argv[3] + '_enriched' #name of directory for saving files
 inAltFile = open(altFile, "r").readlines()  # variations file open
 inGenomeFile = open(genomeFile, "r")  # genome file open
 
+#name of chr
 genomeHeader = inGenomeFile.readline()
 
+#all the fasta content is read and stored in a single line with \n removed
 genomeStr = inGenomeFile.read()
 genomeStr = genomeStr.replace('\n', '')
 
 genomeStr = genomeStr.upper()
+#genome str is listed to be modified faster and easier
 genomeList = list(genomeStr)
 
 iupac_code = {}
@@ -133,6 +136,8 @@ iupac_code_scomposition = {
 print('START ENRICHMENT WITH SNVs AND SVs')
 
 for line in inAltFile:
+    if 'PASS' not in line: #skip line with QUAL inferior to PASS
+        continue
     x = line.rstrip().split(' ')
     x[0] = str(int(x[0])-1)  # taaac
     if (',' in x[2]) and (len(x[1]) == 1) and ('>' not in x[2]) and (len(x[2]) < 6):
@@ -177,7 +182,10 @@ if not (os.path.isdir(dir_enr_name)):
 outFile = open(dir_enr_name + '/' + genomeHeader[1:(len(genomeHeader)-1)]+'.enriched'+'.fa', 'w')
 outFile.write(genomeHeader+genomeStr+'\n')
 
+#step to generate fasta files with indels and snps, now INDELS are treated separately, this works only for single sample VCF
 for line in inAltFile:
+    if 'PASS' not in line: #skip line with QUAL inferior to PASS
+        continue
     x = line.rstrip().split(' ')
     x[0] = str(int(x[0])-1)  # taaac
     if (',' not in x[2]) and (',' not in x[1]) and ('>' not in x[2]) and (len(x[1]) == 1) and (len(x[2]) > 1):
