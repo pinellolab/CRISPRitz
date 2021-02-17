@@ -17,14 +17,17 @@ dir_enr_name = sys.argv[3] + '_enriched' #name of directory for saving files
 inAltFile = open(altFile, "r")  # variations file open
 inGenomeFile = open(genomeFile, "r")  # genome file open
 
-#name of chr
+#read fasta header (chr_name)
 genomeHeader = inGenomeFile.readline()
 
-#all the fasta content is read and stored in a single line with \n removed
+#read VCF header
+VCFheader=inAltFile.readline()
+
+#all the fasta content is read and stored in a single line with \n removed and uppercased to avoid possible conflicts
 genomeStr = inGenomeFile.read()
 genomeStr = genomeStr.replace('\n', '')
-
 genomeStr = genomeStr.upper()
+
 #genome str is listed to be modified faster and easier
 genomeList = list(genomeStr)
 
@@ -133,12 +136,7 @@ iupac_code_scomposition = {
           'N':'ATGC'
         }
 
-print('START ENRICHMENT WITH SNVs AND SVs')
-
-#skip header
-inAltFile.readline()
-
-for line in inAltFile:
+def SNPsProcess(line):
     x = line.strip().split('\t') #split alt file to add snps to genome
     del x[1] #remove the unnecessary rsID from the split list
     x[0] = str(int(x[0])-1)  # taaac
@@ -175,14 +173,24 @@ for line in inAltFile:
             if iupacvalue in value:
                 genomeList[int(x[0])] = str(key)
 
+def chromosomeSave():
+    genomeStr = "".join(genomeList)
+    os.chdir("./SNPs_genome/")
+    if not (os.path.isdir(dir_enr_name)):
+        os.mkdir(dir_enr_name)
+    outFile = open(dir_enr_name + '/' + genomeHeader[1:(len(genomeHeader)-1)]+'.enriched'+'.fa', 'w')
+    outFile.write(genomeHeader+genomeStr+'\n')
 
-genomeStr = "".join(genomeList)
+print('START ENRICHMENT WITH SNVs AND SVs')
 
-os.chdir("./SNPs_genome/")
-if not (os.path.isdir(dir_enr_name)):
-    os.mkdir(dir_enr_name)
-outFile = open(dir_enr_name + '/' + genomeHeader[1:(len(genomeHeader)-1)]+'.enriched'+'.fa', 'w')
-outFile.write(genomeHeader+genomeStr+'\n')
+for line in inAltFile:
+    SNPsProcess(line)
+    #dictionaryCreation(line)
+    #indelsProcess(line)
+
+#saving chr after enrichment
+chromosomeSave()
+
 
 #REMOVED INDELS CREATION AND SUBSTITUTED WITH NEW SCRIPT
 
