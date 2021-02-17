@@ -440,7 +440,9 @@ def genomeEnrichment():
     checkExistance(dirGenome, 'd')
     listChrs = os.listdir(dirVCFFiles)
     listChrs.remove('*.tbi')
-    
+
+    print(listChrs)
+
     chr_with_vcf = set()
     # VCF file must contain '.chrN.' with N = number or letter of chr
     for vcf_chr in [f for f in listdir(dirVCFFiles) if isfile(join(dirVCFFiles, f))]:
