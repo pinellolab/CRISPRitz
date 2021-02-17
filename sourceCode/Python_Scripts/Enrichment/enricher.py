@@ -14,7 +14,7 @@ print("READING VCF FILE AND CHROMOSOME")
 altFile = sys.argv[1]  # file with variations
 genomeFile = sys.argv[2]  # genome file
 dir_enr_name = sys.argv[3] + '_enriched' #name of directory for saving files
-inAltFile = open(altFile, "r").readlines()  # variations file open
+inAltFile = open(altFile, "r")  # variations file open
 inGenomeFile = open(genomeFile, "r")  # genome file open
 
 #name of chr
@@ -135,9 +135,12 @@ iupac_code_scomposition = {
 
 print('START ENRICHMENT WITH SNVs AND SVs')
 
+#skip header
+inAltFile.readline()
+
 for line in inAltFile:
     x = line.strip().split('\t') #split alt file to add snps to genome
-    del x[1]
+    del x[1] #remove the unnecessary rsID from the split list
     x[0] = str(int(x[0])-1)  # taaac
     if (',' in x[2]) and (len(x[1]) == 1) and ('>' not in x[2]) and (len(x[2]) < 6):
         altstr = str(x[2])
