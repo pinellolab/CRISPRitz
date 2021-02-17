@@ -482,8 +482,8 @@ def genomeEnrichment():
     os.chdir(dirEnrichedGenome)
     if not (os.path.isdir("./SNPs_genome/")):
         os.makedirs("./SNPs_genome/")
-    if not (os.path.isdir("./INDELs_genome/")):
-        os.makedirs("./INDELs_genome/")
+    # if not (os.path.isdir("./INDELs_genome/")):
+    #     os.makedirs("./INDELs_genome/")
 
     print("Variants Adding START")
 
@@ -501,8 +501,8 @@ def genomeEnrichment():
     for f in chr_wihtout_vcf:  # Move chromosomes without vcf to enriched directory and change name adding '.enriched.'
         subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends, './SNPs_genome/' +
                         dirGenome.split('/')[-1] + '_enriched/' + f + '.enriched.' + file_ends])
-        subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends,
-                        './INDELs_genome/' + dirGenome.split('/')[-1] + '_enriched/' + f + '.indels.' + file_ends])
+        # subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends,
+        #                 './INDELs_genome/' + dirGenome.split('/')[-1] + '_enriched/' + f + '.indels.' + file_ends])
 
     print("Variants Adding END")
     print("Runtime: %s seconds" % (time.time() - start_time))
