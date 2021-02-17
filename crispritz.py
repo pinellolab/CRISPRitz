@@ -508,7 +508,7 @@ def genomeEnrichment():
     print("Runtime: %s seconds" % (time.time() - start_time))
 
     os.chdir("../")
-    shutil.rmtree(dirParsedFiles)
+    # shutil.rmtree(dirParsedFiles) DO NOT REMOVE ALT FILE TO REUSE THEM LATER
 
 
 def generateReport():
@@ -1060,7 +1060,7 @@ def removeFile(to_remove):
 
 
 def version():
-    print("CRISPRitz v2.3.8")
+    print("CRISPRitz v2.4.0")
 
 
 # HELP FUNCTION
