@@ -190,7 +190,7 @@ for line in inAltFile:
         # dictionaryCreation(line)
         # indelsProcess(line)
 
-#saving chr after enrichment
+#saving chr after enrichment with snps
 chromosomeSave()
 
 
