@@ -185,8 +185,10 @@ print('START ENRICHMENT WITH SNVs AND SVs')
 
 for line in inAltFile:
     SNPsProcess(line)
-    #dictionaryCreation(line)
-    #indelsProcess(line)
+    if sys.argv[4]: #if true do all the creation, if false do only genome enrichment with SNPs
+        print(sys.argv[4])
+        # dictionaryCreation(line)
+        # indelsProcess(line)
 
 #saving chr after enrichment
 chromosomeSave()

@@ -433,6 +433,9 @@ def genomeEnrichment():
 
     dirVCFFiles = os.path.realpath(sys.argv[2])
     dirGenome = os.path.realpath(sys.argv[3])
+    doit = False
+    if sys.argc > 4 and sys.argv[4]:
+        doit = True
     checkExistance(dirVCFFiles, 'd')
     checkExistance(dirGenome, 'd')
     listChrs = os.listdir(dirVCFFiles)
@@ -453,61 +456,79 @@ def genomeEnrichment():
     chr_wihtout_vcf = set([f.split(contains_enr + '.fa')[0]
                            for f in listdir(dirGenome) if isfile(join(dirGenome, f))]) - chr_with_vcf
 
-    dirParsedFiles = "./parsed_vcf_files/"
+    # dirParsedFiles = "./parsed_vcf_files/"
 
-    if not (os.path.isdir(dirParsedFiles)):
-        os.makedirs(dirParsedFiles)
-
-    os.chdir(dirParsedFiles)
-
-    print("Variants Extraction START")
-    start_time = time.time()
-    for elem in listChrs:
-        chrom = ""
-        for cut in elem.split('.'):
-            if 'chr' in cut:
-                chrom = cut
-        subprocess.run([corrected_origin_path +
-                        'Python_Scripts/Enrichment/bcf_query.sh', dirVCFFiles+"/"+elem, chrom])
-    print("Variants Extraction END")
-    print("Runtime: %s seconds" % (time.time() - start_time))
-
-    os.chdir("../")
-    listChrs = os.listdir(dirParsedFiles)
+    # if not (os.path.isdir(dirParsedFiles)):
+    #     os.makedirs(dirParsedFiles)
+    
     dirEnrichedGenome = "./variants_genome/"
-
     if not (os.path.isdir(dirEnrichedGenome)):
         os.makedirs(dirEnrichedGenome)
 
     os.chdir(dirEnrichedGenome)
     if not (os.path.isdir("./SNPs_genome/")):
         os.makedirs("./SNPs_genome/")
+    
+    # os.chdir('../')
+    # os.chdir(dirParsedFiles)
+
+    print("Variants Extraction and Processing START")
+    start_time = time.time()
+    for elem in listChrs:
+        # os.chdir(dirParsedFiles) #enter in parsed file directory
+        chrom = ""
+        for cut in elem.split('.'):
+            if 'chr' in cut:
+                chrom = cut
+        subprocess.run([corrected_origin_path +
+                        'Python_Scripts/Enrichment/bcf_query.sh', dirVCFFiles+"/"+elem, chrom])
+        altfile = str(chrom + '.alt')
+        genfile = str(dirGenome+'/'+ chrom + contains_enr + '.fa')
+        subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], doit])
+        subprocess.run(['rm', '*.alt'])
+        
+    for f in chr_wihtout_vcf:  # Move chromosomes without vcf to enriched directory and change name adding '.enriched.'
+        subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends, './SNPs_genome/' + dirGenome.split('/')[-1] + '_enriched/' + f + '.enriched.' + file_ends])
+    
+    print("Variants Extraction and Processing END")
+    print("Runtime: %s seconds" % (time.time() - start_time))
+
+    # os.chdir("../")
+    # listChrs = os.listdir(dirParsedFiles)
+    # dirEnrichedGenome = "./variants_genome/"
+
+    # if not (os.path.isdir(dirEnrichedGenome)):
+    #     os.makedirs(dirEnrichedGenome)
+
+    # os.chdir(dirEnrichedGenome)
+    # if not (os.path.isdir("./SNPs_genome/")):
+    #     os.makedirs("./SNPs_genome/")
     # if not (os.path.isdir("./INDELs_genome/")):
     #     os.makedirs("./INDELs_genome/")
 
-    print("Variants Adding START")
+    # print("Variants Adding START")
 
-    start_time = time.time()
-    for f in listChrs:
-        splitf = f.split('.')
-        altfile = str('../'+dirParsedFiles+splitf[0]+'.alt')
-        genfile = str(dirGenome+'/'+splitf[0] + contains_enr + '.fa')
-        if not isfile(genfile) and not isfile(str(dirGenome+'/'+splitf[0] + contains_enr + '.fasta')):
-            continue
-        print("Adding Variants to:", splitf[0])
-        subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py',
-                        altfile, genfile, dirGenome.split('/')[-1]])
+    # start_time = time.time()
+    # for f in listChrs:
+    #     splitf = f.split('.')
+    #     altfile = str('../'+dirParsedFiles+splitf[0]+'.alt')
+    #     genfile = str(dirGenome+'/'+splitf[0] + contains_enr + '.fa')
+    #     if not isfile(genfile) and not isfile(str(dirGenome+'/'+splitf[0] + contains_enr + '.fasta')):
+    #         continue
+    #     print("Adding Variants to:", splitf[0])
+    #     subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py',
+    #                     altfile, genfile, dirGenome.split('/')[-1]])
 
-    for f in chr_wihtout_vcf:  # Move chromosomes without vcf to enriched directory and change name adding '.enriched.'
-        subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends, './SNPs_genome/' +
-                        dirGenome.split('/')[-1] + '_enriched/' + f + '.enriched.' + file_ends])
-        # subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends,
-        #                 './INDELs_genome/' + dirGenome.split('/')[-1] + '_enriched/' + f + '.indels.' + file_ends])
+    # for f in chr_wihtout_vcf:  # Move chromosomes without vcf to enriched directory and change name adding '.enriched.'
+    #     subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends, './SNPs_genome/' +
+    #                     dirGenome.split('/')[-1] + '_enriched/' + f + '.enriched.' + file_ends])
+    #     # subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends,
+    #     #                 './INDELs_genome/' + dirGenome.split('/')[-1] + '_enriched/' + f + '.indels.' + file_ends])
 
-    print("Variants Adding END")
-    print("Runtime: %s seconds" % (time.time() - start_time))
+    # print("Variants Adding END")
+    # print("Runtime: %s seconds" % (time.time() - start_time))
 
-    os.chdir("../")
+    # os.chdir("../")
     # shutil.rmtree(dirParsedFiles) DO NOT REMOVE ALT FILE TO REUSE THEM LATER
 
 
