@@ -434,7 +434,7 @@ def genomeEnrichment():
     dirVCFFiles = os.path.realpath(sys.argv[2])
     dirGenome = os.path.realpath(sys.argv[3])
     doit = False
-    if sys.argc > 4 and sys.argv[4]:
+    if len(sys.argv) > 4 and sys.argv[4]:
         doit = True
     checkExistance(dirVCFFiles, 'd')
     checkExistance(dirGenome, 'd')
