@@ -433,9 +433,9 @@ def genomeEnrichment():
 
     dirVCFFiles = os.path.realpath(sys.argv[2])
     dirGenome = os.path.realpath(sys.argv[3])
-    doit = False
-    if len(sys.argv) > 4 and sys.argv[4]:
-        doit = True
+    doit = 'no'
+    if len(sys.argv) > 4 and sys.argv[4] == 'true':
+        doit = 'yes'
     checkExistance(dirVCFFiles, 'd')
     checkExistance(dirGenome, 'd')
     listChrs = os.listdir(dirVCFFiles)
@@ -484,7 +484,7 @@ def genomeEnrichment():
                         'Python_Scripts/Enrichment/bcf_query.sh', dirVCFFiles+"/"+elem, chrom])
         altfile = str(chrom + '.alt')
         genfile = str(dirGenome+'/'+ chrom + contains_enr + '.fa')
-        subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], doit])
+        subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], str(doit)])
         subprocess.run(['rm', '*.alt'])
 
     for f in chr_wihtout_vcf:  # Move chromosomes without vcf to enriched directory and change name adding '.enriched.'

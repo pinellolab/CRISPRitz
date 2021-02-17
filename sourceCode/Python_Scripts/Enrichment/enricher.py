@@ -185,7 +185,7 @@ print('START ENRICHMENT WITH SNVs AND SVs')
 
 for line in inAltFile:
     SNPsProcess(line)
-    if sys.argv[4]: #if true do all the creation, if false do only genome enrichment with SNPs
+    if sys.argv[4] == 'yes': #if true do all the creation, if false do only genome enrichment with SNPs
         print(sys.argv[4])
         # dictionaryCreation(line)
         # indelsProcess(line)
