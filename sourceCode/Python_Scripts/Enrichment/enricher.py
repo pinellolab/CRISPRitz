@@ -136,9 +136,8 @@ iupac_code_scomposition = {
 print('START ENRICHMENT WITH SNVs AND SVs')
 
 for line in inAltFile:
-    # if 'PASS' not in line: #skip line with QUAL inferior to PASS
-    #     continue
-    x = line.strip().split('\t')
+    x = line.strip().split('\t') #split alt file to add snps to genome
+    del x[1]
     x[0] = str(int(x[0])-1)  # taaac
     if (',' in x[2]) and (len(x[1]) == 1) and ('>' not in x[2]) and (len(x[2]) < 6):
         altstr = str(x[2])
