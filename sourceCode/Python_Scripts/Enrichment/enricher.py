@@ -136,8 +136,8 @@ iupac_code_scomposition = {
 print('START ENRICHMENT WITH SNVs AND SVs')
 
 for line in inAltFile:
-    if 'PASS' not in line: #skip line with QUAL inferior to PASS
-        continue
+    # if 'PASS' not in line: #skip line with QUAL inferior to PASS
+    #     continue
     x = line.rstrip().split(' ')
     x[0] = str(int(x[0])-1)  # taaac
     if (',' in x[2]) and (len(x[1]) == 1) and ('>' not in x[2]) and (len(x[2]) < 6):
@@ -184,8 +184,8 @@ outFile.write(genomeHeader+genomeStr+'\n')
 
 #step to generate fasta files with indels and snps, now INDELS are treated separately, this works only for single sample VCF
 for line in inAltFile:
-    if 'PASS' not in line: #skip line with QUAL inferior to PASS
-        continue
+    # if 'PASS' not in line: #skip line with QUAL inferior to PASS
+    #     continue
     x = line.rstrip().split(' ')
     x[0] = str(int(x[0])-1)  # taaac
     if (',' not in x[2]) and (',' not in x[1]) and ('>' not in x[2]) and (len(x[1]) == 1) and (len(x[2]) > 1):
