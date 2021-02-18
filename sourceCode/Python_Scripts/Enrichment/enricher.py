@@ -5,7 +5,7 @@ import re
 import time
 import textwrap
 import os
-
+import json
 
 start_time = time.time()
 
@@ -21,7 +21,7 @@ inGenomeFile = open(genomeFile, "r")  # genome file open
 genomeHeader = inGenomeFile.readline()
 
 #read VCF header
-VCFheader=inAltFile.readline()
+VCFheader=inAltFile.readline().split('\t')
 
 #all the fasta content is read and stored in a single line with \n removed and uppercased to avoid possible conflicts
 genomeStr = inGenomeFile.read()
@@ -181,18 +181,85 @@ def chromosomeSave():
     outFile = open(dir_enr_name + '/' + genomeHeader[1:(len(genomeHeader)-1)]+'.enriched'+'.fa', 'w')
     outFile.write(genomeHeader+genomeStr+'\n')
 
-print('START ENRICHMENT WITH SNVs AND SVs')
+def add_to_dict_snps(line):
+    line = line.strip().split('\t')
+    list_samples = []
+    list_chars = []
+    if len(line[2]) == 1 and len(line[3]) == 1:
+        for pos, i in enumerate(line[5:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
+            if ('1' in i):
+                list_samples.append(VCFheader[ pos + 5])
+        if "chr" not in genomeHeader:
+            chromosome = "chr"+genomeHeader[1:].strip()
+        else:
+            chromosome = genomeHeader[1:].strip()
+        chr_pos_string = chromosome + ',' + line[0] #chr,position
+        #Add in last two position the ref and alt nucleotide, eg: chrX,100 -> sample1,sample5,sample10;A,T;rsID100;0.01
+        #If no sample was found, the dict is chrX,100 -> ;A,T;rsID100;0.01
+        rsID = line[1]
+        list_chars.append(line[2])
+        list_chars.append(line[3])
+        af = line[4]  
+        if len(list_samples) > 0:
+            chr_dict_snps[chr_pos_string] = ','.join(sorted(list_samples)) + ';' + ','.join(list_chars) + ";" + rsID + ";" + af
+        else:
+            chr_dict_snps[chr_pos_string] = ';' + ','.join(list_chars) + ";" + rsID + ";" + af #None
+    elif len(line[2]) == 1:
+        variants = line[3].split(",")
+        snps = []
+        values_for_allele_info = []
+        for value, var in enumerate(variants):
+            if len(var) == 1: 
+                print("case with multiple snps", line[2],line[3])
+                snps.append(var)
+                values_for_allele_info.append(value+1) #save number corresponding to snp (1,2,3...)
+        dict_of_lists_samples = {}
+        for snp in snps:
+            dict_of_lists_samples[snp] = []
+        if len(snps) > 0:		
+            for pos, sample in enumerate(line[5:]):
+                for idx, value in enumerate(values_for_allele_info):
+                    if str(value) in sample:
+                        dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 5]) #add to correct entry of dict the sample with such snp
+                        break
+                    
+            if "chr" not in genomeHeader:
+                chromosome = "chr"+genomeHeader[1:].strip()
+            else:
+                chromosome = genomeHeader[1:].strip()
+            chr_pos_string = chromosome + ',' + line[0]
+            rsID = line[1]
+            af = line[4]
 
+            final_entry = []
+            for snp in snps:
+                list_chars = [line[2]]
+                list_chars.append(snp)
+                if len(dict_of_lists_samples[snp]) > 0:
+                    final_entry.append(','.join(sorted(dict_of_lists_samples[snp])) + ';' + ','.join(list_chars) + ";" + rsID + ";" + af)
+                else:
+                    final_entry.append(';' + ','.join(list_chars) + ";" + rsID + ";" + af)
+            chr_dict_snps[chr_pos_string] = '/'.join(final_entry)
+
+
+def dictSave():
+    #os.chdir("./SNPs_genome/")
+    with open('my_dict_' + genomeHeader[1:].strip() + '.json', 'w') as f:
+        json.dump(chr_dict_snps, f) 
+
+print('START ENRICHMENT WITH SNVs AND SVs')
+chr_dict_snps = dict()
 for line in inAltFile:
     SNPsProcess(line)
     if sys.argv[4] == 'yes': #if true do all the creation, if false do only genome enrichment with SNPs
-        print(sys.argv[4])
-        # dictionaryCreation(line)
+        #print(sys.argv[4])
+        add_to_dict_snps(line)
         # indelsProcess(line)
 
 #saving chr after enrichment with snps
 chromosomeSave()
-
+if sys.argv[4] == 'yes':
+    dictSave()
 
 #REMOVED INDELS CREATION AND SUBSTITUTED WITH NEW SCRIPT
 
