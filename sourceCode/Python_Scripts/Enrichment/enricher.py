@@ -6,6 +6,7 @@ import time
 import textwrap
 import os
 import json
+import pandas as pd
 
 start_time = time.time()
 
@@ -19,6 +20,9 @@ inGenomeFile = open(genomeFile, "r")  # genome file open
 
 #read fasta header (chr_name)
 genomeHeader = inGenomeFile.readline()
+currentChr = genomeHeader[1:].strip()
+if 'chr' not in currentChr:
+    currentChr = 'chr'+currentChr
 
 #read VCF header
 VCFheader=inAltFile.readline().split('\t')
@@ -137,7 +141,8 @@ iupac_code_scomposition = {
         }
 
 def SNPsProcess(line):
-    x = line.strip().split('\t') #split alt file to add snps to genome
+    #x = line.strip().split('\t') #split alt file to add snps to genome
+    x = line
     del x[1] #remove the unnecessary rsID from the split list
     x[0] = str(int(x[0])-1)  # taaac
     if (',' in x[2]) and (len(x[1]) == 1) and ('>' not in x[2]) and (len(x[2]) < 6):
@@ -182,18 +187,15 @@ def chromosomeSave():
     outFile.write(genomeHeader+genomeStr+'\n')
 
 def add_to_dict_snps(line):
-    line = line.strip().split('\t')
+    
     list_samples = []
     list_chars = []
     if len(line[2]) == 1 and len(line[3]) == 1:
         for pos, i in enumerate(line[5:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
             if ('1' in i):
                 list_samples.append(VCFheader[ pos + 5])
-        if "chr" not in genomeHeader:
-            chromosome = "chr"+genomeHeader[1:].strip()
-        else:
-            chromosome = genomeHeader[1:].strip()
-        chr_pos_string = chromosome + ',' + line[0] #chr,position
+        
+        chr_pos_string = currentChr + ',' + line[0] #chr,position
         #Add in last two position the ref and alt nucleotide, eg: chrX,100 -> sample1,sample5,sample10;A,T;rsID100;0.01
         #If no sample was found, the dict is chrX,100 -> ;A,T;rsID100;0.01
         rsID = line[1]
@@ -223,11 +225,7 @@ def add_to_dict_snps(line):
                         dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 5]) #add to correct entry of dict the sample with such snp
                         break
                     
-            if "chr" not in genomeHeader:
-                chromosome = "chr"+genomeHeader[1:].strip()
-            else:
-                chromosome = genomeHeader[1:].strip()
-            chr_pos_string = chromosome + ',' + line[0]
+            chr_pos_string = currentChr + ',' + line[0]
             rsID = line[1]
             af = line[4]
 
@@ -244,22 +242,65 @@ def add_to_dict_snps(line):
 
 def dictSave():
     #os.chdir("./SNPs_genome/")
-    with open('my_dict_' + genomeHeader[1:].strip() + '.json', 'w') as f:
+    with open('my_dict_' + currentChr + '.json', 'w') as f:
         json.dump(chr_dict_snps, f) 
 
+
+def indel_to_fasta(line, id_indel):
+    list_samples = []
+    if len(line[2]) != len(line[3]) and '<' not in line[3] and '<' not in line[4]:
+        if ',' not in line[3]:
+            for pos, i in enumerate(line[5:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
+                if ('1' in i):
+                    list_samples.append(VCFheader[ pos + 5])
+            start_position = int(line[0])-26
+            end_position = int(line[0])+26+len(line[2])
+            sub_fasta = genomeList[start_position:end_position]
+            #sub_fasta[25] = line[3] 
+            sub_fasta = ''.join(sub_fasta)
+            sub_fasta = sub_fasta[0:25] + re.sub(line[2], line[3], sub_fasta[25:], 1, flags=re.IGNORECASE) 
+            with open(f'{output_dir_indels}/{currentChr}_{start_position}-{end_position}_{id_indel}.fa', 'w+') as fasta_out:
+                fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
+                fasta_out.write(sub_fasta+'\n')
+                        
+            rsID = line[1]
+            af = line[4]
+            indel = f"{currentChr}_{line[0]}_{line[2]}_{line[3]}"
+            log_indels.append([f"{currentChr}_{start_position}-{end_position}_{id_indel}", ",".join(list_samples), rsID, af, indel])
+            id_indel += 1
+
+    return id_indel
+
+def logIndelsSave():
+    df = pd.DataFrame(log_indels, columns=['CHR','SAMPLES','rsID','AF','indel'])
+    df.to_csv('log' + currentChr + '.txt', index=False, sep='\t')
+    #dict_indels = df.to_dict(orient='index')
+    #with open('log' + currentChr + '.json', 'w') as f:
+    #    json.dump(log_indels, f) 
+
 print('START ENRICHMENT WITH SNVs AND SVs')
-chr_dict_snps = dict()
+
+if sys.argv[4] == 'yes':
+    chr_dict_snps = dict()
+    log_indels = []
+    id_indel = 1
+    if not os.path.isdir(f"fake_{currentChr}"):
+        os.mkdir(f"fake_{currentChr}")
+    output_dir_indels = os.path.abspath(f"fake_{currentChr}")
 for line in inAltFile:
-    SNPsProcess(line)
+    line = line.strip().split('\t')
     if sys.argv[4] == 'yes': #if true do all the creation, if false do only genome enrichment with SNPs
         #print(sys.argv[4])
         add_to_dict_snps(line)
-        # indelsProcess(line)
+        id_indel = indel_to_fasta(line, id_indel)
+    SNPsProcess(line)
+    
 
 #saving chr after enrichment with snps
 chromosomeSave()
 if sys.argv[4] == 'yes':
     dictSave()
+    logIndelsSave()
 
 #REMOVED INDELS CREATION AND SUBSTITUTED WITH NEW SCRIPT
 
