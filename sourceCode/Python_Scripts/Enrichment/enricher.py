@@ -187,6 +187,7 @@ def chromosomeSave():
         os.mkdir(dir_enr_name)
     outFile = open(dir_enr_name + '/' + genomeHeader[1:(len(genomeHeader)-1)]+'.enriched'+'.fa', 'w')
     outFile.write(genomeHeader+genomeStr+'\n')
+    outFile.close()
 
 def add_to_dict_snps(line, pos_AF):
     

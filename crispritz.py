@@ -481,10 +481,12 @@ def genomeEnrichment():
 
     memo = open('change_version.txt','w')
 
-    memo.write('CRISPRitz indels process is now obsolete and has been removed, if you want to process indels you can download our new tool CRISPRme, https://github.com/samuelecancellieri/CRISPRme_Web_App\n')
+    memo.write('CRISPRitz indels process is now obsolete and has been removed, if you want to process indels you can download our new tool CRISPRme, https://github.com/samuelecancellieri/CRISPRme_Web_App'+'\n')
     memo.write('Thank you')
+
+    memo.close()
     
-    # os.chdir('../')
+    os.chdir('../')
     # os.chdir(dirParsedFiles)
 
     print("Variants Extraction and Processing START")
