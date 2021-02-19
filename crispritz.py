@@ -11,6 +11,7 @@ import sys							# input argv
 from subprocess import Popen, PIPE
 import glob
 import pandas as pd
+import multiprocessing
 # path where this file is located
 origin_path = os.path.dirname(os.path.realpath(__file__))
 # conda path
@@ -420,6 +421,8 @@ def annotateResults():
         print("Annotation END")
         print("Annotation runtime: %s seconds" % (time.time() - start_time))
 
+def genomeEnrichment_subprocess_VCF(altfile,genfile,dirGenome,doit,dirVCFFiles):
+    subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], str(doit), dirVCFFiles])
 
 def genomeEnrichment():
     '''
@@ -488,6 +491,7 @@ def genomeEnrichment():
     
     os.chdir('../')
     # os.chdir(dirParsedFiles)
+    pool = multiprocessing.Pool(2)
 
     print("Variants Extraction and Processing START")
     start_time = time.time()
@@ -502,8 +506,10 @@ def genomeEnrichment():
         #altfile = str(chrom + '.alt')
         altfile = dirVCFFiles+"/"+elem
         genfile = str(dirGenome+'/'+ chrom + contains_enr + '.fa')
+        #pool to process 2 vcf file in parallel
+        pool.apply_async(genomeEnrichment_subprocess_VCF, args=(altfile,genfile,dirGenome,doit,dirVCFFiles))
         #subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], str(doit), dirVCFFiles])
-        subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], str(doit), dirVCFFiles])
+        # subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], str(doit), dirVCFFiles])
         #subprocess.run(['rm', altfile])
 
     for f in chr_wihtout_vcf:  # Move chromosomes without vcf to enriched directory and change name adding '.enriched.'
