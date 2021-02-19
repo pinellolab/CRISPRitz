@@ -7,7 +7,6 @@ import textwrap
 import os
 import json
 import pandas as pd
-import gzip
 
 start_time = time.time()
 
@@ -16,7 +15,7 @@ print("READING VCF FILE AND CHROMOSOME")
 altFile = sys.argv[1]  # file with variations
 genomeFile = sys.argv[2]  # genome file
 dir_enr_name = sys.argv[3] + '_enriched' #name of directory for saving files
-inAltFile = gzip.open(altFile, "rt")  # variations file open
+inAltFile = open(altFile, "r")  # variations file open
 inGenomeFile = open(genomeFile, "r")  # genome file open
 vcfName = os.path.basename(sys.argv[5])
 
@@ -145,40 +144,40 @@ iupac_code_scomposition = {
 def SNPsProcess(line):
     #x = line.strip().split('\t') #split alt file to add snps to genome
     x = line
-    #del x[1] #remove the unnecessary rsID from the split list
-    x[1] = str(int(x[1])-1)  # taaac
-    if (',' in x[4]) and (len(x[3]) == 1) and ('>' not in x[4]) and (len(x[4]) < 6):
-        altstr = str(x[4])
+    del x[1] #remove the unnecessary rsID from the split list
+    x[0] = str(int(x[0])-1)  # taaac
+    if (',' in x[2]) and (len(x[1]) == 1) and ('>' not in x[2]) and (len(x[2]) < 6):
+        altstr = str(x[2])
         k = altstr.split(',')
-        if (len(x[4]) == 3):
-            if (str(genomeList[int(x[1])])) not in k:
-                original = genomeList[int(x[1])]
+        if (len(x[2]) == 3):
+            if (str(genomeList[int(x[0])])) not in k:
+                original = genomeList[int(x[0])]
             else:
                 original = ''
             snp = k[0]+k[1]
             iupacvalue = str(original+snp)  #TODO if original is a single nucleotide, use iupac_code_scomposition[original]
             for key, value in iupac_code.items():
                 if iupacvalue in value:
-                    genomeList[int(x[1])] = str(key)
-        elif (len(x[4]) == 5):
+                    genomeList[int(x[0])] = str(key)
+        elif (len(x[2]) == 5):
             if (len(k[0]) == 1) and (len(k[1]) == 1) and (len(k[2]) == 1):
-                if (str(genomeList[int(x[1])])) not in k:
-                    original = genomeList[int(x[1])]
+                if (str(genomeList[int(x[0])])) not in k:
+                    original = genomeList[int(x[0])]
                 else:
                     original = ''
-                original = genomeList[int(x[1])]
+                original = genomeList[int(x[0])]
                 snp = k[0]+k[1]+k[2]
                 iupacvalue = str(original+snp)  #TODO if original is a single nucleotide, use iupac_code_scomposition[original]
                 for key, value in iupac_code.items():
                     if iupacvalue in value:
-                        genomeList[int(x[1])] = str(key)
-    elif (',' not in x[4]) and (len(x[3]) == 1) and ('>' not in x[4]) and (len(x[4]) == 1):
-        original = iupac_code_scomposition[genomeList[int(x[1])]]
-        snp = x[4]
+                        genomeList[int(x[0])] = str(key)
+    elif (',' not in x[2]) and (len(x[1]) == 1) and ('>' not in x[2]) and (len(x[2]) == 1):
+        original = iupac_code_scomposition[genomeList[int(x[0])]]
+        snp = x[2]
         iupacvalue = str(original+snp)
         for key, value in iupac_code.items():
             if iupacvalue in value:
-                genomeList[int(x[1])] = str(key)
+                genomeList[int(x[0])] = str(key)
 
 def chromosomeSave():
     genomeStr = "".join(genomeList)
@@ -188,28 +187,28 @@ def chromosomeSave():
     outFile = open(dir_enr_name + '/' + genomeHeader[1:(len(genomeHeader)-1)]+'.enriched'+'.fa', 'w')
     outFile.write(genomeHeader+genomeStr+'\n')
 
-def add_to_dict_snps(line, pos_AF):
+def add_to_dict_snps(line):
     
     list_samples = []
     list_chars = []
-    if len(line[3]) == 1 and len(line[4]) == 1:
-        for pos, i in enumerate(line[9:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
-            if ('1' in i.split(':')[0]):
-                list_samples.append(VCFheader[ pos + 9])
+    if len(line[2]) == 1 and len(line[3]) == 1:
+        for pos, i in enumerate(line[5:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
+            if ('1' in i):
+                list_samples.append(VCFheader[ pos + 5])
         
-        chr_pos_string = currentChr + ',' + line[1] #chr,position
+        chr_pos_string = currentChr + ',' + line[0] #chr,position
         #Add in last two position the ref and alt nucleotide, eg: chrX,100 -> sample1,sample5,sample10;A,T;rsID100;0.01
         #If no sample was found, the dict is chrX,100 -> ;A,T;rsID100;0.01
-        rsID = line[2]
+        rsID = line[1]
+        list_chars.append(line[2])
         list_chars.append(line[3])
-        list_chars.append(line[4])
-        af = line[7].split(";")[pos_AF][3:] 
+        af = line[4]  
         if len(list_samples) > 0:
             chr_dict_snps[chr_pos_string] = ','.join(sorted(list_samples)) + ';' + ','.join(list_chars) + ";" + rsID + ";" + af
         else:
             chr_dict_snps[chr_pos_string] = ';' + ','.join(list_chars) + ";" + rsID + ";" + af #None
-    elif len(line[3]) == 1:
-        variants = line[4].split(",")
+    elif len(line[2]) == 1:
+        variants = line[3].split(",")
         snps = []
         values_for_allele_info = []
         for value, var in enumerate(variants):
@@ -220,19 +219,19 @@ def add_to_dict_snps(line, pos_AF):
         for snp in snps:
             dict_of_lists_samples[snp] = []
         if len(snps) > 0:		
-            for pos, sample in enumerate(line[9:]):
+            for pos, sample in enumerate(line[5:]):
                 for idx, value in enumerate(values_for_allele_info):
-                    if str(value) in sample.split(':')[0]:
-                        dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 9]) #add to correct entry of dict the sample with such snp
+                    if str(value) in sample:
+                        dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 5]) #add to correct entry of dict the sample with such snp
                         break
                     
-            chr_pos_string = currentChr + ',' + line[1]
-            rsID = line[2]
-            af = line[7].split(";")[pos_AF][3:]
+            chr_pos_string = currentChr + ',' + line[0]
+            rsID = line[1]
+            af = line[4]
 
             final_entry = []
             for snp in snps:
-                list_chars = [line[3]]
+                list_chars = [line[2]]
                 list_chars.append(snp)
                 if len(dict_of_lists_samples[snp]) > 0:
                     final_entry.append(','.join(sorted(dict_of_lists_samples[snp])) + ';' + ','.join(list_chars) + ";" + rsID + ";" + af)
@@ -247,30 +246,30 @@ def dictSave():
         json.dump(chr_dict_snps, f) 
 
 
-def indel_to_fasta(line, id_indel, pos_AF):
+def indel_to_fasta(line, id_indel):
     list_samples = []
-    if len(line[3]) != len(line[4]) and '<' not in line[3] and '<' not in line[4]:
-        if ',' in line[4]:
-            splitted = line[4].split(',')
+    if len(line[2]) != len(line[3]) and '<' not in line[2] and '<' not in line[3]:
+        if ',' in line[3]:
+            splitted = line[3].split(',')
             for s in splitted:
-                if len(s) != line[3]:
-                    line[4] = s
+                if len(s) != line[2]:
+                    line[3] = s
                     break
-        for pos, i in enumerate(line[9:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
-            if ('1' in i.split(':')[0]):
-                list_samples.append(VCFheader[ pos + 9])
-        start_position = int(line[1])-26
-        end_position = int(line[1])+26+len(line[3])
-        sub_fasta = genomeStr[start_position:end_position]
+        for pos, i in enumerate(line[5:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
+            if ('1' in i):
+                list_samples.append(VCFheader[ pos + 5])
+        start_position = int(line[0])-26
+        end_position = int(line[0])+26+len(line[2])
+        sub_fasta = genomeList[start_position:end_position]
         #sub_fasta[25] = line[3] 
-        #sub_fasta = ''.join(sub_fasta)
-        sub_fasta = sub_fasta[0:25] + re.sub(line[3], line[4], sub_fasta[25:], 1, flags=re.IGNORECASE) 
+        sub_fasta = ''.join(sub_fasta)
+        sub_fasta = sub_fasta[0:25] + re.sub(line[2], line[3], sub_fasta[25:], 1, flags=re.IGNORECASE) 
         with open(f'{output_dir_indels}/{currentChr}_{start_position}-{end_position}_{id_indel}.fa', 'w+') as fasta_out:
             fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
             fasta_out.write(sub_fasta+'\n')
                     
-        rsID = line[2]
-        af = line[7].split(";")[pos_AF][3:]
+        rsID = line[1]
+        af = line[4]
         indel = f"{currentChr}_{line[0]}_{line[2]}_{line[3]}"
         log_indels.append([f"{currentChr}_{start_position}-{end_position}_{id_indel}", ",".join(list_samples), rsID, af, indel])
         id_indel += 1
@@ -293,27 +292,12 @@ if sys.argv[4] == 'yes':
     if not os.path.isdir(f"fake_{vcfName}_{currentChr}"):
         os.mkdir(f"fake_{vcfName}_{currentChr}")
     output_dir_indels = os.path.abspath(f"fake_{vcfName}_{currentChr}")
-
-first_line = True
-for line in inAltFile:
-    if ('#CHROM') in line:
-        VCFheader = line.strip().split('\t')   #Save this header for retrieving sample id
-        break
 for line in inAltFile:
     line = line.strip().split('\t')
-    if first_line:
-        first_line = False
-        splitted = line[7].split(";")
-        for pos, ele in enumerate(splitted):
-            if ele[0:2] == "AF":
-                pos_AF = pos
-                break
-    if line[6] != 'PASS':
-        pass
     if sys.argv[4] == 'yes': #if true do all the creation, if false do only genome enrichment with SNPs
         #print(sys.argv[4])
-        add_to_dict_snps(line, pos_AF)
-        id_indel = indel_to_fasta(line, id_indel, pos_AF)
+        add_to_dict_snps(line)
+        id_indel = indel_to_fasta(line, id_indel)
     SNPsProcess(line)
     
 

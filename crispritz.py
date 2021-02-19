@@ -487,12 +487,14 @@ def genomeEnrichment():
         for cut in elem.split('.'):
             if 'chr' in cut:
                 chrom = cut
-        subprocess.run([corrected_origin_path +
-                        'Python_Scripts/Enrichment/bcf_query.sh', dirVCFFiles+"/"+elem, chrom])
-        altfile = str(chrom + '.alt')
+        #subprocess.run([corrected_origin_path +
+        #                'Python_Scripts/Enrichment/bcf_query.sh', dirVCFFiles+"/"+elem, chrom])
+        #altfile = str(chrom + '.alt')
+        altfile = dirVCFFiles+"/"+elem
         genfile = str(dirGenome+'/'+ chrom + contains_enr + '.fa')
-        subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], str(doit)])
-        subprocess.run(['rm', altfile])
+        #subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], str(doit), dirVCFFiles])
+        subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], str(doit), dirVCFFiles])
+        #subprocess.run(['rm', altfile])
 
     for f in chr_wihtout_vcf:  # Move chromosomes without vcf to enriched directory and change name adding '.enriched.'
         subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends, './SNPs_genome/' + dirGenome.split('/')[-1] + '_enriched/' + f + '.enriched.' + file_ends])
