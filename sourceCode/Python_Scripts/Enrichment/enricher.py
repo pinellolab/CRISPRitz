@@ -167,9 +167,9 @@ def SNPsProcess(line):
                 original = genomeList[int(x[0])]
                 snp = k[0]+k[1]+k[2]
                 iupacvalue = str(original+snp)  #TODO if original is a single nucleotide, use iupac_code_scomposition[original]
-            for key, value in iupac_code.items():
-                if iupacvalue in value:
-                    genomeList[int(x[0])] = str(key)
+                for key, value in iupac_code.items():
+                    if iupacvalue in value:
+                        genomeList[int(x[0])] = str(key)
     elif (',' not in x[2]) and (len(x[1]) == 1) and ('>' not in x[2]) and (len(x[2]) == 1):
         original = iupac_code_scomposition[genomeList[int(x[0])]]
         snp = x[2]
