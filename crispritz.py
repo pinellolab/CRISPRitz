@@ -508,9 +508,9 @@ def genomeEnrichment():
         genfile = str(dirGenome+'/'+ chrom + contains_enr + '.fa')
         #pool to process 2 vcf file in parallel
         pool.apply_async(genomeEnrichment_subprocess_VCF, args=(altfile,genfile,dirGenome,doit,dirVCFFiles))
-        #subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], str(doit), dirVCFFiles])
-        # subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], str(doit), dirVCFFiles])
-        #subprocess.run(['rm', altfile])
+    #wait until all threads are completed than join
+    pool.close()
+    pool.join()
 
     for f in chr_wihtout_vcf:  # Move chromosomes without vcf to enriched directory and change name adding '.enriched.'
         subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends, './SNPs_genome/' + dirGenome.split('/')[-1] + '_enriched/' + f + '.enriched.' + file_ends])
