@@ -272,7 +272,7 @@ def indel_to_fasta(line, id_indel, pos_AF):
                     
         rsID = line[2]
         af = line[7].split(";")[pos_AF][3:]
-        indel = f"{currentChr}_{line[0]}_{line[2]}_{line[3]}"
+        indel = f"{currentChr}_{line[1]}_{line[3]}_{line[4]}"
         log_indels.append([f"{currentChr}_{start_position}-{end_position}_{id_indel}", ",".join(list_samples), rsID, af, indel])
         id_indel += 1
 
