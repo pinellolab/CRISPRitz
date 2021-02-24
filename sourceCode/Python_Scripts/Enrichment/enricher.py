@@ -310,7 +310,7 @@ for line in inAltFile:
                 pos_AF = pos
                 break
     if line[6] != 'PASS':
-        pass
+        continue
     if sys.argv[4] == 'yes': #if true do all the creation, if false do only genome enrichment with SNPs
         #print(sys.argv[4])
         add_to_dict_snps(line, pos_AF)
