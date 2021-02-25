@@ -484,7 +484,7 @@ def genomeEnrichment():
 
     memo = open('change_version.txt','w')
 
-    memo.write('CRISPRitz indels process is now obsolete and has been removed, if you want to process indels you can download our new tool CRISPRme, https://github.com/samuelecancellieri/CRISPRme_Web_App'+'\n')
+    memo.write('CRISPRitz indels process is now obsolete and has been removed, if you want to process indels you can download our new tool CRISPRme, https://github.com/samuelecancellieri/CRISPRme'+'\n')
     memo.write('Thank you')
 
     memo.close()
@@ -639,7 +639,7 @@ def removeFile(to_remove):
 
 #return version
 def version():
-    print("CRISPRitz v2.4.4")
+    print("CRISPRitz v2.4.8")
 
 
 # HELP FUNCTION
@@ -648,7 +648,6 @@ def callHelp():
     print("help:\n",
           "\nALL FASTA FILEs USED BY THE SOFTWARE MUST BE UNZIPPED AND CHROMOSOME SEPARATED, ALL VCFs USED BY THE SOFTWARE MUST BE ZIPPED AND CHROMOSOME SEPARATED",
           "\n"
-          "\ncrispritz version FUNCTION RETURNING THE VERSION OF CRISPRitz INSTALLED",
           "\ncrispritz add-variants FUNCTION TO ADD VARIANTS DATA TO A FASTA GENOME",
           "\ncrispritz index-genome FUNCTION TO CREATE GENOME INDEX TO PERFORM FAST SEARCHES WITH BULGES",
           "\ncrispritz search FUNCTION TO PERFORM SEARCHES ON A GENOME (INDEXED OR PLAIN FASTA)",
