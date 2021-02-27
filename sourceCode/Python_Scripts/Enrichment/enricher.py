@@ -266,24 +266,27 @@ def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
             for pos, i in enumerate(line[9:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
                 if (search_sample_value in i.split(':')[0]):
                     list_samples.append(VCFheader[ pos + 9])
-            start_position = int(line[1])-26
-            end_position = int(line[1])+26+len(line[3])
-            sub_fasta = genomeStr[start_position:end_position]
-            refseq = genomeStr[start_position:end_position]
-            #sub_fasta[25] = line[3] 
-            #sub_fasta = ''.join(sub_fasta)
-            sub_fasta = sub_fasta[0:25] + re.sub(line[3], line[4], sub_fasta[25:], 1, flags=re.IGNORECASE) 
+            if len(list_samples) > 0:
+                start_position = int(line[1])-26
+                end_position = int(line[1])+26+len(line[3])
+                sub_fasta = genomeStr[start_position:end_position]
+                #sub_fasta[25] = line[3] 
+                #sub_fasta = ''.join(sub_fasta)
+                sub_fasta = sub_fasta[0:25] + re.sub(line[3], line[4], sub_fasta[25:], 1, flags=re.IGNORECASE) 
+                
+                #fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
+                list_fasta_indels.append(sub_fasta+'\n'+"N\n")
+                
+                refseq = genomeStr[start_position:start_position+len(sub_fasta)]
+                rsID = line[2]
+                af = line[7].split(";")[pos_AF][3:]
+                indel = f"{currentChr}_{line[1]}_{line[3]}_{line[4]}"
+                end_fake_pos = start_fake_pos + len(sub_fasta)#(end_position - start_position)
+                
+                log_indels.append([f"{currentChr}_{start_position}-{end_position}_{id_indel}", ",".join(list_samples), rsID, af, indel, f"{start_fake_pos},{end_fake_pos}", refseq])
             
-            #fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
-            list_fasta_indels.append(sub_fasta+'\n'+"N\n")
-            
-            rsID = line[2]
-            af = line[7].split(";")[pos_AF][3:]
-            indel = f"{currentChr}_{line[1]}_{line[3]}_{line[4]}"
-            end_fake_pos = start_fake_pos + len(sub_fasta)#(end_position - start_position)
-            log_indels.append([f"{currentChr}_{start_position}-{end_position}_{id_indel}", ",".join(list_samples), rsID, af, indel, f"{start_fake_pos},{end_fake_pos}", refseq])
-            id_indel += 1
-            start_fake_pos = end_fake_pos + 1 
+                id_indel += 1
+                start_fake_pos = end_fake_pos + 1 
 
     return id_indel, start_fake_pos
 
