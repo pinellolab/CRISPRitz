@@ -491,7 +491,7 @@ def genomeEnrichment():
     
     os.chdir('../')
     # os.chdir(dirParsedFiles)
-    pool = multiprocessing.Pool(2)
+    pool = multiprocessing.Pool(4)
 
     print("Variants Extraction and Processing START")
     start_time = time.time()
@@ -506,7 +506,7 @@ def genomeEnrichment():
         #altfile = str(chrom + '.alt')
         altfile = dirVCFFiles+"/"+elem
         genfile = str(dirGenome+'/'+ chrom + contains_enr + '.fa')
-        #pool to process 2 vcf file in parallel
+        #pool to process 4 vcf file in parallel
         pool.apply_async(genomeEnrichment_subprocess_VCF, args=(altfile,genfile,dirGenome,doit,dirVCFFiles))
     #wait until all threads are completed than join
     pool.close()
