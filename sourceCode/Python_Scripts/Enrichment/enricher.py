@@ -248,38 +248,49 @@ def dictSave():
         json.dump(chr_dict_snps, f) 
 
 
-def indel_to_fasta(line, id_indel, pos_AF):
+def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
     list_samples = []
     if len(line[3]) != len(line[4]) and '<' not in line[3] and '<' not in line[4]:
+        search_sample_value = -1
         if ',' in line[4]:
             splitted = line[4].split(',')
-            for s in splitted:
+            for value, s in enumerate(splitted):
                 if len(s) != line[3]:
                     line[4] = s
+                    search_sample_value = str(value+1)
                     break
-        for pos, i in enumerate(line[9:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
-            if ('1' in i.split(':')[0]):
-                list_samples.append(VCFheader[ pos + 9])
-        start_position = int(line[1])-26
-        end_position = int(line[1])+26+len(line[3])
-        sub_fasta = genomeStr[start_position:end_position]
-        #sub_fasta[25] = line[3] 
-        #sub_fasta = ''.join(sub_fasta)
-        sub_fasta = sub_fasta[0:25] + re.sub(line[3], line[4], sub_fasta[25:], 1, flags=re.IGNORECASE) 
-        with open(f'{output_dir_indels}/{currentChr}_{start_position}-{end_position}_{id_indel}.fa', 'w+') as fasta_out:
-            fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
-            fasta_out.write(sub_fasta+'\n')
-                    
-        rsID = line[2]
-        af = line[7].split(";")[pos_AF][3:]
-        indel = f"{currentChr}_{line[1]}_{line[3]}_{line[4]}"
-        log_indels.append([f"{currentChr}_{start_position}-{end_position}_{id_indel}", ",".join(list_samples), rsID, af, indel])
-        id_indel += 1
+        else:
+            search_sample_value = "1"
+        #print(search_sample_value, line[3], line[4])
+        if search_sample_value != -1:
+            for pos, i in enumerate(line[9:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
+                if (search_sample_value in i.split(':')[0]):
+                    list_samples.append(VCFheader[ pos + 9])
+            start_position = int(line[1])-26
+            end_position = int(line[1])+26+len(line[3])
+            sub_fasta = genomeStr[start_position:end_position]
+            refseq = genomeStr[start_position:end_position]
+            #sub_fasta[25] = line[3] 
+            #sub_fasta = ''.join(sub_fasta)
+            sub_fasta = sub_fasta[0:25] + re.sub(line[3], line[4], sub_fasta[25:], 1, flags=re.IGNORECASE) 
+            
+            #fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
+            list_fasta_indels.append(sub_fasta+'\n'+"N\n")
+            
+            rsID = line[2]
+            af = line[7].split(";")[pos_AF][3:]
+            indel = f"{currentChr}_{line[1]}_{line[3]}_{line[4]}"
+            end_fake_pos = start_fake_pos + len(sub_fasta)#(end_position - start_position)
+            log_indels.append([f"{currentChr}_{start_position}-{end_position}_{id_indel}", ",".join(list_samples), rsID, af, indel, f"{start_fake_pos},{end_fake_pos}", refseq])
+            id_indel += 1
+            start_fake_pos = end_fake_pos + 1 
 
-    return id_indel
+    return id_indel, start_fake_pos
 
 def logIndelsSave():
-    df = pd.DataFrame(log_indels, columns=['CHR','SAMPLES','rsID','AF','indel'])
+    fasta_out.write(''.join(list_fasta_indels))
+    fasta_out.close()
+    df = pd.DataFrame(log_indels, columns=['CHR','SAMPLES','rsID','AF','indel', 'FAKEPOS', 'refseq'])
     df.to_csv('log' + currentChr + '.txt', index=False, sep='\t')
     #dict_indels = df.to_dict(orient='index')
     #with open('log' + currentChr + '.json', 'w') as f:
@@ -291,9 +302,13 @@ if sys.argv[4] == 'yes':
     chr_dict_snps = dict()
     log_indels = []
     id_indel = 1
+    start_fake_pos = 0
     if not os.path.isdir(f"fake_{vcfName}_{currentChr}"):
         os.mkdir(f"fake_{vcfName}_{currentChr}")
     output_dir_indels = os.path.abspath(f"fake_{vcfName}_{currentChr}")
+    fasta_out = open(f'{output_dir_indels}/fake{currentChr}.fa', 'w+')
+    fasta_out.write(f">fake{currentChr}\n")
+    list_fasta_indels = []
 
 first_line = True
 for line in inAltFile:
@@ -314,7 +329,7 @@ for line in inAltFile:
     if sys.argv[4] == 'yes': #if true do all the creation, if false do only genome enrichment with SNPs
         #print(sys.argv[4])
         add_to_dict_snps(line, pos_AF)
-        id_indel = indel_to_fasta(line, id_indel, pos_AF)
+        id_indel, start_fake_pos = indel_to_fasta(line, id_indel, pos_AF, start_fake_pos)
     SNPsProcess(line)
     
 
