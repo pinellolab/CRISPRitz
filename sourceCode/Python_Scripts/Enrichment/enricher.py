@@ -228,17 +228,17 @@ def add_to_dict_snps(line, pos_AF):
                         break
                     
             chr_pos_string = currentChr + ',' + line[1]
-            rsID = line[2]
-            af = line[7].split(";")[pos_AF][3:]
+            rsID = line[2].split(',')
+            af = line[7].split(";")[pos_AF][3:].split(',')
 
             final_entry = []
-            for snp in snps:
+            for idx, snp in enumerate(snps):
                 list_chars = [line[3]]
                 list_chars.append(snp)
                 if len(dict_of_lists_samples[snp]) > 0:
-                    final_entry.append(','.join(sorted(dict_of_lists_samples[snp])) + ';' + ','.join(list_chars) + ";" + rsID + ";" + af)
+                    final_entry.append(','.join(sorted(dict_of_lists_samples[snp])) + ';' + ','.join(list_chars) + ";" + rsID[values_for_allele_info[idx]-1] + ";" + af[values_for_allele_info[idx]-1])
                 else:
-                    final_entry.append(';' + ','.join(list_chars) + ";" + rsID + ";" + af)
+                    final_entry.append(';' + ','.join(list_chars) + ";" + rsID[values_for_allele_info[idx]-1] + ";" + af[values_for_allele_info[idx]-1])
             chr_dict_snps[chr_pos_string] = '/'.join(final_entry)
 
 
