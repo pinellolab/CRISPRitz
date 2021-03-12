@@ -155,11 +155,11 @@ def SNPsProcess(line):
         if len(alt) > 1: #se lun di alt nt è > 1 skippo perchè non è snp
             continue
         else:
-            iupac_value.add(alt)
-    iupac_value = ''.join(iupac_value)
-    for key, value in iupac_code.items():
+            iupac_value.add(alt) #add del nt alt al set di iupac
+    iupac_value = ''.join(iupac_value) #converto il set in una string
+    for key, value in iupac_code.items(): #cerco iupac value nel dict per avere il corrispettivo IUPAC nt
         if iupac_value in value:
-            genomeList[int(line[1])] = str(key)
+            genomeList[int(line[1])] = str(key) #inserisco il IUPAC nt nel genoma enriched
 
 
 # def SNPsProcess(line):
