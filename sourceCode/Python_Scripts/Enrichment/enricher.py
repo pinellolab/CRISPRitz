@@ -142,43 +142,63 @@ iupac_code_scomposition = {
           'N':'ATGC'
         }
 
+
 def SNPsProcess(line):
-    #x = line.strip().split('\t') #split alt file to add snps to genome
-    x = line
-    #del x[1] #remove the unnecessary rsID from the split list
-    x[1] = str(int(x[1])-1)  # taaac
-    if (',' in x[4]) and (len(x[3]) == 1) and ('>' not in x[4]) and (len(x[4]) < 6):
-        altstr = str(x[4])
-        k = altstr.split(',')
-        if (len(x[4]) == 3):
-            if (str(genomeList[int(x[1])])) not in k:
-                original = genomeList[int(x[1])]
-            else:
-                original = ''
-            snp = k[0]+k[1]
-            iupacvalue = str(original+snp)  #TODO if original is a single nucleotide, use iupac_code_scomposition[original]
-            for key, value in iupac_code.items():
-                if iupacvalue in value:
-                    genomeList[int(x[1])] = str(key)
-        elif (len(x[4]) == 5):
-            if (len(k[0]) == 1) and (len(k[1]) == 1) and (len(k[2]) == 1):
-                if (str(genomeList[int(x[1])])) not in k:
-                    original = genomeList[int(x[1])]
-                else:
-                    original = ''
-                original = genomeList[int(x[1])]
-                snp = k[0]+k[1]+k[2]
-                iupacvalue = str(original+snp)  #TODO if original is a single nucleotide, use iupac_code_scomposition[original]
-                for key, value in iupac_code.items():
-                    if iupacvalue in value:
-                        genomeList[int(x[1])] = str(key)
-    elif (',' not in x[4]) and (len(x[3]) == 1) and ('>' not in x[4]) and (len(x[4]) == 1):
-        original = iupac_code_scomposition[genomeList[int(x[1])]]
-        snp = x[4]
-        iupacvalue = str(original+snp)
-        for key, value in iupac_code.items():
-            if iupacvalue in value:
-                genomeList[int(x[1])] = str(key)
+    if len(line[3]) > 1: #se len ref > 1 significa che non è snp
+        return
+    line[1] = str(int(line[1])-1)  # taaac per corregere conta posizione da zero/uno
+    altAlleles = line[4].strip().split(',') #list di tutti gli alleli alternative
+    referenceNucleotide = genomeStr[int(line[1])] #nucleotide reference preso dalla stringa del fasta
+    iupac_value = set() #set che contiene nt reference + alt snps
+    iupac_value.add(referenceNucleotide)
+    for alt in altAlleles: #ciclo sugli alt nt
+        if len(alt) > 1: #se lun di alt nt è > 1 skippo perchè non è snp
+            continue
+        else:
+            iupac_value.add(alt)
+    iupac_value = ''.join(iupac_value)
+    for key, value in iupac_code.items():
+        if iupac_value in value:
+            genomeList[int(line[1])] = str(key)
+
+
+# def SNPsProcess(line):
+#     #x = line.strip().split('\t') #split alt file to add snps to genome
+#     x = line
+#     #del x[1] #remove the unnecessary rsID from the split list
+#     x[1] = str(int(x[1])-1)  # taaac
+#     if (',' in x[4]) and (len(x[3]) == 1) and ('>' not in x[4]) and (len(x[4]) < 6):
+#         altstr = str(x[4])
+#         k = altstr.split(',')
+#         if (len(x[4]) == 3):
+#             if (str(genomeList[int(x[1])])) not in k:
+#                 original = genomeList[int(x[1])]
+#             else:
+#                 original = ''
+#             snp = k[0]+k[1]
+#             iupacvalue = str(original+snp)  #TODO if original is a single nucleotide, use iupac_code_scomposition[original]
+#             for key, value in iupac_code.items():
+#                 if iupacvalue in value:
+#                     genomeList[int(x[1])] = str(key)
+#         elif (len(x[4]) == 5):
+#             if (len(k[0]) == 1) and (len(k[1]) == 1) and (len(k[2]) == 1):
+#                 if (str(genomeList[int(x[1])])) not in k:
+#                     original = genomeList[int(x[1])]
+#                 else:
+#                     original = ''
+#                 original = genomeList[int(x[1])]
+#                 snp = k[0]+k[1]+k[2]
+#                 iupacvalue = str(original+snp)  #TODO if original is a single nucleotide, use iupac_code_scomposition[original]
+#                 for key, value in iupac_code.items():
+#                     if iupacvalue in value:
+#                         genomeList[int(x[1])] = str(key)
+#     elif (',' not in x[4]) and (len(x[3]) == 1) and ('>' not in x[4]) and (len(x[4]) == 1):
+#         original = iupac_code_scomposition[genomeList[int(x[1])]]
+#         snp = x[4]
+#         iupacvalue = str(original+snp)
+#         for key, value in iupac_code.items():
+#             if iupacvalue in value:
+#                 genomeList[int(x[1])] = str(key)
 
 def chromosomeSave():
     genomeStr = "".join(genomeList)
