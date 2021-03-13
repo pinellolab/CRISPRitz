@@ -269,44 +269,54 @@ def dictSave():
 
 
 def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
-    list_samples = []
-    if len(line[3]) != len(line[4]) and '<' not in line[3] and '<' not in line[4]:
-        search_sample_value = -1
+    if (len(line[3]) > 1 or len(line[4]) > 1) and '<' not in line[3] and '<' not in line[4]:
+        #print(''.join(line[3:5]))
+        indels = []
+        values_for_allele_info = []
         if ',' in line[4]:
             splitted = line[4].split(',')
             for value, s in enumerate(splitted):
-                if len(s) != line[3]:
-                    line[4] = s
-                    search_sample_value = str(value+1)
+                if len(s) != len(line[3]) or (len(s) > 1 and len(line[3]) > 1):
+                    indels.append(s)
+                    values_for_allele_info.append(value+1)
                     break
-        else:
-            search_sample_value = "1"
         #print(search_sample_value, line[3], line[4])
-        if search_sample_value != -1:
-            for pos, i in enumerate(line[9:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
-                if (search_sample_value in i.split(':')[0]):
-                    list_samples.append(VCFheader[ pos + 9])
-            if len(list_samples) > 0:
+        if len(indels) > 0:
+
+            dict_of_lists_samples = {}
+            for indel in indels:
+                dict_of_lists_samples[indel] = []
+
+            for pos, sample in enumerate(line[9:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
+                for idx, value in enumerate(values_for_allele_info):
+                    if str(value) in sample.split(':')[0]:
+                        dict_of_lists_samples[indels[idx]].append(VCFheader[ pos + 9]) #add to correct entry of dict the sample with such snp
+                        break
+            if len(indels) > 0:
+                rsID = line[2].split(',')
+                af = line[7].split(";")[pos_AF][3:].split(',')
+
                 start_position = int(line[1])-26
                 end_position = int(line[1])+26+len(line[3])
                 sub_fasta = genomeStr[start_position:end_position]
-                #sub_fasta[25] = line[3] 
-                #sub_fasta = ''.join(sub_fasta)
-                sub_fasta = sub_fasta[0:25] + re.sub(line[3], line[4], sub_fasta[25:], 1, flags=re.IGNORECASE) 
-                
-                #fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
-                list_fasta_indels.append(sub_fasta+'\n'+"N\n")
-                
-                refseq = genomeStr[start_position:start_position+len(sub_fasta)]
-                rsID = line[2]
-                af = line[7].split(";")[pos_AF][3:]
-                indel = f"{currentChr}_{line[1]}_{line[3]}_{line[4]}"
-                end_fake_pos = start_fake_pos + len(sub_fasta)#(end_position - start_position)
-                
-                log_indels.append([f"{currentChr}_{start_position}-{end_position}_{id_indel}", ",".join(list_samples), rsID, af, indel, f"{start_fake_pos},{end_fake_pos}", refseq])
-            
-                id_indel += 1
-                start_fake_pos = end_fake_pos + 1 
+                for idx, indel in enumerate(indels):
+                    if len(dict_of_lists_samples[indel]) > 0:
+                        indel_info = f"{currentChr}_{line[1]}_{line[3]}_{indel}"
+                        
+                        #sub_fasta[25] = line[3] 
+                        #sub_fasta = ''.join(sub_fasta)
+                        sub_fasta = sub_fasta[0:25] + re.sub(line[3], indel, sub_fasta[25:], 1, flags=re.IGNORECASE) 
+                        
+                        #fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
+                        list_fasta_indels.append(sub_fasta+'\n'+"N\n")
+                        
+                        refseq = genomeStr[start_position:start_position+len(sub_fasta)]
+                        end_fake_pos = start_fake_pos + len(sub_fasta)#(end_position - start_position)
+                        
+                        log_indels.append([f"{currentChr}_{start_position}-{end_position}_{id_indel}", ",".join(dict_of_lists_samples[indel]), rsID[0], af[values_for_allele_info[idx]-1], indel_info, f"{start_fake_pos},{end_fake_pos}", refseq])
+                    
+                        id_indel += 1
+                        start_fake_pos = end_fake_pos + 1 
 
     return id_indel, start_fake_pos
 
