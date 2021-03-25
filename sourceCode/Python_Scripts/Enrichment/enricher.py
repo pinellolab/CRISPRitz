@@ -269,16 +269,19 @@ def dictSave():
 
 
 def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
-    if (len(line[3]) > 1 or len(line[4]) > 1) :
+    if (len(line[3]) > 1 or len(line[4]) > 1) and '<' not in line[3]:
         #print(''.join(line[3:5]))
         indels = []
         values_for_allele_info = []
         if ',' in line[4]:
             splitted = line[4].split(',')
             for value, s in enumerate(splitted):
-                if (len(s) != len(line[3]) or (len(s) > 1 and len(line[3]) > 1)) and '<' not in line[3] and '<' not in line[4]:
+                if (len(s) != len(line[3]) or (len(s) > 1 and len(line[3]) > 1)) and '<' not in s:
                     indels.append(s)
                     values_for_allele_info.append(value+1)
+        elif (len(line[4]) != len(line[3]) or (len(line[4]) > 1 and len(line[3]) > 1)) and '<' not in line[4]:
+            indels.append(line[4])
+            values_for_allele_info.append(1)
         #print(search_sample_value, line[3], line[4])
         if len(indels) > 0:
 
