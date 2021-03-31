@@ -451,7 +451,7 @@ def genomeEnrichment():
 
     chr_with_vcf = set()
     # VCF file must contain '.chrN.' with N = number or letter of chr
-    for vcf_chr in [f for f in listdir(dirVCFFiles) if isfile(join(dirVCFFiles, f))]:
+    for vcf_chr in [f for f in listdir(dirVCFFiles) if isfile(join(dirVCFFiles, f)) and 'vcf.gz' in f]:
         for x in vcf_chr.split('.'):
             if 'chr' in x:
                 chr_with_vcf.add(x)
