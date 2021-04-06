@@ -17,7 +17,7 @@ def cluster_setup(i, python_path, home, t, work_dir, tempdir):
     t.environment_variables['PYTHONPATH'] = python_path     
     t.environment_variables['HOME'] = home
 
-    print "cluster python_path=%s" % python_path
+    #print "cluster python_path=%s" % python_path
 
 def create(user, models, orders, degrees, GP_likelihoods, adaboost_learning_rates=None, adaboost_num_estimators=None, adaboost_max_depths=None, adaboost_CV=False, exp_name=None, learn_options=None):
     job = WinHPCJob()
@@ -53,7 +53,7 @@ def create(user, models, orders, degrees, GP_likelihoods, adaboost_learning_rate
 
     # generate random dir in results directory   
     tempdir = tempfile.mkdtemp(prefix='cluster_experiment_', dir=remote_dir)
-    print "Created directory: %s" % str(tempdir)
+    #print "Created directory: %s" % str(tempdir)
 
     # dump learn_options
     with open(tempdir+'/learn_options.pickle', 'wb') as f:
