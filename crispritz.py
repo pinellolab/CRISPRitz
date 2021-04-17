@@ -19,7 +19,8 @@ conda_path = "opt/crispritz/"
 # path corrected to use with conda
 corrected_origin_path = origin_path[:-3]+conda_path
 
-#corrected_origin_path = origin_path+'/sourceCode/' #for quick local tests
+# corrected_origin_path = origin_path+'/sourceCode/' #for quick local tests
+
 
 def checkExistance(f_path, element):
     if element == 'f':  # check file
@@ -229,7 +230,6 @@ def searchTST():
                 "ERROR! Please select the directory containing the fasta files of the genome")
             sys.exit()
 
-        
         pam_guide = len(open(PAM).readline().split(" ")[0])
         pam_at_beginning = int(open(PAM).readline().split(" ")[1])
         if (pam_guide != 23 or pam_at_beginning < 0):  # Also block scoring pam at beginning
@@ -385,7 +385,8 @@ def annotateResults():
         print("WARNING: Too few arguments to function annotate-results. Please provide:\n",
               "\nEXAMPLE CALL: crispritz.py annotate-results resultsFile.txt annotationsFile.bed outputFile\n",
               "\n<resultsFile>: Targets file containing all genomic targets for the guides set",
-              "\n<annotationsFile>: Text file containing the annotations in .bed format", # Bed file containing annotation
+              # Bed file containing annotation
+              "\n<annotationsFile>: Text file containing the annotations in .bed format",
               "\n<outputFile>: Name of output file",
               "\n--change-ID <sampleIDfile> : (Optional) Change the samples, population and superpopulation IDs. DEFAULT: the default IDs are taken from the 1000 genome project (used for Human Genome hg19 and hg38)"
               )
@@ -421,8 +422,11 @@ def annotateResults():
         print("Annotation END")
         print("Annotation runtime: %s seconds" % (time.time() - start_time))
 
-def genomeEnrichment_subprocess_VCF(altfile,genfile,dirGenome,doit,dirVCFFiles):
-    subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py', altfile, genfile, dirGenome.split('/')[-1], str(doit), dirVCFFiles])
+
+def genomeEnrichment_subprocess_VCF(altfile, genfile, dirGenome, doit, dirVCFFiles):
+    subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py',
+                    altfile, genfile, dirGenome.split('/')[-1], str(doit), dirVCFFiles])
+
 
 def genomeEnrichment():
     '''
@@ -442,9 +446,11 @@ def genomeEnrichment():
         doit = 'yes'
     checkExistance(dirVCFFiles, 'd')
     checkExistance(dirGenome, 'd')
-    listChrs = os.listdir(dirVCFFiles)
+    # listChrs = os.listdir(dirVCFFiles)
+    listChrs = glob.glob(dirVCFFiles+'/*.vcf.gz')
+
     for elem in listChrs:
-        if 'tbi' in elem: #remove .tbi files in vcf dir to avoid errors in exec
+        if 'tbi' in elem:  # remove .tbi files in vcf dir to avoid errors in exec
             listChrs.remove(elem)
 
     # print(listChrs)
@@ -470,7 +476,7 @@ def genomeEnrichment():
 
     # if not (os.path.isdir(dirParsedFiles)):
     #     os.makedirs(dirParsedFiles)
-    
+
     dirEnrichedGenome = "./variants_genome/"
     if not (os.path.isdir(dirEnrichedGenome)):
         os.makedirs(dirEnrichedGenome)
@@ -482,13 +488,13 @@ def genomeEnrichment():
         os.makedirs("./INDELs_genome/")
     os.chdir("./INDELs_genome/")
 
-    memo = open('change_version.txt','w')
+    memo = open('change_version.txt', 'w')
 
     memo.write('CRISPRitz indels process is now obsolete and has been removed, if you want to process indels you can download our new tool CRISPRme, https://github.com/samuelecancellieri/CRISPRme'+'\n')
     memo.write('Thank you')
 
     memo.close()
-    
+
     os.chdir('../')
     # os.chdir(dirParsedFiles)
     pool = multiprocessing.Pool(4)
@@ -501,20 +507,22 @@ def genomeEnrichment():
         for cut in elem.split('.'):
             if 'chr' in cut:
                 chrom = cut
-        #subprocess.run([corrected_origin_path +
+        # subprocess.run([corrected_origin_path +
         #                'Python_Scripts/Enrichment/bcf_query.sh', dirVCFFiles+"/"+elem, chrom])
         #altfile = str(chrom + '.alt')
         altfile = dirVCFFiles+"/"+elem
-        genfile = str(dirGenome+'/'+ chrom + contains_enr + '.fa')
-        #pool to process 4 vcf file in parallel
-        pool.apply_async(genomeEnrichment_subprocess_VCF, args=(altfile,genfile,dirGenome,doit,dirVCFFiles))
-    #wait until all threads are completed than join
+        genfile = str(dirGenome+'/' + chrom + contains_enr + '.fa')
+        # pool to process 4 vcf file in parallel
+        pool.apply_async(genomeEnrichment_subprocess_VCF, args=(
+            altfile, genfile, dirGenome, doit, dirVCFFiles))
+    # wait until all threads are completed than join
     pool.close()
     pool.join()
 
     for f in chr_wihtout_vcf:  # Move chromosomes without vcf to enriched directory and change name adding '.enriched.'
-        subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends, './SNPs_genome/' + dirGenome.split('/')[-1] + '_enriched/' + f + '.enriched.' + file_ends])
-    
+        subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends, './SNPs_genome/' +
+                        dirGenome.split('/')[-1] + '_enriched/' + f + '.enriched.' + file_ends])
+
     print("Variants Extraction and Processing END")
     print("Runtime: %s seconds" % (time.time() - start_time))
 
@@ -637,7 +645,9 @@ def removeFile(to_remove):
     except:
         pass
 
-#return version
+# return version
+
+
 def version():
     print("CRISPRitz v2.4.8")
 
@@ -648,14 +658,14 @@ def callHelp():
     print("help:\n",
           "\nALL FASTA FILEs USED BY THE SOFTWARE MUST BE UNZIPPED AND CHROMOSOME SEPARATED, ALL VCFs USED BY THE SOFTWARE MUST BE ZIPPED AND CHROMOSOME SEPARATED",
           "\n"
-          "\ncrispritz add-variants FUNCTION TO ADD VARIANTS DATA TO A FASTA GENOME",
-          "\ncrispritz index-genome FUNCTION TO CREATE GENOME INDEX TO PERFORM FAST SEARCHES WITH BULGES",
-          "\ncrispritz search FUNCTION TO PERFORM SEARCHES ON A GENOME (INDEXED OR PLAIN FASTA)",
-          "\ncrispritz scores FUNCTION TO CALCULATE THE CFD SCORE FOR A LIST OF TARGETS",
-          "\ncrispritz annotate-results FUNCTION TO ADD GENOMIC INFORMATION TO TARGETS RESULTS",
-          "\ncrispritz generate-report FUNCTION TO GENERATE GRAPHICAL REPORT FOR A SPECIFIC GUIDE",
+          "\ncrispritz.py add-variants FUNCTION TO ADD VARIANTS DATA TO A FASTA GENOME",
+          "\ncrispritz.py index-genome FUNCTION TO CREATE GENOME INDEX TO PERFORM FAST SEARCHES WITH BULGES",
+          "\ncrispritz.py search FUNCTION TO PERFORM SEARCHES ON A GENOME (INDEXED OR PLAIN FASTA)",
+          "\ncrispritz.py scores FUNCTION TO CALCULATE THE CFD SCORE FOR A LIST OF TARGETS",
+          "\ncrispritz.py annotate-results FUNCTION TO ADD GENOMIC INFORMATION TO TARGETS RESULTS",
+          "\ncrispritz.py generate-report FUNCTION TO GENERATE GRAPHICAL REPORT FOR A SPECIFIC GUIDE",
           "\n",
-          "\nADD help TO ANY FUNCTION TO VISUALIZE A BRIEF HELP PAGE (example: crispritz index-genome help)\n")
+          "\nADD help TO ANY FUNCTION TO VISUALIZE A BRIEF HELP PAGE (example: crispritz.py index-genome help)\n")
 
 
 if len(sys.argv) < 2:
