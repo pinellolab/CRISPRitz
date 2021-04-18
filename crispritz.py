@@ -446,8 +446,8 @@ def genomeEnrichment():
         doit = 'yes'
     checkExistance(dirVCFFiles, 'd')
     checkExistance(dirGenome, 'd')
-    # listChrs = os.listdir(dirVCFFiles)
-    listChrs = glob.glob(dirVCFFiles+'/*.vcf.gz')
+    listChrs = os.listdir(dirVCFFiles)
+    # listChrs = glob.glob(dirVCFFiles+'/*.vcf.gz')
 
     for elem in listChrs:
         if 'tbi' in elem:  # remove .tbi files in vcf dir to avoid errors in exec
