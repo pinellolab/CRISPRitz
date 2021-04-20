@@ -448,10 +448,12 @@ def genomeEnrichment():
     checkExistance(dirGenome, 'd')
     listChrs = os.listdir(dirVCFFiles)
     # listChrs = glob.glob(dirVCFFiles+'/*.vcf.gz')
-
-    for elem in listChrs:
-        if 'tbi' in elem:  # remove .tbi files in vcf dir to avoid errors in exec
-            listChrs.remove(elem)
+    
+    for file in listChrs:
+        if file.endswith('.tbi'): #remove .tbi files
+            listChrs.remove(file)
+        # if 'tbi' in elem:  # remove .tbi files in vcf dir to avoid errors in exec
+            # listChrs.remove(elem)
 
     # print(listChrs)
 
