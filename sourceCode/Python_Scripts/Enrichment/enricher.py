@@ -216,7 +216,7 @@ def add_to_dict_snps(line, pos_AF):
     if len(line[3]) == 1 and len(line[4]) == 1:
         for pos, i in enumerate(line[9:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
             if ('1' in i.split(':')[0]):
-                list_samples.append(VCFheader[ pos + 9])
+                list_samples.append([VCFheader[ pos + 9],i.split(':')[0]])
         
         chr_pos_string = currentChr + ',' + line[1] #chr,position
         #Add in last two position the ref and alt nucleotide, eg: chrX,100 -> sample1,sample5,sample10;A,T;rsID100;0.01
@@ -260,6 +260,7 @@ def add_to_dict_snps(line, pos_AF):
                 else:
                     final_entry.append(';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af[values_for_allele_info[idx]-1])
             chr_dict_snps[chr_pos_string] = '/'.join(final_entry)
+            print('/'.join(final_entry))
 
 
 def dictSave():
