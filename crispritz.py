@@ -654,7 +654,7 @@ def removeFile(to_remove):
 
 
 def version():
-    print("CRISPRitz v2.4.8")
+    print("CRISPRitz v2.5.8")
 
 
 # HELP FUNCTION
