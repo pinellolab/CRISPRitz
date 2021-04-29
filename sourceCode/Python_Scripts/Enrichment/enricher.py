@@ -216,7 +216,7 @@ def add_to_dict_snps(line, pos_AF):
     if len(line[3]) == 1 and len(line[4]) == 1:
         for pos, i in enumerate(line[9:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
             if ('1' in i.split(':')[0]):
-                list_samples.append([VCFheader[ pos + 9],i.split(':')[0]])
+                list_samples.append(VCFheader[ pos + 9]+'('+i.split(':')[0]+')')
         
         print(list_samples)
         
