@@ -16,10 +16,13 @@ import multiprocessing
 origin_path = os.path.dirname(os.path.realpath(__file__))
 # conda path
 conda_path = "opt/crispritz/"
-# path corrected to use with conda
-# corrected_origin_path = origin_path[:-3]+conda_path
-#for quick local tests
-corrected_origin_path = origin_path+'/sourceCode/' 
+
+if '--debug' in sys.argv[1:]:
+    #for quick local tests
+    corrected_origin_path = origin_path+'/sourceCode/'
+else:
+     # path corrected to use with conda
+    corrected_origin_path = origin_path[:-3]+conda_path
 
 
 def checkExistance(f_path, element):
