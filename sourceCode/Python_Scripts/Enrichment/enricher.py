@@ -230,7 +230,7 @@ def add_to_dict_snps(line, pos_AF):
             chr_dict_snps[chr_pos_string] = ','.join(sorted(list_samples)) + ';' + ','.join(list_chars) + ";" + rsID + ";" + af
         else:
             chr_dict_snps[chr_pos_string] = ';' + ','.join(list_chars) + ";" + rsID + ";" + af #None
-        print(chr_dict_snps[chr_pos_string])
+        # print(chr_dict_snps[chr_pos_string])
     elif len(line[3]) == 1:
         variants = line[4].split(",")
         snps = []
