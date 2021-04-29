@@ -261,7 +261,7 @@ def add_to_dict_snps(line, pos_AF):
                     final_entry.append(','.join(sorted(dict_of_lists_samples[snp])) + ';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af[values_for_allele_info[idx]-1])
                 else:
                     final_entry.append(';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af[values_for_allele_info[idx]-1])
-            chr_dict_snps[chr_pos_string] = '/'.join(final_entry)
+            chr_dict_snps[chr_pos_string] = '$'.join(final_entry)
 
 def dictSave():
     #os.chdir("./SNPs_genome/")
