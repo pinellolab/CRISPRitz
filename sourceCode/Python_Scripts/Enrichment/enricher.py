@@ -210,7 +210,6 @@ def chromosomeSave():
     outFile.close()
 
 def add_to_dict_snps(line, pos_AF):
-    
     list_samples = []
     list_chars = []
     if len(line[3]) == 1 and len(line[4]) == 1:
@@ -231,6 +230,7 @@ def add_to_dict_snps(line, pos_AF):
             chr_dict_snps[chr_pos_string] = ','.join(sorted(list_samples)) + ';' + ','.join(list_chars) + ";" + rsID + ";" + af
         else:
             chr_dict_snps[chr_pos_string] = ';' + ','.join(list_chars) + ";" + rsID + ";" + af #None
+        print(chr_dict_snps[chr_pos_string])
     elif len(line[3]) == 1:
         variants = line[4].split(",")
         snps = []
@@ -246,7 +246,7 @@ def add_to_dict_snps(line, pos_AF):
             for pos, sample in enumerate(line[9:]):
                 for idx, value in enumerate(values_for_allele_info):
                     if str(value) in sample.split(':')[0]:
-                        dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 9]) #add to correct entry of dict the sample with such snp
+                        dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 9]+'('+sample.split(':')[0]+')') #add to correct entry of dict the sample with such snp
                         break
                     
             chr_pos_string = currentChr + ',' + line[1]
@@ -262,8 +262,7 @@ def add_to_dict_snps(line, pos_AF):
                 else:
                     final_entry.append(';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af[values_for_allele_info[idx]-1])
             chr_dict_snps[chr_pos_string] = '/'.join(final_entry)
-            print('/'.join(final_entry))
-
+        print(chr_dict_snps[chr_pos_string])
 
 def dictSave():
     #os.chdir("./SNPs_genome/")
