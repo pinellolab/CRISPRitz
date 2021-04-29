@@ -215,7 +215,7 @@ def add_to_dict_snps(line, pos_AF):
     if len(line[3]) == 1 and len(line[4]) == 1:
         for pos, i in enumerate(line[9:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
             if ('1' in i.split(':')[0]):
-                list_samples.append(VCFheader[ pos + 9]+'('+i.split(':')[0]+')')
+                list_samples.append(VCFheader[ pos + 9]+':'+i.split(':')[0])
         
         # print(list_samples)
         
@@ -246,7 +246,7 @@ def add_to_dict_snps(line, pos_AF):
             for pos, sample in enumerate(line[9:]):
                 for idx, value in enumerate(values_for_allele_info):
                     if str(value) in sample.split(':')[0]:
-                        dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 9]+'('+sample.split(':')[0]+')') #add to correct entry of dict the sample with such snp
+                        dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 9]+':'+sample.split(':')[0]) #add to correct entry of dict the sample with such snp
                         break
                     
             chr_pos_string = currentChr + ',' + line[1]
@@ -262,7 +262,6 @@ def add_to_dict_snps(line, pos_AF):
                 else:
                     final_entry.append(';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af[values_for_allele_info[idx]-1])
             chr_dict_snps[chr_pos_string] = '/'.join(final_entry)
-        print('/'.join(final_entry))
 
 def dictSave():
     #os.chdir("./SNPs_genome/")
