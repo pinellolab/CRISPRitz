@@ -19,24 +19,16 @@ The two fastest way to use CRISPRitz is through the installation of Docker or Co
 Here we summarize the steps to install CRISPRitz with Docker and Conda.
 
 ## Installation (Phase 1)
-**Conda installation (Linux and MacOS):**
+**Conda installation (Linux only):**
 - Open a terminal window
 - Paste this command into the terminal (Linux):
     ```
     curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh --output Miniconda3-latest-Linux-x86_64.sh
     ```
-- Paste this command into the terminal (MacOS):
-    ```
-    curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh --output Miniconda3-latest-MacOSX-x86_64.sh
-    ```
 - If the file is correctly downloaded you now need to execute it to complete the installation, so paste this command into the terminal:
     - Linux
     ```
     bash Miniconda3-latest-Linux-x86_64.sh
-    ```
-    - MacOS
-    ```    
-    bash Miniconda3-latest-MacOSX-x86_64.sh
     ```
 - Press ENTER when requested and yes when an answer is requested, in this way you allow conda to set all the directories in your HOME path for an easy use
 - After the complete installation you will receive this message “Thank you for installing Miniconda3!” to certify the correct installation.
@@ -65,7 +57,7 @@ Here we summarize the steps to install CRISPRitz with Docker and Conda.
 ![crispritz.py_help](https://user-images.githubusercontent.com/40895152/63214203-8452be80-c115-11e9-88e2-4613ba8c3718.png)
 Now the software is installed and ready to be used.
 
-**Docker installation:  
+**Docker installation (Linux, Mac OSX and Windows):  
 Note: if you are using MasOS or Windows, you just need to download the installer file
 and follow the on screen instructions.  
 https://docs.docker.com/docker-for-windows/install/ (Windows)  
