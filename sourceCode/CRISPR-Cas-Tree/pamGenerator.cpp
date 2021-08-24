@@ -325,7 +325,7 @@ void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, st
 	vector<bitset<4>> genome_bit = genomeBitConversion(genome_sequence);
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
-		for (int nt = 0; nt < genome.length(); ++nt)
+		for (int nt = 0; nt < genome_sequence.length(); ++nt)
 		{
 			bool found_positive = true;
 			bool found_negative = true;
@@ -350,7 +350,7 @@ void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, st
 			}
 			if (found_negative)
 			{
-				if ((nt <= (genome.length() - (pam_len + max_bulges))) //same as for positive pam(out of bound problem)
+				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges))) //same as for positive pam(out of bound problem)
 				{
 					indices.push_back(-nt);
 				}
@@ -359,7 +359,7 @@ void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, st
 	}
 	else //pam al 3' quindi in cima alla sequenza
 	{
-		for (int nt = 0; nt < genome.length(); ++nt)
+		for (int nt = 0; nt < genome_sequence.length(); ++nt)
 		{
 			bool found_positive = true;
 			bool found_negative = true;
@@ -377,7 +377,7 @@ void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, st
 			}
 			if (found_positive)
 			{
-				if ((nt <= (genome.length() - (pam_len + max_bulges))) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
+				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges))) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
 				{
 					indices.push_back(-nt);
 				}
