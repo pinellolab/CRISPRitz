@@ -33,7 +33,7 @@ typedef struct tleaf
 {
 	int guideIndex;
 	string guideDNA;
-	const char * guideDNA_char;
+	const char *guideDNA_char;
 	string pamDNA;
 	int next;
 } Tleaf;
@@ -42,24 +42,23 @@ typedef struct tleaf
 #define MAXCHARS (MAXWORDS * 30)
 
 const int TARG_IN_GROUP = 5000000; //number of strings for each TST; Change to have smaller or bigger TSTs
-					   
-Tptr tree; 
+
+Tptr tree;
 int nodeUsed; // number of nodes
 
-vector<Tleaf> targetOnDNA;		// array of target on DNA
-string pamRNA;				 	// input pam RNA
-string chrName;				 	// input chromosome name
-string chrSeq;				 	// input chromosome sequence
+vector<Tleaf> targetOnDNA; // array of target on DNA
+string pamRNA;			   // input pam RNA
+string chrName;			   // input chromosome name
+string chrSeq;			   // input chromosome sequence
 int gruppo;
 bool pam_at_start;
-
 
 // function that inserts a guide DNA in TST
 void insert(string st, int i, int i2)
 {
-	int d;					 		// distance between characters
+	int d; // distance between characters
 	const char *s = st.c_str();
-	Tptr pp = tree; 				// insert start from root
+	Tptr pp = tree; // insert start from root
 	while (nodeUsed)
 	{ // move through TST
 		if ((d = *s - pp->splitchar) == 0)
@@ -321,7 +320,6 @@ void serialize(Tptr p)
 	}
 }
 
-
 int len_guide_used = 20;
 // Write to file
 void saveTST(int inizio, int fine, int part)
@@ -330,15 +328,15 @@ void saveTST(int inizio, int fine, int part)
 	int arrayDim = fine - inizio;
 	fileTree.open(pamRNA + "_" + chrName + "_" + to_string(part) + ".bin", ios::out | ios::binary);
 
-	fileTree.write((char *)&arrayDim, sizeof(int)); // write number of targets
-	fileTree.write((char*)&len_guide_used, sizeof(int)); //write len of guide etc etc
+	fileTree.write((char *)&arrayDim, sizeof(int));		  // write number of targets
+	fileTree.write((char *)&len_guide_used, sizeof(int)); //write len of guide etc etc
 	for (int i = inizio; i < fine; i++)
 	{																	 // write array of targets on DNA
 		fileTree.write((char *)&targetOnDNA[i].guideIndex, sizeof(int)); // write index of target on DNA
 		int k = 0;
 		bitNuc = 0;
 		int counter = 0;
-		const char * ppp = targetOnDNA[i].pamDNA.c_str(); 
+		const char *ppp = targetOnDNA[i].pamDNA.c_str();
 		do
 		{ // write target site PAM
 			counter++;
@@ -434,7 +432,7 @@ void insall(int l, int r)
 	if (r < l)
 		return;
 	int m = l + (r - l) / 2;
-	insert(targetOnDNA[m].guideDNA, m,(m - (gruppo -1) * TARG_IN_GROUP ));
+	insert(targetOnDNA[m].guideDNA, m, (m - (gruppo - 1) * TARG_IN_GROUP));
 	insall(l, m - 1);
 	insall(m + 1, r);
 }
@@ -448,8 +446,8 @@ int main(int argc, char **argv)
 	vector<int> pamIndices;									  // vector of target indices of pam RNA on DNA
 	ifstream fasta(argv[1]);								  // input fasta file
 	ifstream pamfile(argv[2]);								  // input pam.txt
-	int par_thr = stoi(argv[3]);							//thread to use in parallel algorithm
-	int max_bulges = stoi(argv[4]);							//max allowed bulges
+	int par_thr = stoi(argv[3]);							  //thread to use in parallel algorithm
+	int max_bulges = stoi(argv[4]);							  //max allowed bulges
 	pam_at_start = false;
 	globalstart = omp_get_wtime(); // start global time
 
@@ -488,9 +486,9 @@ int main(int argc, char **argv)
 		pam_at_start = true;
 		pamlimit = pamlimit * -1;
 	}
-	 
-	int pamlen = pam.length();										//length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
-	
+
+	int pamlen = pam.length(); //length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
+
 	len_guide_used = pamlen - pamlimit;
 	if (!pam_at_start)
 	{
@@ -502,7 +500,7 @@ int main(int argc, char **argv)
 	}
 
 	// cout << "arrivo a generate\n";
-	all_pam = generatePam(pamRNA); // generate a vector of each possible input pam
+	// all_pam = generatePam(pamRNA); // generate a vector of each possible input pam
 	// cout << "faccio generate\n";
 	// make list of all possible pam RNA
 	// int counter = 0;
@@ -515,7 +513,6 @@ int main(int argc, char **argv)
 	// string list[all_pam.size()];
 	// vector<string> list(all_pam.size());
 	// string *list = new string[all_pam.size()];
-
 
 	// cout << "ma che oooooh\n";
 
@@ -531,66 +528,62 @@ int main(int argc, char **argv)
 	//devo splittare le pam per evitare crush nel build dell'automa
 	//calcolo i chunk di PAM da cercare
 	//grandezza chunck in toto
-	int chunckSize = 2000;
-	double chuncks = ceil((double)all_pam.size()/(double)chunckSize);
+	// int chunckSize = 2000;
+	// double chuncks = ceil((double)all_pam.size()/(double)chunckSize);
 
-	// cout<<"i chunck sono "<<chuncks<<"\n";
+	// // cout<<"i chunck sono "<<chuncks<<"\n";
 
-	
-	int totalSize = all_pam.size();
+	// int totalSize = all_pam.size();
 
-	for (size_t kk=0;kk<chuncks;++kk)
-	{
-		vector<int> tempPamIndices; //vettore tempindici da sommare a indicesPAM
-		tempPamIndices.clear();
-		string *tempList; //array di stringhe con le PAM del chunck corrente
-		int sizeOfChunck; //grandezza chunck per ogni run (chuncksize o quello che rimane di totalsize)
+	// for (size_t kk=0;kk<chuncks;++kk)
+	// {
+	// 	vector<int> tempPamIndices; //vettore tempindici da sommare a indicesPAM
+	// 	tempPamIndices.clear();
+	// 	string *tempList; //array di stringhe con le PAM del chunck corrente
+	// 	int sizeOfChunck; //grandezza chunck per ogni run (chuncksize o quello che rimane di totalsize)
 
-		if (totalSize > chunckSize)
-		{
-			sizeOfChunck = chunckSize;
-			totalSize -= chunckSize;
-		}
-		else
-		{
-			sizeOfChunck = totalSize;
-		}
+	// 	if (totalSize > chunckSize)
+	// 	{
+	// 		sizeOfChunck = chunckSize;
+	// 		totalSize -= chunckSize;
+	// 	}
+	// 	else
+	// 	{
+	// 		sizeOfChunck = totalSize;
+	// 	}
 
-		tempList = new string[sizeOfChunck];
+	// 	tempList = new string[sizeOfChunck];
 
-		for (size_t copyList=0;copyList<(sizeOfChunck/2);++copyList)
-		{
-			if(chuncks>1)
-			{
-				tempList[copyList] = all_pam[(kk*(chunckSize/2))+copyList];
-				tempList[copyList+(sizeOfChunck/2)] = all_pam[(all_pam.size()/2)+(kk*(chunckSize/2))+copyList];
-			}
-			else
-			{
-				tempList[copyList] = all_pam[copyList];
-				tempList[copyList+(sizeOfChunck/2)] = all_pam[copyList+(sizeOfChunck/2)];
-			}
-		}
+	// 	for (size_t copyList=0;copyList<(sizeOfChunck/2);++copyList)
+	// 	{
+	// 		if(chuncks>1)
+	// 		{
+	// 			tempList[copyList] = all_pam[(kk*(chunckSize/2))+copyList];
+	// 			tempList[copyList+(sizeOfChunck/2)] = all_pam[(all_pam.size()/2)+(kk*(chunckSize/2))+copyList];
+	// 		}
+	// 		else
+	// 		{
+	// 			tempList[copyList] = all_pam[copyList];
+	// 			tempList[copyList+(sizeOfChunck/2)] = all_pam[copyList+(sizeOfChunck/2)];
+	// 		}
+	// 	}
 
-		// cout<<"le pam per il giro "<< kk <<" sono "<< sizeOfChunck<<endl;
-		
-		searchWords(tempPamIndices, tempList, sizeOfChunck, chrSeq, pamlen, pamlimit, pam_at_start, max_bulges);
-		
-		pamIndices.insert(pamIndices.end(), tempPamIndices.begin(), tempPamIndices.end());
-	}
+	// 	// cout<<"le pam per il giro "<< kk <<" sono "<< sizeOfChunck<<endl;
+
+	// 	searchWords(tempPamIndices, tempList, sizeOfChunck, chrSeq, pamlen, pamlimit, pam_at_start, max_bulges);
+
+	// 	pamIndices.insert(pamIndices.end(), tempPamIndices.begin(), tempPamIndices.end());
+	// }
 	// searchWords(pamIndices, list, all_pam.size(), chrSeq, pamlen, pamlimit, pam_at_start, max_bulges);
+	searchPAMonGenome(pamIndices, pamRNA, pamlen, chrSeq, pamlimit, pam_at_start, max_bulges);
 	// cout << "faccio search\n";
-
-	
 
 	// cout<< "lunghezza degli indices " << pamIndices.size()<<endl;
 	//elimino gli indici duplicati dovuti a combinazioni di PAM con lo stesso pattern (IUPAC)
-	__gnu_parallel::sort( pamIndices.begin(), pamIndices.end() );
-	pamIndices.erase(unique( pamIndices.begin(), pamIndices.end() ), pamIndices.end() );
+	__gnu_parallel::sort(pamIndices.begin(), pamIndices.end());
+	pamIndices.erase(unique(pamIndices.begin(), pamIndices.end()), pamIndices.end());
 
 	// cout<< "lunghezza del indices post erase " << pamIndices.size()<<endl;
-
-
 
 	// for (int check = 0;check<pamIndices.size();++check)
 	// {
@@ -613,38 +606,37 @@ int main(int argc, char **argv)
 	int i = 0;
 	int counter_index = 0;
 	targetOnDNA.resize(pamIndices.size());
-	if (pam_at_start){
+	if (pam_at_start)
+	{
 		for (i = 0; i < pamIndices.size(); i++)
 		{
-	
+
 			string target;
-			if (pamIndices[i] < 0) 		//String found in positive strand (PAM AT BEGINNING case)
+			if (pamIndices[i] < 0) //String found in positive strand (PAM AT BEGINNING case)
 			{
 				target = chrSeq.substr(pamIndices[i] * -1, pamlen + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
-				
-	
-				if (target.find('N') != std::string::npos)		   //if 'N' is in the target, remove the target
+
+				if (target.find('N') != std::string::npos) //if 'N' is in the target, remove the target
 				{
 					counter_index--;
 					discarded++;
 				}
 				else
 				{
-					
+
 					string tmp_pam_str;
-					tmp_pam_str = target.substr(0,pamRNA.length());
+					tmp_pam_str = target.substr(0, pamRNA.length());
 					reverse(tmp_pam_str.begin(), tmp_pam_str.end());
-					
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length(), pamlen - pamRNA.length()+ max_bulges), target.substr(pamRNA.length(), pamlen - pamRNA.length()+ max_bulges).c_str(),
-					 				tmp_pam_str,
-									0}; //salvo l'indice del target
-				
+
+					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges), target.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges).c_str(),
+														 tmp_pam_str,
+														 0}; //salvo l'indice del target
 				}
 			}
 			else
 			{
 				target = chrSeq.substr((pamIndices[i]), pamlen + max_bulges);
-			
+
 				if (target.find('N') != std::string::npos)
 				{
 					counter_index--;
@@ -652,7 +644,7 @@ int main(int argc, char **argv)
 				}
 				else
 				{
-					
+
 					string tmp;
 					for (char &c : target) //complemento dei nucleotidi per pam negativa
 						switch (c)
@@ -706,47 +698,47 @@ int main(int argc, char **argv)
 						}
 
 					reverse(tmp.begin(), tmp.end());
-					
+
 					string tmp_pam_str;
-					tmp_pam_str = tmp.substr(0,pamRNA.length());
+					tmp_pam_str = tmp.substr(0, pamRNA.length());
 					reverse(tmp_pam_str.begin(), tmp_pam_str.end());
 
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length(), pamlen - pamRNA.length()+ max_bulges), tmp.substr(pamRNA.length(), pamlen - pamRNA.length()+ max_bulges).c_str(),
-					 				tmp_pam_str, 
-									 0}; //salvo l'indice del target
+					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges), tmp.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges).c_str(),
+														 tmp_pam_str,
+														 0}; //salvo l'indice del target
 				}
 			}
-			
+
 			counter_index++;
 		}
 	}
-	else{			//PAM AT END
+	else
+	{ //PAM AT END
 		for (i = 0; i < pamIndices.size(); i++)
 		{
 			string target;
-			if (pamIndices[i] > 0) 
+			if (pamIndices[i] > 0)
 			{
 				target = chrSeq.substr(pamIndices[i], pamlen + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
-								
-				if (target.find('N') != std::string::npos)		   //if 'N' is in the target, remove the target
+
+				if (target.find('N') != std::string::npos) //if 'N' is in the target, remove the target
 				{
 					counter_index--;
 					discarded++;
 				}
 				else
 				{
-					
+
 					reverse(target.begin(), target.end()); //reverse per aggiungere nell'albero
-					
+
 					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length()), target.substr(pamRNA.length()).c_str(),
-									target.substr(0, pamRNA.length()), 0}; //salvo l'indice del target			
-					
+														 target.substr(0, pamRNA.length()), 0}; //salvo l'indice del target
 				}
 			}
 			else
 			{
 				target = chrSeq.substr((pamIndices[i]) * -1, pamlen + max_bulges);
-				
+
 				if (target.find('N') != std::string::npos)
 				{
 					counter_index--;
@@ -754,7 +746,7 @@ int main(int argc, char **argv)
 				}
 				else
 				{
-					
+
 					string tmp;
 					for (char &c : target) //complemento dei nucleotidi per pam negativa
 						switch (c)
@@ -808,19 +800,18 @@ int main(int argc, char **argv)
 						}
 
 					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length()), tmp.substr(pamRNA.length()).c_str(),
-									tmp.substr(0, pamRNA.length()),0};
-					
+														 tmp.substr(0, pamRNA.length()), 0};
 				}
 			}
-			
+
 			counter_index++;
 		}
 	}
 	targetOnDNA.shrink_to_fit();
-	
+
 	end = omp_get_wtime();
 	cout << end - start << "\n";
-	
+
 	cout << "Sorting:\t";
 	start = omp_get_wtime(); // sorting the strings before inserting into the tree
 
@@ -834,7 +825,7 @@ int main(int argc, char **argv)
 	// 		par_thr = 4;
 	// 	}
 	// }
-	
+
 	// omp_set_num_threads(par_thr);
 
 	__gnu_parallel::sort(targetOnDNA.begin(), targetOnDNA.begin() + counter_index, compareFunc);
@@ -845,16 +836,16 @@ int main(int argc, char **argv)
 
 	//Create tree
 	int group_tst = ceil(counter_index / (double)TARG_IN_GROUP); // if a tree is too big, divide it into group_tst smaller trees
-	
+
 	for (int jk = 0; jk < group_tst; jk++)
 	{
 		tree = new Tnode[TARG_IN_GROUP * (pamlen)];
-		gruppo = jk+1;
+		gruppo = jk + 1;
 		int inizio = jk * TARG_IN_GROUP;
 		int fine = MIN(((jk + 1) * TARG_IN_GROUP), counter_index);
 		cout << "Creating tree " << jk + 1 << " of " << group_tst << endl;
 		cout << "Build TST:\t";
-		
+
 		start = omp_get_wtime(); // build tst
 		nodeUsed = 0;
 		insall(inizio, fine - 1);
