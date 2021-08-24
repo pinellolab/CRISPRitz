@@ -324,6 +324,9 @@ void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, st
 	vector<bitset<4>> pam_bit = pam_bitConversion(pam_sequence);
 	vector<bitset<4>> pam_bit_reverse = pam_bitConversion(reversenuc(pam_sequence));
 	vector<bitset<4>> genome_bit = genomeBitConversion(genome_sequence);
+
+	cout << "entro in search pam nuovo" << endl;
+
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
 		for (int nt = 0; nt < genome_sequence.length(); ++nt)
