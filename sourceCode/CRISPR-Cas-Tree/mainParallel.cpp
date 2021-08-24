@@ -599,7 +599,7 @@ int main(int argc, char **argv)
 	// }
 	all_pam.clear();
 	end = omp_get_wtime();
-	cout << end - start << "\n";
+	cout << "Search PAM completed in " << end - start << "\n";
 
 	// ------------------------ CREATE THE TST ----------------------------
 
