@@ -319,30 +319,15 @@ string reversenuc(string pam)
 
 vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges)
 {
-	vector<int> indices;
-	string pam_reverse = reversenuc(pam_sequence);
-	// vector<bitset<4>> pam_bit;
+	vector<int> indices; //to save indices for TST extraction
 	vector<bitset<4>> pam_bit = pam_bitConversion(pam_sequence);
 	vector<bitset<4>> pam_bit_reverse = pam_bitConversion(reversenuc(pam_sequence));
 	vector<bitset<4>> genome_bit = genomeBitConversion(genome_sequence);
-
-	// for (int elem = 0; elem < genome_bit.size(); ++elem)
-	// {
-	// 	cout << "converted genome in bit" << genome_bit[elem] << endl;
-	// }
-
-	// for (int elem = 0; elem < pam_bit.size(); ++elem)
-	// {
-	// 	cout << "converted pam in bit" << pam_bit[elem] << endl;
-	// 	cout << "converted pam reverse in bit" << pam_bit_reverse[elem] << endl;
-	// }
-	// cout << "entro in search pam nuovo" << endl;
 
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
 		for (int nt = 0; nt < genome_sequence.length(); ++nt)
 		{
-			// cout << "ricerca sul genoma" << endl;
 			bool found_positive = true;
 			bool found_negative = true;
 
@@ -359,22 +344,15 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			}
 			if (found_positive)
 			{
-
 				if ((nt - (pam_len - pam_limit - 1 + max_bulges)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
 				{
-					// cout << "ho salvato pam positiva" << endl;
-
 					indices.push_back((nt - (pam_len - pam_limit - 1 + max_bulges)));
 				}
 			}
 			if (found_negative)
 			{
-				// cout << "ho trovato pam negativa" << endl;
-
 				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges)))) //same as for positive pam(out of bound problem)
 				{
-					// cout << "ho salvato pam negativa" << endl;
-
 					indices.push_back(-nt);
 				}
 			}
