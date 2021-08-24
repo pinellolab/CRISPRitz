@@ -23,7 +23,7 @@ using namespace std;
 
 // #define char NUCLEOTIDE[4] = {'A', 'C', 'G', 'T'}
 
-vector<bitset<4>> genomeBitConversion(string genome) //converto il genoma dal fasta alla versione bit
+vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal fasta alla versione bit
 {
 	vector<bitset<4>> genomeBit;
 	genomeBit.clear();
@@ -96,7 +96,7 @@ vector<bitset<4>> genomeBitConversion(string genome) //converto il genoma dal fa
 	return genomeBit;
 }
 
-vector<bitset<4>> pam_bitConversion(string PAM) //converto la pam in input da nt alla versione bit
+vector<bitset<4>> pam_bit_conversion(string PAM) //converto la pam in input da nt alla versione bit
 {
 	vector<bitset<4>> pam_bit;
 	pam_bit.clear();
@@ -320,9 +320,9 @@ string reversenuc(string pam)
 vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges)
 {
 	vector<int> indices; //to save indices for TST extraction
-	vector<bitset<4>> pam_bit = pam_bitConversion(pam_sequence);
-	vector<bitset<4>> pam_bit_reverse = pam_bitConversion(reversenuc(pam_sequence));
-	vector<bitset<4>> genome_bit = genomeBitConversion(genome_sequence);
+	vector<bitset<4>> pam_bit = pam_bit_conversion(pam_sequence);
+	vector<bitset<4>> pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
+	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
 
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
