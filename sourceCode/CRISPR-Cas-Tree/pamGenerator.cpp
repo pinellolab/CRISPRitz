@@ -17,6 +17,7 @@
 #include <omp.h>
 #include <string.h>
 #include <vector>
+#include <bitset>
 
 using namespace std;
 
