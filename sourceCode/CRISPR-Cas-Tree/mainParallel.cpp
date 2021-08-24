@@ -451,6 +451,7 @@ int main(int argc, char **argv)
 	ifstream pamfile(argv[2]);								  // input pam.txt
 	int par_thr = stoi(argv[3]);							  //thread to use in parallel algorithm
 	int max_bulges = stoi(argv[4]);							  //max allowed bulges
+	int max_mismatches_pam = 0;
 	pam_at_start = false;
 	globalstart = omp_get_wtime(); // start global time
 
@@ -578,7 +579,7 @@ int main(int argc, char **argv)
 	// 	pamIndices.insert(pamIndices.end(), tempPamIndices.begin(), tempPamIndices.end());
 	// }
 	// searchWords(pamIndices, list, all_pam.size(), chrSeq, pamlen, pamlimit, pam_at_start, max_bulges);
-	pamIndices = searchPAMonGenome(pamRNA, pamlen, chrSeq, pamlimit, pam_at_start, max_bulges);
+	pamIndices = searchPAMonGenome(pamRNA, pamlen, chrSeq, pamlimit, pam_at_start, max_bulges, max_mismatches_pam);
 	// cout << "faccio search\n";
 
 	// cout << "lunghezza degli indices " << pamIndices.size() << endl;

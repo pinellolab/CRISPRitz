@@ -317,7 +317,7 @@ string reversenuc(string pam)
 // 	return res;
 // }
 
-vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges)
+vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges, int max_mismatches)
 {
 	vector<int> indices; //to save indices for TST extraction
 	vector<bitset<4>> pam_bit = pam_bit_conversion(pam_sequence);
@@ -330,31 +330,37 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 		{
 			bool found_positive = true;
 			bool found_negative = true;
+			int positive_mismatches = max_mismatches;
+			int negative_mismatches = max_mismatches;
 
 			for (int pam_nt = 0; pam_nt < pam_limit; ++pam_nt)
 			{
 				if ((genome_bit[nt + pam_nt] & pam_bit[pam_nt]) == 0)
 				{
-					found_positive = false;
+					positive_mismatches--;
+					if (positive_mismatches < 0)
+						found_positive = false;
 				}
 				if ((genome_bit[nt + pam_nt] & pam_bit_reverse[pam_nt]) == 0)
 				{
-					found_negative = false;
+					negative_mismatches--;
+					if (negative_mismatches < 0)
+						found_negative = false;
 				}
 			}
 			if (found_positive)
 			{
-				if ((nt - (pam_len - pam_limit - 1 + max_bulges)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
-				{
-					indices.push_back((nt - (pam_len - pam_limit - 1 + max_bulges)));
-				}
+				// if ((nt - (pam_len - pam_limit - 1 + max_bulges)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
+				// {
+				indices.push_back((nt - (pam_len - pam_limit - 1 + max_bulges)));
+				// }
 			}
 			if (found_negative)
 			{
-				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges)))) //same as for positive pam(out of bound problem)
-				{
-					indices.push_back(-nt);
-				}
+				// if ((nt <= (genome_sequence.length() - (pam_len + max_bulges)))) //same as for positive pam(out of bound problem)
+				// {
+				indices.push_back(-nt);
+				// }
 			}
 		}
 	}
@@ -364,16 +370,22 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 		{
 			bool found_positive = true;
 			bool found_negative = true;
+			int positive_mismatches = max_mismatches;
+			int negative_mismatches = max_mismatches;
 
 			for (int pam_nt = 0; pam_nt < pam_limit; ++pam_nt)
 			{
 				if ((genome_bit[nt + pam_nt] & pam_bit[pam_nt]) == 0)
 				{
-					found_positive = false;
+					positive_mismatches--;
+					if (positive_mismatches < 0)
+						found_positive = false;
 				}
 				if ((genome_bit[nt + pam_nt] & pam_bit_reverse[pam_nt]) == 0)
 				{
-					found_negative = false;
+					negative_mismatches--;
+					if (negative_mismatches < 0)
+						found_negative = false;
 				}
 			}
 			if (found_positive)
