@@ -578,7 +578,7 @@ int main(int argc, char **argv)
 	// 	pamIndices.insert(pamIndices.end(), tempPamIndices.begin(), tempPamIndices.end());
 	// }
 	// searchWords(pamIndices, list, all_pam.size(), chrSeq, pamlen, pamlimit, pam_at_start, max_bulges);
-	searchPAMonGenome(pamIndices, pamRNA, pamlen, chrSeq, pamlimit, pam_at_start, max_bulges);
+	pamIndices = searchPAMonGenome(pamRNA, pamlen, chrSeq, pamlimit, pam_at_start, max_bulges);
 	// cout << "faccio search\n";
 
 	cout << "lunghezza degli indices " << pamIndices.size() << endl;

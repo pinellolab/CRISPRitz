@@ -317,8 +317,9 @@ string reversenuc(string pam)
 // 	return res;
 // }
 
-void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges)
+vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges)
 {
+	vector<int> indices;
 	string pam_reverse = reversenuc(pam_sequence);
 	// vector<bitset<4>> pam_bit;
 	vector<bitset<4>> pam_bit = pam_bitConversion(pam_sequence);
@@ -413,6 +414,7 @@ void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, st
 			}
 		}
 	}
+	return indices;
 }
 // Given a pam and a automaton it fill the automaton with each pam possible
 // vector<string> generatePam(string pamInput)
