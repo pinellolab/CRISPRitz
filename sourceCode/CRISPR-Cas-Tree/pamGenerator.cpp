@@ -362,7 +362,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 
 				if ((nt - (pam_len - pam_limit - 1 + max_bulges)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
 				{
-					cout << "ho salvato pam positiva" << endl;
+					// cout << "ho salvato pam positiva" << endl;
 
 					indices.push_back((nt - (pam_len - pam_limit - 1 + max_bulges)));
 				}
@@ -373,7 +373,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 
 				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges)))) //same as for positive pam(out of bound problem)
 				{
-					cout << "ho salvato pam negativa" << endl;
+					// cout << "ho salvato pam negativa" << endl;
 
 					indices.push_back(-nt);
 				}
