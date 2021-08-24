@@ -331,11 +331,11 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 	// 	cout << "converted genome in bit" << genome_bit[elem] << endl;
 	// }
 
-	for (int elem = 0; elem < pam_bit.size(); ++elem)
-	{
-		cout << "converted pam in bit" << pam_bit[elem] << endl;
-		cout << "converted pam reverse in bit" << pam_bit_reverse[elem] << endl;
-	}
+	// for (int elem = 0; elem < pam_bit.size(); ++elem)
+	// {
+	// 	cout << "converted pam in bit" << pam_bit[elem] << endl;
+	// 	cout << "converted pam reverse in bit" << pam_bit_reverse[elem] << endl;
+	// }
 	// cout << "entro in search pam nuovo" << endl;
 
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
