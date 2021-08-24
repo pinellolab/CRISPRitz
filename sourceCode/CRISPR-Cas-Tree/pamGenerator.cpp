@@ -350,17 +350,17 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			}
 			if (found_positive)
 			{
-				// if ((nt - (pam_len - pam_limit - 1 + max_bulges)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
-				// {
-				indices.push_back((nt - (pam_len - pam_limit - 1 + max_bulges)));
-				// }
+				if (((nt + pam_limit - 1) - (pam_len - 1 + max_bulges)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
+				{
+					indices.push_back(((nt + pam_limit - 1) - (pam_len - 1 + max_bulges)));
+				}
 			}
 			if (found_negative)
 			{
-				// if ((nt <= (genome_sequence.length() - (pam_len + max_bulges)))) //same as for positive pam(out of bound problem)
-				// {
-				indices.push_back(-nt);
-				// }
+				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges)))) //same as for positive pam(out of bound problem)
+				{
+					indices.push_back(-nt);
+				}
 			}
 		}
 	}
@@ -397,9 +397,9 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			}
 			if (found_negative)
 			{
-				if ((nt - (pam_len - pam_limit - 1 + max_bulges)) >= 0)
+				if (((nt + pam_limit - 1) - (pam_len - 1 + max_bulges)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
 				{
-					indices.push_back((nt - (pam_len - pam_limit - 1 + max_bulges)));
+					indices.push_back(((nt + pam_limit - 1) - (pam_len - 1 + max_bulges)));
 				}
 			}
 		}
