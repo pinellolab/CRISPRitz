@@ -335,11 +335,11 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			{
 				if ((genome_bit[nt + pam_nt] & pam_bit[pam_nt]) == 0)
 				{
-					found_positive = false;
+					// found_positive = false;
 				}
 				if ((genome_bit[nt + pam_nt] & pam_bit_reverse[pam_nt]) == 0)
 				{
-					found_negative = false;
+					// found_negative = false;
 				}
 			}
 			if (found_positive)
