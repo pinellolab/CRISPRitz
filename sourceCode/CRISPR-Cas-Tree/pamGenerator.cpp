@@ -95,77 +95,77 @@ vector<bitset<4>> genomeBitConversion(string genome) //converto il genoma dal fa
 	return genomeBit;
 }
 
-vector<bitset<4>> PAMBitConversion(string PAM) //converto la pam in input da nt alla versione bit
+vector<bitset<4>> pam_bitConversion(string PAM) //converto la pam in input da nt alla versione bit
 {
-	vector<bitset<4>> PAMbit;
-	PAMbit.clear();
-	PAMbit.resize(PAM.length());
+	vector<bitset<4>> pam_bit;
+	pam_bit.clear();
+	pam_bit.resize(PAM.length());
 
 	// #pragma omp parallel for schedule(static)
-	for (int i = 0; i < pam.length(); ++i)
+	for (int i = 0; i < PAM.length(); ++i)
 	{
 		if (PAM[i] == 'A')
 		{
-			PAMBit[i] = bitset<4>(string("0001"));
+			pam_bit[i] = bitset<4>(string("0001"));
 		}
 		else if (PAM[i] == 'C')
 		{
-			PAMBit[i] = bitset<4>(string("0010"));
+			pam_bit[i] = bitset<4>(string("0010"));
 		}
 		else if (PAM[i] == 'G')
 		{
-			PAMBit[i] = bitset<4>(string("0100"));
+			pam_bit[i] = bitset<4>(string("0100"));
 		}
 		else if (PAM[i] == 'T')
 		{
-			PAMBit[i] = bitset<4>(string("1000"));
+			pam_bit[i] = bitset<4>(string("1000"));
 		}
 		else if (PAM[i] == 'N')
 		{
-			PAMBit[i] = bitset<4>(string("1111"));
+			pam_bit[i] = bitset<4>(string("1111"));
 		}
 		else if (PAM[i] == 'R')
 		{
-			PAMBit[i] = bitset<4>(string("0101"));
+			pam_bit[i] = bitset<4>(string("0101"));
 		}
 		else if (PAM[i] == 'Y')
 		{
-			PAMBit[i] = bitset<4>(string("1010"));
+			pam_bit[i] = bitset<4>(string("1010"));
 		}
 		else if (PAM[i] == 'S')
 		{
-			PAMBit[i] = bitset<4>(string("0110"));
+			pam_bit[i] = bitset<4>(string("0110"));
 		}
 		else if (PAM[i] == 'W')
 		{
-			PAMBit[i] = bitset<4>(string("1001"));
+			pam_bit[i] = bitset<4>(string("1001"));
 		}
 		else if (PAM[i] == 'K')
 		{
-			PAMBit[i] = bitset<4>(string("1100"));
+			pam_bit[i] = bitset<4>(string("1100"));
 		}
 		else if (PAM[i] == 'M')
 		{
-			PAMBit[i] = bitset<4>(string("0011"));
+			pam_bit[i] = bitset<4>(string("0011"));
 		}
 		else if (PAM[i] == 'B')
 		{
-			PAMBit[i] = bitset<4>(string("1110"));
+			pam_bit[i] = bitset<4>(string("1110"));
 		}
 		else if (PAM[i] == 'D')
 		{
-			PAMBit[i] = bitset<4>(string("1101"));
+			pam_bit[i] = bitset<4>(string("1101"));
 		}
 		else if (PAM[i] == 'H')
 		{
-			PAMBit[i] = bitset<4>(string("1011"));
+			pam_bit[i] = bitset<4>(string("1011"));
 		}
 		else if (PAM[i] == 'V')
 		{
-			PAMBit[i] = bitset<4>(string("0111"));
+			pam_bit[i] = bitset<4>(string("0111"));
 		}
 	}
-	return PAMbit;
+	return pam_bit;
 }
 
 // Given a symbol it return a corresponding nucleotides
@@ -319,9 +319,9 @@ string reversenuc(string pam)
 void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges)
 {
 	string pam_reverse = reversenuc(pam_sequence);
-	// vector<bitset<4>> PAMbit;
-	vector<bitset<4>> pam_bit = PAMBitConversion(pam_sequence);
-	vector<bitset<4>> pam_bit_reverse = PAMBitConversion(reversenuc(pam_sequence));
+	// vector<bitset<4>> pam_bit;
+	vector<bitset<4>> pam_bit = pam_bitConversion(pam_sequence);
+	vector<bitset<4>> pam_bit_reverse = pam_bitConversion(reversenuc(pam_sequence));
 	vector<bitset<4>> genome_bit = genomeBitConversion(genome_sequence);
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
