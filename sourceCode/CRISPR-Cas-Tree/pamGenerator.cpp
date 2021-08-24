@@ -341,7 +341,7 @@ void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, st
 	{
 		for (int nt = 0; nt < genome_sequence.length(); ++nt)
 		{
-			cout << "ricerca sul genoma" << endl;
+			// cout << "ricerca sul genoma" << endl;
 			bool found_positive = true;
 			bool found_negative = true;
 
@@ -358,6 +358,8 @@ void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, st
 			}
 			if (found_positive)
 			{
+				cout << "ho trovato pam positiva" << endl;
+
 				if ((nt - (pam_len - pam_limit - 1 + max_bulges)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
 				{
 					indices.push_back((nt - (pam_len - pam_limit - 1 + max_bulges)));
@@ -365,6 +367,8 @@ void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, st
 			}
 			if (found_negative)
 			{
+				cout << "ho trovato pam negativa" << endl;
+
 				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges)))) //same as for positive pam(out of bound problem)
 				{
 					indices.push_back(-nt);
