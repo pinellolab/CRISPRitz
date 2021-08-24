@@ -350,7 +350,7 @@ void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, st
 			}
 			if (found_negative)
 			{
-				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges))) //same as for positive pam(out of bound problem)
+				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges)))) //same as for positive pam(out of bound problem)
 				{
 					indices.push_back(-nt);
 				}
@@ -377,7 +377,7 @@ void searchPAMonGenome(vector<int> indices, string pam_sequence, int pam_len, st
 			}
 			if (found_positive)
 			{
-				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges))) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
+				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges)))) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
 				{
 					indices.push_back(-nt);
 				}
