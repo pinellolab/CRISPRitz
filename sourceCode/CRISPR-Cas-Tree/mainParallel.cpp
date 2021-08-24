@@ -581,10 +581,10 @@ int main(int argc, char **argv)
 	searchPAMonGenome(pamIndices, pamRNA, pamlen, chrSeq, pamlimit, pam_at_start, max_bulges);
 	// cout << "faccio search\n";
 
-	// cout<< "lunghezza degli indices " << pamIndices.size()<<endl;
+	cout << "lunghezza degli indices " << pamIndices.size() << endl;
 	//elimino gli indici duplicati dovuti a combinazioni di PAM con lo stesso pattern (IUPAC)
-	__gnu_parallel::sort(pamIndices.begin(), pamIndices.end());
-	pamIndices.erase(unique(pamIndices.begin(), pamIndices.end()), pamIndices.end());
+	// __gnu_parallel::sort(pamIndices.begin(), pamIndices.end());
+	// pamIndices.erase(unique(pamIndices.begin(), pamIndices.end()), pamIndices.end());
 
 	// cout<< "lunghezza del indices post erase " << pamIndices.size()<<endl;
 
