@@ -599,6 +599,7 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 				{
 					vecInGuide[thr].emplace_back(g);	   // save guide
 					vecTargetOfGuide[thr].emplace_back(t); // save target
+					cout << "target found " << t << endl;
 				}
 			}
 			else
@@ -752,6 +753,7 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 				{
 					vecInGuide[thr].emplace_back(g);	   // save guide
 					vecTargetOfGuide[thr].emplace_back(t); // save target
+					cout << "target found " << t << endl;
 				}
 			}
 			else
