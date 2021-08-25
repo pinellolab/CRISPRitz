@@ -810,7 +810,7 @@ int main(int argc, char **argv)
 
 					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length()), tmp.substr(pamRNA.length()).c_str(),
 														 tmp.substr(0, pamRNA.length()), 0};
-					cout << "pam saved positive " << targetOnDNA[counter_index].pamDNA << endl;
+					cout << "pam saved negative " << targetOnDNA[counter_index].pamDNA << endl;
 				}
 			}
 
