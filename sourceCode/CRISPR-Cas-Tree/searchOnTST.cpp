@@ -317,7 +317,7 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 		unsigned char mask = 0;
 		int k = 0;
 
-		cout << "bit dna " << targetOnDNA[thr][i].guideDNA_bit << endl;
+		// cout << "bit dna " << targetOnDNA[thr][i].guideDNA_bit << endl;
 
 		fileTree.get(in);
 
@@ -414,7 +414,7 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 			k++;
 		}
 
-		cout << "pam rna read " << targetOnDNA[thr][i].guideDNA << endl;
+		// cout << "pam rna read " << targetOnDNA[thr][i].guideDNA << endl;
 
 		fileTree.get(in); // read index of next PAM with same guide
 
