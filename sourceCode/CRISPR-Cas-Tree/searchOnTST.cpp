@@ -330,6 +330,11 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 			mask = in & 0xF0;
 			in <<= 4;
 
+			for (int nt = 0; nt < 8; ++nt)
+			{
+				cout << "mask " << mask[nt] << endl;
+			}
+
 			switch (mask)
 			{
 			case 0x0:
