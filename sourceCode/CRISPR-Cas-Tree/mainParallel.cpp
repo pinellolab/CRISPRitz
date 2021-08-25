@@ -344,7 +344,7 @@ void saveTST(int inizio, int fine, int part)
 		do
 		{ // write target site PAM
 			counter++;
-			cout << "print PAM char to check (" << *ppp << ")" << endl;
+			cout << "print PAM char to check prima (" << *ppp << ")" << endl;
 			switch (*ppp)
 			{ //bits table: check the writePair() function
 			case 'A':
@@ -405,6 +405,7 @@ void saveTST(int inizio, int fine, int part)
 			}
 
 			bitNuc <<= 4;
+			cout << "print PAM char to check dopo (" << *ppp << ")" << endl;
 		} while (*ppp);
 
 		if (targetOnDNA[i].next)
