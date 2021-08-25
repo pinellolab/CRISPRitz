@@ -340,6 +340,7 @@ void saveTST(int inizio, int fine, int part)
 		bitNuc = 0;
 		int counter = 0;
 		const char *ppp = targetOnDNA[i].pamDNA.c_str();
+		cout << "pam dna " << targetOnDNA[i].pamDNA << endl;
 		do
 		{ // write target site PAM
 			counter++;
