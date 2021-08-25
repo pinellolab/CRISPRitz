@@ -306,7 +306,7 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 	//offset_guide_len = 20;
 	offset_guide_len = offset_guide_len - len_guide;
 
-	char in;
+	char in = 0;
 	for (int i = 0; i < numLeaves; i++)
 	{																		 // fill array of targets on DNA
 		fileTree.read((char *)&targetOnDNA[thr][i].guideIndex, sizeof(int)); // read index of target on DNA
@@ -314,7 +314,7 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 		targetOnDNA[thr][i].guideDNA_bit = new bitset<4>[pamRNA.size()];
 		targetOnDNA[thr][i].guideDNA = new char[pamRNA.size() + 1]; // initialize PAM size
 		targetOnDNA[thr][i].guideDNA[pamRNA.size()] = '\0';
-		unsigned char mask;
+		unsigned char mask = 0;
 		int k = 0;
 
 		fileTree.get(in);
