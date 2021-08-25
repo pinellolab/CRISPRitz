@@ -314,9 +314,10 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 		targetOnDNA[thr][i].guideDNA_bit = new bitset<4>[pamRNA.size()];
 		targetOnDNA[thr][i].guideDNA = new char[pamRNA.size() + 1]; // initialize PAM size
 		targetOnDNA[thr][i].guideDNA[pamRNA.size()] = '\0';
-		// unsigned char mask = 0;
-		char mask = 0;
+		unsigned char mask = 0;
 		int k = 0;
+
+		cout << "bit dna " << targetOnDNA[thr][i].guideDNA_bit << endl;
 
 		fileTree.get(in);
 
