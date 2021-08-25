@@ -509,10 +509,10 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 		{
 
 			string t(targetOfGuide[thr]);
-			cout << "t subito assignment " << t << endl;
+			// cout << "t subito assignment " << t << endl;
 
 			t = t.substr(0, len_guide + bulDNA - bD);
-			cout << "t substring " << t << endl;
+			// cout << "t substring " << t << endl;
 
 			if (pam_at_start)
 			{
@@ -525,7 +525,7 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 				t += targetOnDNA[thr][index].guideDNA;
 			}
 
-			cout << "t pam assignment " << t << endl;
+			// cout << "t pam assignment " << t << endl;
 
 			vector<bitset<4>> t_bit(len_guide + bulDNA);
 			int i = 0;
@@ -607,7 +607,7 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 				{
 					vecInGuide[thr].emplace_back(g);	   // save guide
 					vecTargetOfGuide[thr].emplace_back(t); // save target
-					cout << "target found " << t << endl;
+														   // cout << "target found " << t << endl;
 				}
 			}
 			else
@@ -761,7 +761,7 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 				{
 					vecInGuide[thr].emplace_back(g);	   // save guide
 					vecTargetOfGuide[thr].emplace_back(t); // save target
-					cout << "target found " << t << endl;
+														   // cout << "target found " << t << endl;
 				}
 			}
 			else
@@ -1167,7 +1167,7 @@ int main(int argc, char **argv)
 						{
 
 							fileResults << bulgeType[thr][j] << "\t" << vecInGuide[thr][j] << "\t" << vecTargetOfGuide[thr][j] << "\t" << chrName_glb[thr][j] << "\t" << indices[thr][j] << "\t" << cluster_position[thr][j] << "\t" << directions[thr][j] << "\t" << mismatches[thr][j] << "\t" << bulgeSize[thr][j] << "\t" << mismatches[thr][j] + bulgeSize[thr][j] << "\n";
-							cout << bulgeType[thr][j] << "\t" << vecInGuide[thr][j] << "\t" << vecTargetOfGuide[thr][j] << "\t" << chrName_glb[thr][j] << "\t" << indices[thr][j] << "\t" << cluster_position[thr][j] << "\t" << directions[thr][j] << "\t" << mismatches[thr][j] << "\t" << bulgeSize[thr][j] << "\t" << mismatches[thr][j] + bulgeSize[thr][j] << "\n";
+							// cout << bulgeType[thr][j] << "\t" << vecInGuide[thr][j] << "\t" << vecTargetOfGuide[thr][j] << "\t" << chrName_glb[thr][j] << "\t" << indices[thr][j] << "\t" << cluster_position[thr][j] << "\t" << directions[thr][j] << "\t" << mismatches[thr][j] << "\t" << bulgeSize[thr][j] << "\t" << mismatches[thr][j] + bulgeSize[thr][j] << "\n";
 						}
 					}
 
