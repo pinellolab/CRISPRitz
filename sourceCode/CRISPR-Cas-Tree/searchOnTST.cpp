@@ -505,8 +505,10 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 		{
 
 			string t(targetOfGuide[thr]);
+			cout << "t subito assignment " << t << endl;
 
 			t = t.substr(0, len_guide + bulDNA - bD);
+			cout << "t substring " << t << endl;
 
 			if (pam_at_start)
 			{
