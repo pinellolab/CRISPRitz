@@ -405,7 +405,7 @@ void saveTST(int inizio, int fine, int part)
 			}
 
 			bitNuc <<= 4;
-			cout << "print PAM char to check dopo (" << *ppp << ")" << endl;
+			// cout << "print PAM char to check dopo (" << *ppp << ")" << endl;
 		} while (*ppp);
 
 		if (targetOnDNA[i].next)
