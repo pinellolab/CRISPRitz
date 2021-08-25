@@ -400,6 +400,7 @@ void saveTST(int inizio, int fine, int part)
 				if (counter % 3 == 0 && counter != 0)
 					bitNuc <<= 4;
 				fileTree.put(bitNuc);
+				cout << "bitnuc " << bitNuc << endl;
 				bitNuc = 0;
 				k = 0;
 			}
