@@ -55,6 +55,7 @@ string chrName;			   // input chromosome name
 string chrSeq;			   // input chromosome sequence
 int gruppo;
 bool pam_at_start;
+int len_guide_used;
 
 // function that inserts a guide DNA in TST
 void insert(string st, int i, int i2)
@@ -323,7 +324,6 @@ void serialize(Tptr p)
 	}
 }
 
-int len_guide_used = 20;
 // Write to file
 void saveTST(int inizio, int fine, int part)
 {
