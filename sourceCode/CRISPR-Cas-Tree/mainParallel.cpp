@@ -343,6 +343,7 @@ void saveTST(int inizio, int fine, int part)
 		do
 		{ // write target site PAM
 			counter++;
+			cout << "print PAM char to check (" << *ppp << ")" << endl;
 			switch (*ppp)
 			{ //bits table: check the writePair() function
 			case 'A':
