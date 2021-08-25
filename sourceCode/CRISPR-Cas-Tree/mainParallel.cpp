@@ -619,7 +619,7 @@ int main(int argc, char **argv)
 			if (pamIndices[i] < 0) //String found in positive strand (PAM AT BEGINNING case)
 			{
 				target = chrSeq.substr(pamIndices[i] * -1, pamlen + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
-
+				cout << "check target " << target << endl;
 				if (target.find('N') != std::string::npos) //if 'N' is in the target, remove the target
 				{
 					counter_index--;
@@ -640,6 +640,7 @@ int main(int argc, char **argv)
 			else
 			{
 				target = chrSeq.substr((pamIndices[i]), pamlen + max_bulges);
+				cout << "check target " << target << endl;
 
 				if (target.find('N') != std::string::npos)
 				{
@@ -724,6 +725,7 @@ int main(int argc, char **argv)
 			if (pamIndices[i] > 0)
 			{
 				target = chrSeq.substr(pamIndices[i], pamlen + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
+				cout << "check target " << target << endl;
 
 				if (target.find('N') != std::string::npos) //if 'N' is in the target, remove the target
 				{
@@ -742,6 +744,7 @@ int main(int argc, char **argv)
 			else
 			{
 				target = chrSeq.substr((pamIndices[i]) * -1, pamlen + max_bulges);
+				cout << "check target " << target << endl;
 
 				if (target.find('N') != std::string::npos)
 				{
