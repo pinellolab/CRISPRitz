@@ -726,7 +726,7 @@ int main(int argc, char **argv)
 			if (pamIndices[i] > 0)
 			{
 				target = chrSeq.substr(pamIndices[i], pamlen + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
-				// cout << "check target pam end positive" << target << endl;
+				cout << "check target pam end positive" << target << endl;
 
 				if (target.find('N') != std::string::npos) //if 'N' is in the target, remove the target
 				{
@@ -740,12 +740,13 @@ int main(int argc, char **argv)
 
 					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length()), target.substr(pamRNA.length()).c_str(),
 														 target.substr(0, pamRNA.length()), 0}; //salvo l'indice del target
+					cout << "pam saved positive " << targetOnDNA[counter_index].pamDNA << endl;
 				}
 			}
 			else
 			{
 				target = chrSeq.substr((pamIndices[i]) * -1, pamlen + max_bulges);
-				// cout << "check target pam end negative" << target << endl;
+				cout << "check target pam end negative" << target << endl;
 
 				if (target.find('N') != std::string::npos)
 				{
@@ -809,6 +810,7 @@ int main(int argc, char **argv)
 
 					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length()), tmp.substr(pamRNA.length()).c_str(),
 														 tmp.substr(0, pamRNA.length()), 0};
+					cout << "pam saved positive " << targetOnDNA[counter_index].pamDNA << endl;
 				}
 			}
 
