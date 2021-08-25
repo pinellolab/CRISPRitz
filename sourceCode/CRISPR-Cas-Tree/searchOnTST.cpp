@@ -521,6 +521,8 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 				t += targetOnDNA[thr][index].guideDNA;
 			}
 
+			cout << "t pam assignment " << t << endl;
+
 			vector<bitset<4>> t_bit(len_guide + bulDNA);
 			int i = 0;
 			for (i = 0; i < (len_guide + bulDNA - bD); i++)
