@@ -559,7 +559,7 @@ void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence,
 	}
 	else
 	{
-		pam_sequence = pam_sequence.substr(0, pam_limit)
+		pam_sequence = pam_sequence.substr(0, pam_limit);
 	}
 
 	vector<bitset<4>> pam_bit = pam_bit_conversion(pam_sequence);
