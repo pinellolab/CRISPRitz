@@ -11,22 +11,22 @@ extern string fastaname, pamname, guidename;
 extern bool pamdirection;
 
 //generate all pam and automata construction
-void pamGeneration()
-{
-   //generate all PAMs
-   if (!pamdirection)
-   {
-      //genero lista comprensiva di PAM
-      listPam = generatePam(pam.substr(pamlen - pamlimit, pamlimit));
-   }
-   else
-   {
-      listPam = generatePam(pam.substr(0, pamlimit));
-   }
+// void pamGeneration()
+// {
+//    //generate all PAMs
+//    if (!pamdirection)
+//    {
+//       //genero lista comprensiva di PAM
+//       listPam = generatePam(pam.substr(pamlen - pamlimit, pamlimit));
+//    }
+//    else
+//    {
+//       listPam = generatePam(pam.substr(0, pamlimit));
+//    }
 
-   //generate the automata for PAM search
-   buildMachine();
-}
+//    //generate the automata for PAM search
+//    buildMachine();
+// }
 
 void reading_pam()
 {
