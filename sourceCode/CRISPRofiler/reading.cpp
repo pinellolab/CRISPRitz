@@ -47,7 +47,7 @@ void reading_pam()
       pamlen = pam.length();
    }
 
-   pamGeneration();
+   // pamGeneration();
 }
 
 void reading_guide()
