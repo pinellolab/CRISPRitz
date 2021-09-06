@@ -46,7 +46,7 @@ void reading_pam()
       }
       pamlen = pam.length();
    }
-
+   cout << "leggo la pam" << endl;
    // pamGeneration();
 }
 

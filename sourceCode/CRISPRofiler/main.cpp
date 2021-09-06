@@ -14,7 +14,7 @@ int main(int argc, char **argv)
 {
    //start total execution time
    starttotal = omp_get_wtime();
-
+   cout << "entro in main" << endl;
    //assign argv variables to stream
    string resultwriting = "r";
    string profilewriting = "p";
