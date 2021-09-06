@@ -625,7 +625,7 @@ void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence,
 			{
 				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges)))) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
 				{
-					pamindicesreverse.push_back(-nt);
+					pamindicesreverse.push_back(nt);
 				}
 			}
 			if (found_negative)
