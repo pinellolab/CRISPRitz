@@ -961,12 +961,14 @@ int main(int argc, char **argv)
 			reverse(iguide.begin(), iguide.end());
 		}
 
-		char *writable = new char[iguide.size() + 1];
-		writable[iguide.size()] = '\0'; //terminating zero for char*
-		guideRNA.push_back(writable);
-		std::copy(iguide.begin(), iguide.end(), guideRNA[numGuide]);
+		// char *writable = new char[iguide.size() + 1];
+		// writable[iguide.size()] = '\0'; //terminating zero for char*
+		// guideRNA.push_back(writable);
+		// std::copy(iguide.begin(), iguide.end(), guideRNA[numGuide]);
 
-		delete[] writable;
+		guideRNA.push_back(iguide.c_str());
+
+		// delete[] writable;
 		// char *temp_char_guide = (char *)malloc((pamlen - pamlimit + 1) * sizeof(char));
 		// // strcpy(temp_char_guide, iguide.c_str());
 		// guideRNA.push_back(temp_char_guide);
