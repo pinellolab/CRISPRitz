@@ -961,7 +961,7 @@ int main(int argc, char **argv)
 			reverse(iguide.begin(), iguide.end());
 		}
 		char *temp_char_guide = new char(iguide.length() + 1);
-		strcpy(temp_char_guide, iguide);
+		strcpy(temp_char_guide, iguide.c_str());
 		guideRNA.push_back(temp_char_guide);
 		// use of pw
 		delete[] temp_char_guide;
