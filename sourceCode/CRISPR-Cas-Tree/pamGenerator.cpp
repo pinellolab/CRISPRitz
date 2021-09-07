@@ -82,7 +82,7 @@ vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal 
 		}
 		else if (genome[i] == 'D')
 		{
-			genomeBit.push_back(bitset<4>(string("1101")=);
+			genomeBit.push_back(bitset<4>(string("1101")));
 		}
 		else if (genome[i] == 'H')
 		{
