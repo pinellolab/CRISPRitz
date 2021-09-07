@@ -962,12 +962,12 @@ int main(int argc, char **argv)
 			reverse(iguide.begin(), iguide.end());
 		}
 
-		char *temp_char_guide = (char *)malloc(sizeof(char) * iguide.size());
+		char *temp_char_guide = (char *)malloc(sizeof(char) * iguide.size() + 1);
 		// guideRNA.push_back((char *)malloc((pamlen - pamlimit) * sizeof(char)));
 		guideRNA.push_back(temp_char_guide);
 		copy(iguide.begin(), iguide.end(), guideRNA[numGuide]); // save Guide
-		guideRNA[numGuide][iguide.size()] = '\0';
-		for (size_t iter = 0; iter < iguide.size(); ++iter)
+		guideRNA[numGuide][iguide.size() + 1] = '\0';
+		for (size_t iter = 0; iter < iguide.size() + 1; ++iter)
 		{
 			cout << "char[] " << guideRNA[numGuide][iter] << endl;
 		}
