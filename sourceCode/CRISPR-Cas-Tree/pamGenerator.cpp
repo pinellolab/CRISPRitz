@@ -30,7 +30,7 @@ vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal 
 	// genomeBit.reserve(genome.length());
 
 	// #pragma omp parallel for schedule(static)
-	for (int i = 0; i < genome.length(); ++i)
+	for (int i = 0; i < genome.length(); i++)
 	{
 		if (genome[i] == 'A')
 		{
