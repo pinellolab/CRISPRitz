@@ -28,7 +28,7 @@ vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal 
 	vector<bitset<4>> genomeBit;
 
 	// #pragma omp parallel for schedule(static)
-	for (int i = 0; i < genome.length(); ++i)
+	for (int i = 0; i < genome.length() - 1; ++i)
 	{
 		if (genome[i] == 'A')
 		{
@@ -320,12 +320,9 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 	vector<bitset<4>> pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
 	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
 
-	cout << genome_sequence << endl;
-	cout << genome_sequence.length() << endl;
-
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
-		for (int nt = 0; nt < genome_sequence.length(); nt++)
+		for (int nt = 0; nt < genome_sequence.length() - 1; nt++)
 		{
 			bool found_positive = true;
 			bool found_negative = true;
@@ -368,7 +365,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 	}
 	else //pam al 3' quindi in cima alla sequenza
 	{
-		for (int nt = 0; nt < genome_sequence.length(); nt++)
+		for (int nt = 0; nt < genome_sequence.length() - 1; nt++)
 		{
 			bool found_positive = true;
 			bool found_negative = true;
