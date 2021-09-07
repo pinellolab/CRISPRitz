@@ -332,10 +332,10 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			bool found_negative = true;
 			int positive_mismatches = max_mismatches;
 			int negative_mismatches = max_mismatches;
-			bitset<4> bit_check = 0;
 
 			for (int pam_nt = 0; pam_nt < pam_limit; ++pam_nt)
 			{
+				bitset<4> bit_check;
 				bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
 				if (bit_check.none())
 				{
@@ -375,10 +375,10 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			bool found_negative = true;
 			int positive_mismatches = max_mismatches;
 			int negative_mismatches = max_mismatches;
-			bitset<4> bit_check = 0;
 
 			for (int pam_nt = 0; pam_nt < pam_limit; ++pam_nt)
 			{
+				bitset<4> bit_check;
 				bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
 				if (bit_check.none())
 				{
