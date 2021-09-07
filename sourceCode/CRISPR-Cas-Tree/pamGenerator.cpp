@@ -26,8 +26,8 @@ using namespace std;
 vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal fasta alla versione bit
 {
 	vector<bitset<4>> genomeBit;
-	genomeBit.clear();
-	genomeBit.reserve(genome.length());
+	// genomeBit.clear();
+	// genomeBit.reserve(genome.length());
 
 	// #pragma omp parallel for schedule(static)
 	for (int i = 0; i < genome.length(); ++i)
@@ -99,7 +99,7 @@ vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal 
 vector<bitset<4>> pam_bit_conversion(string PAM) //converto la pam in input da nt alla versione bit
 {
 	vector<bitset<4>> pam_bit;
-	pam_bit.clear();
+	// pam_bit.clear();
 	pam_bit.resize(PAM.length());
 
 	// #pragma omp parallel for schedule(static)
