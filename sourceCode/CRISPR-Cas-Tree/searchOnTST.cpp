@@ -70,7 +70,8 @@ vector<vector<bitset<4>>> targetOfGuide_bit;
 vector<char *> inGuide;
 vector<char *> targetOfGuide;
 
-vector<char *> guideRNA;				// input guide RNA
+// vector<char *> guideRNA;				// input guide RNA
+vector<string> guideRNA;				// input guide RNA
 vector<string> guideRNA_s;				//input guide RNA as strings;
 vector<vector<bitset<4>>> guideRNA_bit; //input guide RNA in bitset
 int len_guide;
@@ -961,12 +962,14 @@ int main(int argc, char **argv)
 			reverse(iguide.begin(), iguide.end());
 		}
 
+		guideRNA.push_back(iguide);
+
 		// char *writable = new char[iguide.size() + 1];
 		// writable[iguide.size()] = '\0'; //terminating zero for char*
 		// guideRNA.push_back(writable);
 		// std::copy(iguide.begin(), iguide.end(), guideRNA[numGuide]);
 
-		guideRNA.push_back(iguide.c_str());
+		// guideRNA.push_back(iguide.c_str());
 
 		// delete[] writable;
 		// char *temp_char_guide = (char *)malloc((pamlen - pamlimit + 1) * sizeof(char));
@@ -987,7 +990,7 @@ int main(int argc, char **argv)
 		vector<bitset<4>> tmp(pamlen - pamlimit);
 		for (int j = 0; j < (pamlen - pamlimit); j++)
 		{
-			tmp[j] = bitset<4>(convertCharToBitset(guideRNA[i][j]));
+			tmp[j] = bitset<4>(convertCharToBitset(guideRNA[i][j].c_str()));
 		}
 		guideRNA_bit.push_back(tmp);
 	}
@@ -1158,7 +1161,7 @@ int main(int argc, char **argv)
 					gi[thr] = 0;
 					guideI[thr] = i;
 
-					nearsearch(guideRNA[i], &albero_glb[thr][0], 0, mm2, bulDNA2, bulRNA2, true, 0, thr);
+					nearsearch(guideRNA[i][0].c_str(), &albero_glb[thr][0], 0, mm2, bulDNA2, bulRNA2, true, 0, thr);
 				}
 
 				if (create_target)
