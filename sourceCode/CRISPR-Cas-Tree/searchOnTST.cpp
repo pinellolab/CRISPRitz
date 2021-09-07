@@ -960,12 +960,18 @@ int main(int argc, char **argv)
 		{
 			reverse(iguide.begin(), iguide.end());
 		}
-		char *temp_char_guide = (char *)malloc((pamlen - pamlimit + 1) * sizeof(char));
-		// strcpy(temp_char_guide, iguide.c_str());
-		guideRNA.push_back(temp_char_guide);
-		copy(iguide.begin(), iguide.end(), guideRNA[numGuide]);
-		// use of pw
-		delete[] temp_char_guide;
+
+		char *writable = new char[iguide.size() + 1];
+		std::copy(iguide.begin(), iguide.end(), writable);
+		writable[iguide.size()] = '\0'; // don't forget the terminating 0
+		// don't forget to free the string after finished using it
+		delete[] writable;
+		// char *temp_char_guide = (char *)malloc((pamlen - pamlimit + 1) * sizeof(char));
+		// // strcpy(temp_char_guide, iguide.c_str());
+		// guideRNA.push_back(temp_char_guide);
+		// copy(iguide.begin(), iguide.end(), guideRNA[numGuide]);
+		// // use of pw
+		// delete[] temp_char_guide;
 		// guideRNA.push_back((char *)malloc((pamlen - pamlimit) * sizeof(char)));
 		// copy(iguide.begin(), iguide.end(), guideRNA[numGuide]); // save Guide
 		// guideRNA[numGuide][pamlen - pamlimit + 1] = '\0';
