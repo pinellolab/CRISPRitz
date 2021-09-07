@@ -960,9 +960,14 @@ int main(int argc, char **argv)
 		{
 			reverse(iguide.begin(), iguide.end());
 		}
-		guideRNA.push_back((char *)malloc((pamlen - pamlimit) * sizeof(char)));
-		copy(iguide.begin(), iguide.end(), guideRNA[numGuide]); // save Guide
-		guideRNA[numGuide][pamlen - pamlimit + 1] = '\0';
+		char *temp_char_guide = new char(strlen(iguide) + 1);
+		strcpy(temp_char_guide, iguide);
+		guideRNA.push_back(temp_char_guide);
+		// use of pw
+		delete[] temp_char_guide;
+		// guideRNA.push_back((char *)malloc((pamlen - pamlimit) * sizeof(char)));
+		// copy(iguide.begin(), iguide.end(), guideRNA[numGuide]); // save Guide
+		// guideRNA[numGuide][pamlen - pamlimit + 1] = '\0';
 		numGuide++;
 	}
 
