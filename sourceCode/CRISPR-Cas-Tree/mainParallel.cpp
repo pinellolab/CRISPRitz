@@ -458,14 +458,16 @@ int main(int argc, char **argv)
 	pam_at_start = false;
 	globalstart = omp_get_wtime(); // start global time
 
-	if (par_thr > std::thread::hardware_concurrency() || par_thr == 0)
-	{
-		omp_set_num_threads(std::thread::hardware_concurrency());
-	}
-	else
-	{
-		omp_set_num_threads(par_thr);
-	}
+	// if (par_thr > std::thread::hardware_concurrency() || par_thr == 0)
+	// {
+	// 	omp_set_num_threads(std::thread::hardware_concurrency());
+	// }
+	// else
+	// {
+	// 	omp_set_num_threads(par_thr);
+	// }
+	omp_set_dynamic(0); // Explicitly disable dynamic teams
+	omp_set_num_threads(1);
 
 	// ----------------------- READ INPUT FASTA ---------------------------
 	//Read chromosome name

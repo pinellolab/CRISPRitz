@@ -332,16 +332,19 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			bool found_negative = true;
 			int positive_mismatches = max_mismatches;
 			int negative_mismatches = max_mismatches;
+			bitset<4> bit_check = (string("0000"));
 
 			for (int pam_nt = 0; pam_nt < pam_limit; ++pam_nt)
 			{
-				if ((genome_bit[nt + pam_nt] & pam_bit[pam_nt]) == 0)
+				bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
+				if (bit_check.none())
 				{
 					positive_mismatches--;
 					if (positive_mismatches < 0)
 						found_positive = false;
 				}
-				if ((genome_bit[nt + pam_nt] & pam_bit_reverse[pam_nt]) == 0)
+				bit_check = genome_bit[nt + pam_nt] & pam_bit_reverse[pam_nt];
+				if (bit_check.none())
 				{
 					negative_mismatches--;
 					if (negative_mismatches < 0)
@@ -372,16 +375,19 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			bool found_negative = true;
 			int positive_mismatches = max_mismatches;
 			int negative_mismatches = max_mismatches;
+			bitset<4> bit_check = (string("0000"));
 
 			for (int pam_nt = 0; pam_nt < pam_limit; ++pam_nt)
 			{
-				if ((genome_bit[nt + pam_nt] & pam_bit[pam_nt]) == 0)
+				bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
+				if (bit_check.none())
 				{
 					positive_mismatches--;
 					if (positive_mismatches < 0)
 						found_positive = false;
 				}
-				if ((genome_bit[nt + pam_nt] & pam_bit_reverse[pam_nt]) == 0)
+				bit_check = genome_bit[nt + pam_nt] & pam_bit_reverse[pam_nt];
+				if (bit_check.none())
 				{
 					negative_mismatches--;
 					if (negative_mismatches < 0)
