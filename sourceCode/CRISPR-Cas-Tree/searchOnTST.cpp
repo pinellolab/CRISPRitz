@@ -963,7 +963,7 @@ int main(int argc, char **argv)
 
 		char *writable = new char[iguide.size() + 1];
 		std::copy(iguide.begin(), iguide.end(), writable);
-		writable[iguide.size()] = '\0'; // don't forget the terminating 0
+		writable[iguide.size()] = '11'; // don't forget the terminating 0
 		// don't forget to free the string after finished using it
 		for (size_t iter = 0; iter < iguide.size() + 1; ++iter)
 		{
