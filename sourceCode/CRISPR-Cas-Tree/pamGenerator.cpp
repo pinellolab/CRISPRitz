@@ -335,9 +335,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 
 			for (int pam_nt = 0; pam_nt < pam_limit; ++pam_nt)
 			{
-				bitset<4> bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
-				// if ((genome_bit[nt + pam_nt] & pam_bit[pam_nt]) == 0)
-				if (bit_check == 0)
+				if ((genome_bit[nt + pam_nt] & pam_bit[pam_nt]) == 0)
 				{
 					positive_mismatches--;
 					if (positive_mismatches < 0)
