@@ -326,7 +326,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
-		for (int nt = 0; nt < genome_sequence.length(); ++nt)
+		for (int nt = 0; nt < genome_sequence.length(); nt++)
 		{
 			bool found_positive = true;
 			bool found_negative = true;
@@ -334,7 +334,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			int negative_mismatches = max_mismatches;
 			bitset<4> bit_check = 0;
 
-			for (int pam_nt = 0; pam_nt < pam_limit; ++pam_nt)
+			for (int pam_nt = 0; pam_nt < pam_limit; pam_nt++)
 			{
 				bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
 				if (bit_check.none())
@@ -369,7 +369,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 	}
 	else //pam al 3' quindi in cima alla sequenza
 	{
-		for (int nt = 0; nt < genome_sequence.length(); ++nt)
+		for (int nt = 0; nt < genome_sequence.length(); nt++)
 		{
 			bool found_positive = true;
 			bool found_negative = true;
@@ -377,7 +377,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			int negative_mismatches = max_mismatches;
 			bitset<4> bit_check = 0;
 
-			for (int pam_nt = 0; pam_nt < pam_limit; ++pam_nt)
+			for (int pam_nt = 0; pam_nt < pam_limit; pam_nt++)
 			{
 				bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
 				if (bit_check.none())
