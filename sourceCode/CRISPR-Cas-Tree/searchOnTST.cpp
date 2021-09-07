@@ -968,7 +968,7 @@ int main(int argc, char **argv)
 		copy(iguide.begin(), iguide.end(), guideRNA[numGuide]); // save Guide
 		guideRNA[numGuide][iguide.size()] = '\0';
 		numGuide++;
-		free(temp_char_guide)
+		free(temp_char_guide);
 	}
 
 	//Transform loaded guides into bitset
