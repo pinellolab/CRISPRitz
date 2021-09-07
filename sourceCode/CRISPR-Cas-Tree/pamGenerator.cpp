@@ -30,7 +30,7 @@ vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal 
 	// genomeBit.reserve(genome.length());
 
 	// #pragma omp parallel for schedule(static)
-	for (int i = 0; i < genome.length(); i++)
+	for (int i = 0; i < genome.length(); ++i)
 	{
 		if (genome[i] == 'A')
 		{
@@ -100,70 +100,70 @@ vector<bitset<4>> pam_bit_conversion(string PAM) //converto la pam in input da n
 {
 	vector<bitset<4>> pam_bit;
 	// pam_bit.clear();
-	pam_bit.resize(PAM.length());
+	// pam_bit.resize(PAM.length());
 
 	// #pragma omp parallel for schedule(static)
 	for (int i = 0; i < PAM.length(); ++i)
 	{
 		if (PAM[i] == 'A')
 		{
-			pam_bit[i] = bitset<4>(string("0001"));
+			pam_bit.push_back(bitset<4>(string("0001")));
 		}
 		else if (PAM[i] == 'C')
 		{
-			pam_bit[i] = bitset<4>(string("0010"));
+			pam_bit.push_back(bitset<4>(string("0010")));
 		}
 		else if (PAM[i] == 'G')
 		{
-			pam_bit[i] = bitset<4>(string("0100"));
+			pam_bit.push_back(bitset<4>(string("0100")));
 		}
 		else if (PAM[i] == 'T')
 		{
-			pam_bit[i] = bitset<4>(string("1000"));
+			pam_bit.push_back(bitset<4>(string("1000")));
 		}
 		else if (PAM[i] == 'N')
 		{
-			pam_bit[i] = bitset<4>(string("1111"));
+			pam_bit.push_back(bitset<4>(string("1111")));
 		}
 		else if (PAM[i] == 'R')
 		{
-			pam_bit[i] = bitset<4>(string("0101"));
+			pam_bit.push_back(bitset<4>(string("0101")));
 		}
 		else if (PAM[i] == 'Y')
 		{
-			pam_bit[i] = bitset<4>(string("1010"));
+			pam_bit.push_back(bitset<4>(string("1010")));
 		}
 		else if (PAM[i] == 'S')
 		{
-			pam_bit[i] = bitset<4>(string("0110"));
+			pam_bit.push_back(bitset<4>(string("0110")));
 		}
 		else if (PAM[i] == 'W')
 		{
-			pam_bit[i] = bitset<4>(string("1001"));
+			pam_bit.push_back(bitset<4>(string("1001")));
 		}
 		else if (PAM[i] == 'K')
 		{
-			pam_bit[i] = bitset<4>(string("1100"));
+			pam_bit.push_back(bitset<4>(string("1100")));
 		}
 		else if (PAM[i] == 'M')
 		{
-			pam_bit[i] = bitset<4>(string("0011"));
+			pam_bit.push_back(bitset<4>(string("0011")));
 		}
 		else if (PAM[i] == 'B')
 		{
-			pam_bit[i] = bitset<4>(string("1110"));
+			pam_bit.push_back(bitset<4>(string("1110")));
 		}
 		else if (PAM[i] == 'D')
 		{
-			pam_bit[i] = bitset<4>(string("1101"));
+			pam_bit.push_back(bitset<4>(string("1101")));
 		}
 		else if (PAM[i] == 'H')
 		{
-			pam_bit[i] = bitset<4>(string("1011"));
+			pam_bit.push_back(bitset<4>(string("1011")));
 		}
 		else if (PAM[i] == 'V')
 		{
-			pam_bit[i] = bitset<4>(string("0111"));
+			pam_bit.push_back(bitset<4>(string("0111")));
 		}
 	}
 	return pam_bit;
