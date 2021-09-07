@@ -962,10 +962,13 @@ int main(int argc, char **argv)
 			reverse(iguide.begin(), iguide.end());
 		}
 
-		guideRNA.push_back((char *)malloc((pamlen - pamlimit) * sizeof(char)));
+		char *temp_char_guide = (char *)malloc(sizeof(char) * (iguide.size() + 1));
+		// guideRNA.push_back((char *)malloc((pamlen - pamlimit) * sizeof(char)));
+		guideRNA.push_back(temp_char_guide);
 		copy(iguide.begin(), iguide.end(), guideRNA[numGuide]); // save Guide
-		guideRNA[numGuide][pamlen - pamlimit + 1] = '\0';
+		guideRNA[numGuide][iguide.size()] = '\0';
 		numGuide++;
+		free(temp_char_guide)
 	}
 
 	//Transform loaded guides into bitset
@@ -1091,8 +1094,8 @@ int main(int argc, char **argv)
 	int numNodes;
 	int numLeaves;
 
-	char c_inGuide[50];
-	char c_targetOfGuide[50];
+	char c_inGuide[100];
+	char c_targetOfGuide[100];
 	int file;
 	int jk;
 	int i;
