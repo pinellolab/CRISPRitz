@@ -962,7 +962,7 @@ int main(int argc, char **argv)
 			reverse(iguide.begin(), iguide.end());
 		}
 
-		char *temp_char_guide = (char *)malloc(sizeof(char) * (iguide.size() + 1));
+		char *temp_char_guide = (char *)malloc(sizeof(char) * iguide.size());
 		// guideRNA.push_back((char *)malloc((pamlen - pamlimit) * sizeof(char)));
 		guideRNA.push_back(temp_char_guide);
 		copy(iguide.begin(), iguide.end(), guideRNA[numGuide]); // save Guide
