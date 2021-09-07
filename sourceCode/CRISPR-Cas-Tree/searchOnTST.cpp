@@ -967,6 +967,10 @@ int main(int argc, char **argv)
 		guideRNA.push_back(temp_char_guide);
 		copy(iguide.begin(), iguide.end(), guideRNA[numGuide]); // save Guide
 		guideRNA[numGuide][iguide.size()] = '\0';
+		for (size_t iter = 0; iter < iguide.size(); ++iter)
+		{
+			cout << "char[] " << guideRNA[numGuide][iter] << endl;
+		}
 		numGuide++;
 		free(temp_char_guide);
 	}
