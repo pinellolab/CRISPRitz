@@ -316,9 +316,9 @@ string reversenuc(string pam)
 vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges, int max_mismatches)
 {
 	vector<int> indices; //to save indices for TST extraction
-	vector<bitset<4>> pam_bit(pam_bit_conversion(pam_sequence));
-	vector<bitset<4>> pam_bit_reverse(pam_bit_conversion(reversenuc(pam_sequence));
-	vector<bitset<4>> genome_bit (genome_bit_conversion(genome_sequence));
+	vector<bitset<4>> pam_bit = pam_bit_conversion(pam_sequence);
+	vector<bitset<4>> pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
+	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
 
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
