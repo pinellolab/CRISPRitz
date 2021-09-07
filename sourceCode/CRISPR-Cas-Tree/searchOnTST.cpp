@@ -960,7 +960,7 @@ int main(int argc, char **argv)
 		{
 			reverse(iguide.begin(), iguide.end());
 		}
-		char *temp_char_guide = new char(strlen(iguide) + 1);
+		char *temp_char_guide = new char(iguide.length() + 1);
 		strcpy(temp_char_guide, iguide);
 		guideRNA.push_back(temp_char_guide);
 		// use of pw
