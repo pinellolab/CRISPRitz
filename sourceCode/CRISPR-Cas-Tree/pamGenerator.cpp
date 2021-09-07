@@ -26,71 +26,71 @@ using namespace std;
 vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal fasta alla versione bit
 {
 	vector<bitset<4>> genomeBit;
-	genomeBit.clear();
-	genomeBit.resize(genome.length());
+	// genomeBit.clear();
+	// genomeBit.resize(genome.length());
 
-#pragma omp parallel for schedule(static)
+	// #pragma omp parallel for schedule(static)
 	for (int i = 0; i < genome.length(); ++i)
 	{
 		if (genome[i] == 'A')
 		{
-			genomeBit[i] = bitset<4>(string("0001"));
+			genomeBit.pushback(bitset<4>(string("0001")));
 		}
 		else if (genome[i] == 'C')
 		{
-			genomeBit[i] = bitset<4>(string("0010"));
+			genomeBit.pushback(bitset<4>(string("0010")));
 		}
 		else if (genome[i] == 'G')
 		{
-			genomeBit[i] = bitset<4>(string("0100"));
+			genomeBit.pushback(bitset<4>(string("0100")));
 		}
 		else if (genome[i] == 'T')
 		{
-			genomeBit[i] = bitset<4>(string("1000"));
+			genomeBit.pushback(bitset<4>(string("1000")));
 		}
 		else if (genome[i] == 'N')
 		{
-			genomeBit[i] = bitset<4>(string("0000"));
+			genomeBit.pushback(bitset<4>(string("0000")));
 		}
 		else if (genome[i] == 'R')
 		{
-			genomeBit[i] = bitset<4>(string("0101"));
+			genomeBit.pushback(bitset<4>(string("0101")));
 		}
 		else if (genome[i] == 'Y')
 		{
-			genomeBit[i] = bitset<4>(string("1010"));
+			genomeBit.pushback(bitset<4>(string("1010")));
 		}
 		else if (genome[i] == 'S')
 		{
-			genomeBit[i] = bitset<4>(string("0110"));
+			genomeBit.pushback(bitset<4>(string("0110")));
 		}
 		else if (genome[i] == 'W')
 		{
-			genomeBit[i] = bitset<4>(string("1001"));
+			genomeBit.pushback(bitset<4>(string("1001")));
 		}
 		else if (genome[i] == 'K')
 		{
-			genomeBit[i] = bitset<4>(string("1100"));
+			genomeBit.pushback(bitset<4>(string("1100")));
 		}
 		else if (genome[i] == 'M')
 		{
-			genomeBit[i] = bitset<4>(string("0011"));
+			genomeBit.pushback(bitset<4>(string("0011")));
 		}
 		else if (genome[i] == 'B')
 		{
-			genomeBit[i] = bitset<4>(string("1110"));
+			genomeBit.pushback(bitset<4>(string("1110")));
 		}
 		else if (genome[i] == 'D')
 		{
-			genomeBit[i] = bitset<4>(string("1101"));
+			genomeBit.pushback(bitset<4>(string("1101")=);
 		}
 		else if (genome[i] == 'H')
 		{
-			genomeBit[i] = bitset<4>(string("1011"));
+			genomeBit.pushback(bitset<4>(string("1011")));
 		}
 		else if (genome[i] == 'V')
 		{
-			genomeBit[i] = bitset<4>(string("0111"));
+			genomeBit.pushback(bitset<4>(string("0111")));
 		}
 	}
 	return genomeBit;
