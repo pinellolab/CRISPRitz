@@ -26,8 +26,6 @@ using namespace std;
 vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal fasta alla versione bit
 {
 	vector<bitset<4>> genomeBit;
-	// genomeBit.clear();
-	// genomeBit.reserve(genome.length());
 
 	// #pragma omp parallel for schedule(static)
 	for (int i = 0; i < genome.length(); ++i)
@@ -99,8 +97,6 @@ vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal 
 vector<bitset<4>> pam_bit_conversion(string PAM) //converto la pam in input da nt alla versione bit
 {
 	vector<bitset<4>> pam_bit;
-	// pam_bit.clear();
-	// pam_bit.resize(PAM.length());
 
 	// #pragma omp parallel for schedule(static)
 	for (int i = 0; i < PAM.length(); ++i)
@@ -320,9 +316,10 @@ string reversenuc(string pam)
 vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges, int max_mismatches)
 {
 	vector<int> indices; //to save indices for TST extraction
-	vector<bitset<4>> pam_bit = pam_bit_conversion(pam_sequence);
-	vector<bitset<4>> pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
-	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
+	vector<bitset<4>> pam_bit, pam_bit_reverse, genome_bit;
+	pam_bit = pam_bit_conversion(pam_sequence);
+	pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
+	genome_bit = genome_bit_conversion(genome_sequence);
 
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
