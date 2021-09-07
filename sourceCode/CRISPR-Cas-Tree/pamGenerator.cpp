@@ -23,9 +23,9 @@ using namespace std;
 
 // #define char NUCLEOTIDE[4] = {'A', 'C', 'G', 'T'}
 
-vector<bitset<4>> &genome_bit_conversion(string genome, vector<bitset<4>> &genomeBit) //converto il genoma dal fasta alla versione bit
+vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal fasta alla versione bit
 {
-	// vector<bitset<4>> genomeBit;
+	vector<bitset<4>> genomeBit;
 
 	// #pragma omp parallel for schedule(static)
 	for (int i = 0; i < genome.length(); ++i)
@@ -318,9 +318,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 	vector<int> indices; //to save indices for TST extraction
 	vector<bitset<4>> pam_bit = pam_bit_conversion(pam_sequence);
 	vector<bitset<4>> pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
-	vector<bitset<4>> temp_genome_bit;
-	vector<bitset<4>> genome_bit;
-	genome_bit = genome_bit_conversion(genome_sequence, temp_genome_bit);
+	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
 
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
