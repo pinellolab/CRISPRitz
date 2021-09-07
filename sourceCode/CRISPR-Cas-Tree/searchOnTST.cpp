@@ -990,7 +990,7 @@ int main(int argc, char **argv)
 		vector<bitset<4>> tmp(pamlen - pamlimit);
 		for (int j = 0; j < (pamlen - pamlimit); j++)
 		{
-			tmp[j] = bitset<4>(convertCharToBitset(guideRNA[i][j].c_str()));
+			tmp[j] = bitset<4>(convertCharToBitset(guideRNA[i][j]));
 		}
 		guideRNA_bit.push_back(tmp);
 	}
@@ -1161,7 +1161,7 @@ int main(int argc, char **argv)
 					gi[thr] = 0;
 					guideI[thr] = i;
 
-					nearsearch(guideRNA[i][0].c_str(), &albero_glb[thr][0], 0, mm2, bulDNA2, bulRNA2, true, 0, thr);
+					nearsearch(guideRNA[i], &albero_glb[thr][0], 0, mm2, bulDNA2, bulRNA2, true, 0, thr);
 				}
 
 				if (create_target)
