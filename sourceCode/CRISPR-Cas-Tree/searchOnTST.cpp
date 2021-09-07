@@ -70,8 +70,8 @@ vector<vector<bitset<4>>> targetOfGuide_bit;
 vector<char *> inGuide;
 vector<char *> targetOfGuide;
 
-// vector<char *> guideRNA;				// input guide RNA
-vector<string> guideRNA;				// input guide RNA
+vector<char *> guideRNA; // input guide RNA
+// vector<string> guideRNA;				// input guide RNA
 vector<string> guideRNA_s;				//input guide RNA as strings;
 vector<vector<bitset<4>>> guideRNA_bit; //input guide RNA in bitset
 int len_guide;
@@ -962,7 +962,7 @@ int main(int argc, char **argv)
 			reverse(iguide.begin(), iguide.end());
 		}
 
-		guideRNA.push_back(iguide);
+		// guideRNA.push_back(iguide);
 
 		// char *writable = new char[iguide.size() + 1];
 		// writable[iguide.size()] = '\0'; //terminating zero for char*
@@ -978,9 +978,9 @@ int main(int argc, char **argv)
 		// copy(iguide.begin(), iguide.end(), guideRNA[numGuide]);
 		// // use of pw
 		// delete[] temp_char_guide;
-		// guideRNA.push_back((char *)malloc((pamlen - pamlimit) * sizeof(char)));
-		// copy(iguide.begin(), iguide.end(), guideRNA[numGuide]); // save Guide
-		// guideRNA[numGuide][pamlen - pamlimit + 1] = '\0';
+		guideRNA.push_back((char *)malloc((pamlen - pamlimit) * sizeof(char)));
+		copy(iguide.begin(), iguide.end(), guideRNA[numGuide]); // save Guide
+		guideRNA[numGuide][pamlen - pamlimit + 1] = '\0';
 		numGuide++;
 	}
 
