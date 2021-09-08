@@ -6,9 +6,9 @@ extern int genlen, guidelen, pamlimit, totalguides, threads, inputmissmatch;
 int guidelencorrected;
 extern vector<string> guides;
 extern string genome;
-vector<vector<int>> guideprofiling;							 //vector profile
-vector<vector<vector<vector<int>>>> matrixprofiling;	//vector extended profile
-vector<bitset<4>> genomebit;									 //genome in bit
+vector<vector<int>> guideprofiling;					   //vector profile
+vector<vector<vector<vector<int>>>> matrixprofiling;   //vector extended profile
+vector<bitset<4>> genomebit;						   //genome in bit
 vector<vector<bitset<4>>> guidesbit, reverseguidesbit; //guides and reverseguides in bit
 extern bool pamdirection;
 
@@ -17,7 +17,7 @@ void genomebitconversion() //converto il genoma dal fasta alla versione bit
 	genomebit.clear();
 	genomebit.resize(genlen);
 
-#pragma omp parallel for num_threads(threads) schedule(static)
+	// #pragma omp parallel for num_threads(threads) schedule(static)
 	for (int i = 0; i < genlen; i++)
 	{
 		if (genome[i] == 'A')
@@ -90,7 +90,7 @@ void guidesbitconversion() //converto le guide dal file.txt alla versione bit
 	guidelen = guides[0].size();
 	guidelencorrected = guidelen - pamlimit;
 
-#pragma omp parallel for num_threads(threads) schedule(static)
+	// #pragma omp parallel for num_threads(threads) schedule(static)
 	for (int i = 0; i < totalguides; i++)
 	{
 		guidesbit[i].resize(guidelencorrected);
