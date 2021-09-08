@@ -371,71 +371,69 @@ using namespace std;
 vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal fasta alla versione bit
 {
 	vector<bitset<4>> genomeBit;
-	genomeBit.clear();
-	genomeBit.resize(genome.length());
 
-#pragma omp parallel for schedule(static)
+	// #pragma omp parallel for schedule(static)
 	for (int i = 0; i < genome.length(); ++i)
 	{
 		if (genome[i] == 'A')
 		{
-			genomeBit[i] = bitset<4>(string("0001"));
+			genomeBit.push_back(bitset<4>(string("0001")));
 		}
 		else if (genome[i] == 'C')
 		{
-			genomeBit[i] = bitset<4>(string("0010"));
+			genomeBit.push_back(bitset<4>(string("0010")));
 		}
 		else if (genome[i] == 'G')
 		{
-			genomeBit[i] = bitset<4>(string("0100"));
+			genomeBit.push_back(bitset<4>(string("0100")));
 		}
 		else if (genome[i] == 'T')
 		{
-			genomeBit[i] = bitset<4>(string("1000"));
+			genomeBit.push_back(bitset<4>(string("1000")));
 		}
 		else if (genome[i] == 'N')
 		{
-			genomeBit[i] = bitset<4>(string("0000"));
+			genomeBit.push_back(bitset<4>(string("0000")));
 		}
 		else if (genome[i] == 'R')
 		{
-			genomeBit[i] = bitset<4>(string("0101"));
+			genomeBit.push_back(bitset<4>(string("0101")));
 		}
 		else if (genome[i] == 'Y')
 		{
-			genomeBit[i] = bitset<4>(string("1010"));
+			genomeBit.push_back(bitset<4>(string("1010")));
 		}
 		else if (genome[i] == 'S')
 		{
-			genomeBit[i] = bitset<4>(string("0110"));
+			genomeBit.push_back(bitset<4>(string("0110")));
 		}
 		else if (genome[i] == 'W')
 		{
-			genomeBit[i] = bitset<4>(string("1001"));
+			genomeBit.push_back(bitset<4>(string("1001")));
 		}
 		else if (genome[i] == 'K')
 		{
-			genomeBit[i] = bitset<4>(string("1100"));
+			genomeBit.push_back(bitset<4>(string("1100")));
 		}
 		else if (genome[i] == 'M')
 		{
-			genomeBit[i] = bitset<4>(string("0011"));
+			genomeBit.push_back(bitset<4>(string("0011")));
 		}
 		else if (genome[i] == 'B')
 		{
-			genomeBit[i] = bitset<4>(string("1110"));
+			genomeBit.push_back(bitset<4>(string("1110")));
 		}
 		else if (genome[i] == 'D')
 		{
-			genomeBit[i] = bitset<4>(string("1101"));
+			genomeBit.push_back(bitset<4>(string("1101")));
 		}
 		else if (genome[i] == 'H')
 		{
-			genomeBit[i] = bitset<4>(string("1011"));
+			genomeBit.push_back(bitset<4>(string("1011")));
 		}
 		else if (genome[i] == 'V')
 		{
-			genomeBit[i] = bitset<4>(string("0111"));
+			genomeBit.push_back(bitset<4>(string("0111")));
 		}
 	}
 	return genomeBit;
@@ -444,71 +442,69 @@ vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal 
 vector<bitset<4>> pam_bit_conversion(string PAM) //converto la pam in input da nt alla versione bit
 {
 	vector<bitset<4>> pam_bit;
-	pam_bit.clear();
-	pam_bit.resize(PAM.length());
 
 	// #pragma omp parallel for schedule(static)
 	for (int i = 0; i < PAM.length(); ++i)
 	{
 		if (PAM[i] == 'A')
 		{
-			pam_bit[i] = bitset<4>(string("0001"));
+			pam_bit.push_back(bitset<4>(string("0001")));
 		}
 		else if (PAM[i] == 'C')
 		{
-			pam_bit[i] = bitset<4>(string("0010"));
+			pam_bit.push_back(bitset<4>(string("0010")));
 		}
 		else if (PAM[i] == 'G')
 		{
-			pam_bit[i] = bitset<4>(string("0100"));
+			pam_bit.push_back(bitset<4>(string("0100")));
 		}
 		else if (PAM[i] == 'T')
 		{
-			pam_bit[i] = bitset<4>(string("1000"));
+			pam_bit.push_back(bitset<4>(string("1000")));
 		}
 		else if (PAM[i] == 'N')
 		{
-			pam_bit[i] = bitset<4>(string("1111"));
+			pam_bit.push_back(bitset<4>(string("1111")));
 		}
 		else if (PAM[i] == 'R')
 		{
-			pam_bit[i] = bitset<4>(string("0101"));
+			pam_bit.push_back(bitset<4>(string("0101")));
 		}
 		else if (PAM[i] == 'Y')
 		{
-			pam_bit[i] = bitset<4>(string("1010"));
+			pam_bit.push_back(bitset<4>(string("1010")));
 		}
 		else if (PAM[i] == 'S')
 		{
-			pam_bit[i] = bitset<4>(string("0110"));
+			pam_bit.push_back(bitset<4>(string("0110")));
 		}
 		else if (PAM[i] == 'W')
 		{
-			pam_bit[i] = bitset<4>(string("1001"));
+			pam_bit.push_back(bitset<4>(string("1001")));
 		}
 		else if (PAM[i] == 'K')
 		{
-			pam_bit[i] = bitset<4>(string("1100"));
+			pam_bit.push_back(bitset<4>(string("1100")));
 		}
 		else if (PAM[i] == 'M')
 		{
-			pam_bit[i] = bitset<4>(string("0011"));
+			pam_bit.push_back(bitset<4>(string("0011")));
 		}
 		else if (PAM[i] == 'B')
 		{
-			pam_bit[i] = bitset<4>(string("1110"));
+			pam_bit.push_back(bitset<4>(string("1110")));
 		}
 		else if (PAM[i] == 'D')
 		{
-			pam_bit[i] = bitset<4>(string("1101"));
+			pam_bit.push_back(bitset<4>(string("1101")));
 		}
 		else if (PAM[i] == 'H')
 		{
-			pam_bit[i] = bitset<4>(string("1011"));
+			pam_bit.push_back(bitset<4>(string("1011")));
 		}
 		else if (PAM[i] == 'V')
 		{
-			pam_bit[i] = bitset<4>(string("0111"));
+			pam_bit.push_back(bitset<4>(string("0111")));
 		}
 	}
 	return pam_bit;
@@ -568,7 +564,7 @@ void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence,
 
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
-		for (int nt = 0; nt < genome_sequence.length(); ++nt)
+		for (int nt = 0; nt < genome_sequence.length() - pam_limit; ++nt)
 		{
 			bool found_positive = true;
 			bool found_negative = true;
@@ -608,7 +604,7 @@ void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence,
 	}
 	else //pam al 3' quindi in cima alla sequenza
 	{
-		for (int nt = 0; nt < genome_sequence.length(); ++nt)
+		for (int nt = 0; nt < genome_sequence.length() - pam_len; ++nt)
 		{
 			bool found_positive = true;
 			bool found_negative = true;
