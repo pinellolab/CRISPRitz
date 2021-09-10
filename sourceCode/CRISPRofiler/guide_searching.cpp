@@ -192,11 +192,11 @@ string missmatching(string targetfound, int index, int guidafound, int reverse) 
 					}
 
 					targetfound[pos] = tolower(targetfound[pos]); //lettera minuscola
-					tmp_mismatch++;										 //conto MM totali della guida
+					tmp_mismatch++;								  //conto MM totali della guida
 					if (!pamdirection)
 					{
 						guideprofiling[guidafound][pos]++; //segno un MM in una base della guida nel profilo
-						tmp_mismatch_position[pos] = 5;	 //segno posizione MM
+						tmp_mismatch_position[pos] = 5;	   //segno posizione MM
 					}
 					else
 					{
@@ -384,7 +384,7 @@ string missmatching(string targetfound, int index, int guidafound, int reverse) 
 //execute guide search
 void guide_searching()
 {
-	vector<int> respos, resneg, respos_private, resneg_private;			  //inizializzazione variabili per store indici pam
+	vector<int> respos, resneg, respos_private, resneg_private;			//inizializzazione variabili per store indici pam
 	vector<int> guidepos, guideneg, guidepos_private, guideneg_private; //inizializzaione variabili per store indici guide
 
 	int pampossize = pamindices.size();
@@ -405,6 +405,8 @@ void guide_searching()
 					if ((genomebit[j + pamindices[i]] & guidesbit[guidecount][j]) == 0)
 					{
 						currentmissmatch++;
+						if (genomebit[j + pamindices[i]] == 0)
+							currentmissmatch += 100;
 					}
 				}
 				if (currentmissmatch <= inputmissmatch) //se rimango nella soglia, salvo dati, guida e pam che hanno generato target
@@ -427,6 +429,8 @@ void guide_searching()
 					if ((genomebit[j + pamlimit + pamindicesreverse[i]] & reverseguidesbit[guidecount][j]) == 0)
 					{
 						currentmissmatch++;
+						if (genomebit[j + pamlimit + pamindicesreverse[i]] == 0)
+							currentmissmatch += 100;
 					}
 				}
 				if (currentmissmatch <= inputmissmatch)
@@ -487,7 +491,7 @@ void guide_searching()
 			totalbuf += "\t";
 			totalbuf += to_string(resneg[i]);
 			totalbuf += "\t";
-			totalbuf += to_string(resneg[i]);	//Cluster Position
+			totalbuf += to_string(resneg[i]); //Cluster Position
 			totalbuf += "\t";
 			totalbuf += "-";
 			totalbuf += "\t";
@@ -538,7 +542,7 @@ void guide_searching()
 			totalbuf += "\t";
 			totalbuf += to_string(resneg[i]);
 			totalbuf += "\t";
-			totalbuf += to_string(resneg[i]);		//Cluster Position
+			totalbuf += to_string(resneg[i]); //Cluster Position
 			totalbuf += "\t";
 			totalbuf += "+";
 			totalbuf += "\t";
