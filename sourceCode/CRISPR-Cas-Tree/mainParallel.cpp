@@ -397,15 +397,15 @@ void saveTST(int inizio, int fine, int part)
 			*ppp++;
 			if (!*ppp || k == 2)
 			{
-				if (counter % 3 == 0 && counter != 0)
-					bitNuc <<= 4;
+				//save two nt in each char then reset the char and k (k keep track of how many nt are already saved in the char [0/1])
 				fileTree.put(bitNuc);
 				bitNuc = 0;
 				k = 0;
 			}
 
-			bitNuc <<= 4;
-			// cout << "print PAM char to check dopo (" << *ppp << ")" << endl;
+			if (bitNuc)
+				bitNuc <<= 4; //if bitnuc already has one nt written, shift to write the second one
+			
 		} while (*ppp);
 
 		if (targetOnDNA[i].next)
@@ -498,7 +498,7 @@ int main(int argc, char **argv)
 
 	int pamlen = pam.length(); //length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
 
-	len_guide_used = pamlen - pamlimit;
+	
 	if (!pam_at_start)
 	{
 		pamRNA = pam.substr(pamlen - pamlimit, pamlimit);
@@ -507,6 +507,10 @@ int main(int argc, char **argv)
 	{
 		pamRNA = pam.substr(0, pamlimit); // if pam_at_start is set, then PAM = TTTNNNNNNNNNNNNNNNNNNNNN -4, i select the first 4 chars
 	}
+
+	pamlen=pam.length()*2; //force to input longer sequence, so it's possible to search longer guide without recreating the index
+	// cout<<"pamlen is "<<pamlen<<endl;
+	len_guide_used = pamlen - pamlimit;
 
 	// cout << "arrivo a generate\n";
 	// all_pam = generatePam(pamRNA); // generate a vector of each possible input pam

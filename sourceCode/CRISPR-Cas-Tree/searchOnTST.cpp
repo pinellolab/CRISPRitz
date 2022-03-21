@@ -318,20 +318,24 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 		unsigned char mask = 0;
 		int k = 0;
 
-		// cout << "bit dna " << targetOnDNA[thr][i].guideDNA_bit << endl;
-
+		//read first char of PAM seq before entering the for cycle
 		fileTree.get(in);
 
 		for (int j = pamRNA.size() - 1; j > -1; j--)
 		{
-			if (k == 2)
+			if (k == 2) //when 2, one PAM char was read entirely
 			{
 				fileTree.get(in);
 				k = 0;
 			}
+			
+			//if PAM size is uneven, necessary to shift the last char to read the last nt of PAM seq
+			if (j==0 && (pamRNA.size()%2))
+				in <<= 4;
 
-			mask = in & 0xF0;
-			in <<= 4;
+			//mask to read each time the correct 4bits of the char containing the PAM nt
+			mask = in & 0xF0;//mask with 11110000
+			in <<= 4;//shift to read the correct 4 bits
 
 			switch (mask)
 			{
@@ -341,22 +345,22 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 			case 0x10:
 				targetOnDNA[thr][i].guideDNA[j] = 'A';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("0001");
-				//cout << "A" ;
+				// cout << "A" <<endl;
 				break;
 			case 0x20:
 				targetOnDNA[thr][i].guideDNA[j] = 'C';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("0010");
-				//cout << "C";
+				// cout << "C"<<endl;
 				break;
 			case 0x40:
 				targetOnDNA[thr][i].guideDNA[j] = 'G';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("0100");
-				//cout << "G" ;
+				// cout << "G" <<endl;
 				break;
 			case 0x80:
 				targetOnDNA[thr][i].guideDNA[j] = 'T';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("1000");
-				// cout << "T" ;
+				// cout << "T" <<endl;
 				break;
 			case 0x50: //R
 				targetOnDNA[thr][i].guideDNA[j] = 'R';
@@ -415,7 +419,9 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 			k++;
 		}
 
-		// cout << "pam rna read " << targetOnDNA[thr][i].guideDNA << endl;
+
+		// std::string str(targetOnDNA[thr][i].guideDNA);
+		// cout << "pam rna read " << str << endl;
 
 		fileTree.get(in); // read index of next PAM with same guide
 
