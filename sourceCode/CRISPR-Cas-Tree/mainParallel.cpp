@@ -497,7 +497,7 @@ int main(int argc, char **argv)
 	}
 
 	int pamlen = pam.length(); //length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
-
+	len_guide_used = pamlen - pamlimit;
 	
 	if (!pam_at_start)
 	{
@@ -508,9 +508,10 @@ int main(int argc, char **argv)
 		pamRNA = pam.substr(0, pamlimit); // if pam_at_start is set, then PAM = TTTNNNNNNNNNNNNNNNNNNNNN -4, i select the first 4 chars
 	}
 
-	pamlen=pam.length()*2; //force to input longer sequence, so it's possible to search longer guide without recreating the index
+	//removed to avoid skip near start or near end pam, also incurring in N's PROBLEM MORE OFTEN
+	// pamlen=pam.length()*2; //force to input longer sequence, so it's possible to search longer guide without recreating the index
 	// cout<<"pamlen is "<<pamlen<<endl;
-	len_guide_used = pamlen - pamlimit;
+	
 
 	// cout << "arrivo a generate\n";
 	// all_pam = generatePam(pamRNA); // generate a vector of each possible input pam
