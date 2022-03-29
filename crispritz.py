@@ -46,7 +46,7 @@ def indexGenome():
               "\n<genomeDirectory>: Directory containing a genome in .fa or .fasta format, need to be separated into single chromosome files.",
               "\n<pamFile>: Text file containing the PAM (including a number of Ns equal to the guide length) and a space separated number indicating the length of the PAM sequence",
               "\n-bMax <maxBulges_num>: Number of bulges allowed for the search phase",
-              "\n-th <num_thread>: (Optional) Number of threads to use. Default uses all of the available threads")
+              "\n-th <num_thread>: (Optional) Number of threads to use. Default uses 4 threads")
         sys.exit()
 
     nameGenome = sys.argv[2]								# save name of the genome
@@ -84,11 +84,13 @@ def indexGenome():
     print(TSTgenome, "Indexing generation:")
 
     # read number of threads
-    th = 1000
+    th = 4
     if "-th" in sys.argv[1:]:
         try:
             th = (sys.argv).index("-th") + 1
             th = int(sys.argv[th])
+            if th < 1: #if th number is lower than 1 put to 4
+                th = 4
         except:
             print(
                 "ATTENTION! Check the thread option: -th <th_num> (th_num is an integer)")

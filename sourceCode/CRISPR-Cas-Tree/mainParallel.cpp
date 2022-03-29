@@ -448,26 +448,18 @@ int main(int argc, char **argv)
 	//cout << "Versione di test per pam all'inizio -> DONE" << endl;
 	string line;											  // line of fasta file
 	double start, end, globalstart, globalend, globalpartial; // start and end time, global start and end time
-	vector<string> all_pam;									  // vector of all possible pam RNA
+	// vector<string> all_pam;									  // vector of all possible pam RNA
 	vector<int> pamIndices;									  // vector of target indices of pam RNA on DNA
 	ifstream fasta(argv[1]);								  // input fasta file
 	ifstream pamfile(argv[2]);								  // input pam.txt
 	int par_thr = stoi(argv[3]);							  //thread to use in parallel algorithm
 	int max_bulges = stoi(argv[4]);							  //max allowed bulges
-	int max_mismatches_pam = 0;
+	int max_mismatches_pam = 0; 							  //future user input for PAM mismatches, currently set to zero
 	pam_at_start = false;
 	globalstart = omp_get_wtime(); // start global time
 
-	// if (par_thr > std::thread::hardware_concurrency() || par_thr == 0)
-	// {
-	// 	omp_set_num_threads(std::thread::hardware_concurrency());
-	// }
-	// else
-	// {
-	// 	omp_set_num_threads(par_thr);
-	// }
-	// omp_set_dynamic(0); // Explicitly disable dynamic teams
-	omp_set_num_threads(1);
+	//set parallel threads for gnuparallel algorithms
+	omp_set_num_threads(par_thr);
 
 	// ----------------------- READ INPUT FASTA ---------------------------
 	//Read chromosome name
@@ -480,7 +472,6 @@ int main(int argc, char **argv)
 		chrSeq += line;
 	}
 	__gnu_parallel::transform(chrSeq.begin(), chrSeq.end(), chrSeq.begin(), ::toupper); // parallelized to uppercase
-	//transform(chrSeq.begin(), chrSeq.end(), chrSeq.begin(), ::toupper);
 	end = omp_get_wtime();
 	cout << end - start << "\n";
 
@@ -508,107 +499,10 @@ int main(int argc, char **argv)
 		pamRNA = pam.substr(0, pamlimit); // if pam_at_start is set, then PAM = TTTNNNNNNNNNNNNNNNNNNNNN -4, i select the first 4 chars
 	}
 
-	//removed to avoid skip near start or near end pam, also incurring in N's PROBLEM MORE OFTEN
-	// pamlen=pam.length()*2; //force to input longer sequence, so it's possible to search longer guide without recreating the index
-	// cout<<"pamlen is "<<pamlen<<endl;
-	
-
-	// cout << "arrivo a generate\n";
-	// all_pam = generatePam(pamRNA); // generate a vector of each possible input pam
-	// cout << "faccio generate\n";
-	// make list of all possible pam RNA
-	// int counter = 0;
-	// for (int k=0; k<all_pam.size();k++)
-	// {
-	// 	// cout<<all_pam[k]<<"\n";
-	// 	counter++;
-	// }
-	// cout << "arrivo a list, le pam sono "<<all_pam.size()<<"\n";
-	// string list[all_pam.size()];
-	// vector<string> list(all_pam.size());
-	// string *list = new string[all_pam.size()];
-
-	// cout << "ma che oooooh\n";
-
-	// for (int j = 0; j < all_pam.size(); j++)
-	// {
-	// 	list[j] = all_pam[j];
-	// }
-
 	// ------------------- SEARCH PAM IN THE CHROMOSOME -------------------
-	// cout << "Search PAM:\t";
-	// cout << "arrivo a search\n";
 	start = omp_get_wtime();
-	//devo splittare le pam per evitare crush nel build dell'automa
-	//calcolo i chunk di PAM da cercare
-	//grandezza chunck in toto
-	// int chunckSize = 2000;
-	// double chuncks = ceil((double)all_pam.size()/(double)chunckSize);
-
-	// // cout<<"i chunck sono "<<chuncks<<"\n";
-
-	// int totalSize = all_pam.size();
-
-	// for (size_t kk=0;kk<chuncks;++kk)
-	// {
-	// 	vector<int> tempPamIndices; //vettore tempindici da sommare a indicesPAM
-	// 	tempPamIndices.clear();
-	// 	string *tempList; //array di stringhe con le PAM del chunck corrente
-	// 	int sizeOfChunck; //grandezza chunck per ogni run (chuncksize o quello che rimane di totalsize)
-
-	// 	if (totalSize > chunckSize)
-	// 	{
-	// 		sizeOfChunck = chunckSize;
-	// 		totalSize -= chunckSize;
-	// 	}
-	// 	else
-	// 	{
-	// 		sizeOfChunck = totalSize;
-	// 	}
-
-	// 	tempList = new string[sizeOfChunck];
-
-	// 	for (size_t copyList=0;copyList<(sizeOfChunck/2);++copyList)
-	// 	{
-	// 		if(chuncks>1)
-	// 		{
-	// 			tempList[copyList] = all_pam[(kk*(chunckSize/2))+copyList];
-	// 			tempList[copyList+(sizeOfChunck/2)] = all_pam[(all_pam.size()/2)+(kk*(chunckSize/2))+copyList];
-	// 		}
-	// 		else
-	// 		{
-	// 			tempList[copyList] = all_pam[copyList];
-	// 			tempList[copyList+(sizeOfChunck/2)] = all_pam[copyList+(sizeOfChunck/2)];
-	// 		}
-	// 	}
-
-	// 	// cout<<"le pam per il giro "<< kk <<" sono "<< sizeOfChunck<<endl;
-
-	// 	searchWords(tempPamIndices, tempList, sizeOfChunck, chrSeq, pamlen, pamlimit, pam_at_start, max_bulges);
-
-	// 	pamIndices.insert(pamIndices.end(), tempPamIndices.begin(), tempPamIndices.end());
-	// }
-	// searchWords(pamIndices, list, all_pam.size(), chrSeq, pamlen, pamlimit, pam_at_start, max_bulges);
+	//search pam sequences on the target genome, necessary to extract all putative targets
 	pamIndices = searchPAMonGenome(pamRNA, pamlen, chrSeq, pamlimit, pam_at_start, max_bulges, max_mismatches_pam);
-	// cout << "faccio search\n";
-
-	// cout << "lunghezza degli indices " << pamIndices.size() << endl;
-	//elimino gli indici duplicati dovuti a combinazioni di PAM con lo stesso pattern (IUPAC)
-	// __gnu_parallel::sort(pamIndices.begin(), pamIndices.end());
-	// pamIndices.erase(unique(pamIndices.begin(), pamIndices.end()), pamIndices.end());
-
-	// cout<< "lunghezza del indices post erase " << pamIndices.size()<<endl;
-
-	// for (int check = 0;check<pamIndices.size();++check)
-	// {
-	// 	if (abs(pamIndices[check])>chrSeq.size())
-	// 	{
-	// 		cout << "seq size "<<chrSeq.size()<<endl;
-	// 		cout << "error in index, maggiore di chrseq length"<<endl;
-	// 		cout<<"pamindices "<<pamIndices[check]<<endl;
-	// 	}
-	// }
-	all_pam.clear();
 	end = omp_get_wtime();
 	cout << "Search PAM completed in " << end - start << "\n";
 
@@ -835,21 +729,8 @@ int main(int argc, char **argv)
 	cout << "Sorting:\t";
 	start = omp_get_wtime(); // sorting the strings before inserting into the tree
 
-	// Set the number of thrs for the sorting phase
-	// const auto processor_count = std::thread::hardware_concurrency();
-
-	// if (par_thr == 0){			// the user did not set a thr number, se it to half available (or to 4 if it's not possible to see the available thrs)
-	// 	if (processor_count != 0){
-	// 		par_thr = int(processor_count/2);
-	// 	}else{					//cannot see the number of available thrs
-	// 		par_thr = 4;
-	// 	}
-	// }
-
-	// omp_set_num_threads(par_thr);
-
+	//parallel sort of sequences extracted from genome
 	__gnu_parallel::sort(targetOnDNA.begin(), targetOnDNA.begin() + counter_index, compareFunc);
-	//sort(targetOnDNA.begin(), targetOnDNA.begin() + counter_index, compareFunc);
 
 	end = omp_get_wtime();
 	cout << end - start << "\n";
