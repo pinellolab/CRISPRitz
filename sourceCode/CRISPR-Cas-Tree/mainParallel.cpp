@@ -35,6 +35,7 @@ typedef struct tnode
 typedef struct tleaf
 {
 	int guideIndex;
+	//INSERIRE BITSET CON bitset<#sample> CHE CONTIENE INFO SAMPLES
 	string guideDNA;
 	const char *guideDNA_char;
 	string pamDNA;
