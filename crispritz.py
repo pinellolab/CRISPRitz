@@ -17,6 +17,8 @@ origin_path = os.path.dirname(os.path.realpath(__file__))
 # conda path
 conda_path = "opt/crispritz/"
 
+VERSION="2.6.6"
+
 if '--debug' in sys.argv[1:]:
     #for quick local tests
     corrected_origin_path = origin_path+'/sourceCode/'
@@ -656,12 +658,12 @@ def removeFile(to_remove):
 
 
 def version():
-    print("CRISPRitz v2.5.8")
+    print("CRISPRitz v",VERSION)
 
 
 # HELP FUNCTION
 def callHelp():
-
+    print("version",VERSION)
     print("help:\n",
           "\nALL FASTA FILEs USED BY THE SOFTWARE MUST BE UNZIPPED AND CHROMOSOME SEPARATED, ALL VCFs USED BY THE SOFTWARE MUST BE ZIPPED AND CHROMOSOME SEPARATED",
           "\n",
