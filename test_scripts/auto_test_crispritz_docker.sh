@@ -49,32 +49,32 @@ echo "STARTING THE AUTO TEST SCRIPT"
 echo "THIS SCRIPT WILL NOW TEST ALL THE CRISPRitz FUNCTION TO CHECK THE INSTALLATION"
 echo ""
 echo "TESTING ADD-VARIANTS"
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py add-variants hg38_1000genomeproject_vcf/ hg38_ref/ &> output.redirect.out
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py add-variants hg38_1000genomeproject_vcf/ hg38_ref/ &>output.redirect.out
 echo -e "ADD-VARIANTS \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING INDEX-GENOME"
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py index-genome hg38_ref hg38_ref/ 20bp-NGG-SpCas9.txt -bMax 2 &> output.redirect.out
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py index-genome hg38_ref hg38_ref/ 20bp-NGG-SpCas9.txt -bMax 2 &>output.redirect.out
 echo -e "INDEX-GENOME \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING SEARCH WITH ONLY MISMATCHES"
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38 -mm 4 -t -scores hg38_ref/ &> output.redirect.out
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38 -mm 4 -t -scores hg38_ref/ &>output.redirect.out
 echo -e "SEARCH WITH ONLY MISMATCHES \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING SEARCH WITH MISMATCHES AND BULGES"
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search genome_library/NGG_2_hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38.bulges -index -mm 4 -bDNA 1 -bRNA 1 -t &> output.redirect.out
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py search genome_library/NGG_2_hg38_ref/ 20bp-NGG-SpCas9.txt EMX1.sgRNA.txt emx1.hg38.bulges -index -mm 4 -bDNA 1 -bRNA 1 -t &>output.redirect.out
 echo -e "SEARCH WITH MISMATCHES AND BULGES \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING ANNOTATE-RESULTS"
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py annotate-results emx1.hg38.targets.txt hg38Annotation.bed emx1.hg38 &> output.redirect.out
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py annotate-results emx1.hg38.targets.txt hg38Annotation.bed emx1.hg38 &>output.redirect.out
 echo -e "ANNOTATE-RESULTS \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 
 echo "TESTING GENERATE-REPORT"
-docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -annotation emx1.hg38.Annotation.summary.txt -extprofile emx1.hg38.extended_profile.xls &> output.redirect.out
+docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispritz crispritz.py generate-report GAGTCCGAGCAGAAGAAGAANNN -mm 4 -annotation emx1.hg38.Annotation.summary.txt -extprofile emx1.hg38.extended_profile.xls &>output.redirect.out
 echo -e "GENERATE-REPORT \e[32mOK\e[0m"
 echo "-------------------------------------------------------------------------"
 

@@ -4,3 +4,5 @@
 *.bin
 searchBruteForce
 *.txt
+*.zip
+*.gz
