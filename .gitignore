@@ -5,4 +5,6 @@
 searchBruteForce
 *.txt
 *.zip
+*.pkl
+*.zip
 *.gz
