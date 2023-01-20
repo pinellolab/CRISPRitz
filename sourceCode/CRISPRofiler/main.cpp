@@ -45,7 +45,7 @@ int main(int argc, char **argv)
    {
       nowriting = 'r';
       results.open(resultname);
-      results << "#Bulge_type\tcrRNA\tDNA\tChromosome\tPosition\tCluster Position\tDirection\tMismatches\tBulge_Size\tTotal\n";
+      results << "#Bulge_type\tcrRNA\tDNA\tChromosome\tPosition\tCluster_Position\tDirection\tMismatches\tBulge_Size\tTotal\n";
    }
    else if (argc > 7 && (argv[7] == profilewriting)) // consenso a scrivere i profili (profile+extended_profile)
    {
@@ -60,7 +60,7 @@ int main(int argc, char **argv)
       results.open(resultname);
       profile.open(profilename);
       extentedprofile.open(extendedprofilename);
-      results << "#Bulge_type\tcrRNA\tDNA\tChromosome\tPosition\tCluster Position\tDirection\tMismatches\tBulge_Size\tTotal\n";
+      results << "#Bulge_type\tcrRNA\tDNA\tChromosome\tPosition\tCluster_Position\tDirection\tMismatches\tBulge_Size\tTotal\n";
    }
 
    // reading pam

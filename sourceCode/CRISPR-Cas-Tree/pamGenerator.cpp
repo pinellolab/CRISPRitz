@@ -23,7 +23,7 @@ using namespace std;
 
 // #define char NUCLEOTIDE[4] = {'A', 'C', 'G', 'T'}
 
-vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal fasta alla versione bit
+vector<bitset<4>> genome_bit_conversion(string genome) // converto il genoma dal fasta alla versione bit
 {
 	vector<bitset<4>> genomeBit;
 
@@ -94,7 +94,7 @@ vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal 
 	return genomeBit;
 }
 
-vector<bitset<4>> pam_bit_conversion(string PAM) //converto la pam in input da nt alla versione bit
+vector<bitset<4>> pam_bit_conversion(string PAM) // converto la pam in input da nt alla versione bit
 {
 	vector<bitset<4>> pam_bit;
 
@@ -226,19 +226,19 @@ vector<bitset<4>> pam_bit_conversion(string PAM) //converto la pam in input da n
 /*
 // Given a symbol it return a corresponding nucleotides //OLD
 string switchSymbol(char sym) {
-    if (sym == 'R') return "AG";		//{'A', 'G'};
-    else if (sym == 'Y') return "CT";	//{'C', 'T'};
-    else if (sym == 'S') return "GC";	//{'G', 'C'};
-    else if (sym == 'W') return "AT";	//{'A', 'T'};
-    else if (sym == 'K') return "GT";	//{'G', 'T'};
-    else if (sym == 'M') return "AC";	//{'A', 'C'};
-    else if (sym == 'B') return "CGT";	//{'C', 'G', 'T'};
-    else if (sym == 'D') return "AGT";	//{'A', 'G', 'T'};
-    else if (sym == 'H') return "ACT";	//{'A', 'C', 'T'};
-    else if (sym == 'V') return "ACG";	//{'A', 'C', 'G'};
-    else if (sym == 'N') return "ACGT";	//{'A', 'C', 'G', 'T'};
+	if (sym == 'R') return "AG";		//{'A', 'G'};
+	else if (sym == 'Y') return "CT";	//{'C', 'T'};
+	else if (sym == 'S') return "GC";	//{'G', 'C'};
+	else if (sym == 'W') return "AT";	//{'A', 'T'};
+	else if (sym == 'K') return "GT";	//{'G', 'T'};
+	else if (sym == 'M') return "AC";	//{'A', 'C'};
+	else if (sym == 'B') return "CGT";	//{'C', 'G', 'T'};
+	else if (sym == 'D') return "AGT";	//{'A', 'G', 'T'};
+	else if (sym == 'H') return "ACT";	//{'A', 'C', 'T'};
+	else if (sym == 'V') return "ACG";	//{'A', 'C', 'G'};
+	else if (sym == 'N') return "ACGT";	//{'A', 'C', 'G', 'T'};
 	string str(1, sym);
-    return str;
+	return str;
 }
 */
 // Given a pam return its reverse
@@ -315,19 +315,12 @@ string reversenuc(string pam)
 
 vector<int> searchPAMonGenome(string pam_sequence, int len_guide, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges, int max_mismatches)
 {
-	vector<int> indices; //to save indices for TST extraction
+	vector<int> indices; // to save indices for TST extraction
 	vector<bitset<4>> pam_bit = pam_bit_conversion(pam_sequence);
 	vector<bitset<4>> pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
 	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
 
-	string pam_position="5'";
-	if (pam_at_start)
-	{
-		pam_position="3'";
-	}
-	cout<<"PAM sequence is "<<pam_sequence<<" at "<<pam_position<<endl;
-
-	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
+	if (!pam_at_start) // pam al 5' quindi in fondo alla sequenza
 	{
 		for (int nt = 0; nt < genome_sequence.length() - pam_limit; nt++)
 		{
@@ -356,23 +349,23 @@ vector<int> searchPAMonGenome(string pam_sequence, int len_guide, string genome_
 			}
 			if (found_positive)
 			{
-				int start_position=nt-(len_guide+max_bulges);
-				if (start_position>=0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
+				int start_position = nt - (len_guide + max_bulges);
+				if (start_position >= 0) // save the pam position only if possible for a guide to attach that position(avoid out of bound)
 				{
 					indices.push_back(start_position);
 				}
 			}
 			if (found_negative)
 			{
-				int end_position=nt+(pam_limit-1)+len_guide+max_bulges;
-				if (end_position<=genome_sequence.length()) //same as for positive pam(out of bound problem)
+				int end_position = nt + (pam_limit - 1) + len_guide + max_bulges;
+				if (end_position <= genome_sequence.length()) // same as for positive pam(out of bound problem)
 				{
 					indices.push_back(-nt);
 				}
 			}
 		}
 	}
-	else //pam al 3' quindi in cima alla sequenza
+	else // pam al 3' quindi in cima alla sequenza
 	{
 		for (int nt = 0; nt < genome_sequence.length() - pam_limit; nt++)
 		{
@@ -401,16 +394,16 @@ vector<int> searchPAMonGenome(string pam_sequence, int len_guide, string genome_
 			}
 			if (found_positive)
 			{
-				int end_position=nt+(pam_limit-1)+len_guide+max_bulges;
-				if (end_position<=genome_sequence.length()) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
+				int end_position = nt + (pam_limit - 1) + len_guide + max_bulges;
+				if (end_position <= genome_sequence.length()) // save the pam position only if possible for a guide to attach that position(avoid out of bound)
 				{
 					indices.push_back(-nt);
 				}
 			}
 			if (found_negative)
 			{
-				int start_position=nt-(len_guide+max_bulges);
-				if (start_position>=0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
+				int start_position = nt - (len_guide + max_bulges);
+				if (start_position >= 0) // save the pam position only if possible for a guide to attach that position(avoid out of bound)
 				{
 					indices.push_back(start_position);
 				}

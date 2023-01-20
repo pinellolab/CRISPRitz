@@ -47,9 +47,9 @@ def indexGenome():
               "\n<name_genome>: Name of the genome to create",
               "\n<genomeDirectory>: Directory containing a genome in .fa or .fasta format, need to be separated into single chromosome files.",
               "\n<pamFile>: Text file containing the PAM and a space separated number indicating the length of the PAM sequence (e.g., NGG 3 for 5' or TTTN -4 for 3')",
-              "\n-guide_max_len <guideMaxLen_num>: Max length for any guide to use with this index (default 25bps)",
-              "\n-bMax <maxBulges_num>: Number of bulges allowed for the search phase (default 2)",
-              "\n-th <num_thread>: (Optional) Number of threads to use. Default uses 1 thread")
+              "\n-guide_max_len <guideMaxLen_num>: Max length for any guide to use with this index (default 25bps max guide length)",
+              "\n-bMax <maxBulges_num>: Number of bulges allowed for the search phase (default 2 max bulges)",
+              "\n-th <num_thread>: (Optional) Number of threads to use. (default 1 thread")
         sys.exit()
 
     nameGenome = sys.argv[2]								# save name of the genome

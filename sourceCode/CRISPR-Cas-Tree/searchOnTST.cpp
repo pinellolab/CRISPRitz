@@ -25,7 +25,7 @@ using namespace std;
  * 	-Patched PAM at beginning
  * 	-Saving results every 50 guides: ACTIVE
  * 	-Added column Cluster Position
- * 
+ *
  * Note: all databases created before 25/10/2019 are missing the length of the guide in the .bin file. This search is not compatible.
  * To avoid this issue, comment the line
  * fileTree.read((char *)&offset_guide_len, sizeof(int));
@@ -63,7 +63,7 @@ string pamRNA;
 vector<vector<Tnode>> albero_glb;
 vector<int> guideI;
 vector<int> ti, gi;
-//vector<Tleaf *> targetOnDNA;
+// vector<Tleaf *> targetOnDNA;
 vector<vector<Tleaf>> targetOnDNA;
 vector<vector<bitset<4>>> inGuide_bit;
 vector<vector<bitset<4>>> targetOfGuide_bit;
@@ -72,27 +72,27 @@ vector<char *> targetOfGuide;
 
 vector<char *> guideRNA; // input guide RNA
 // vector<string> guideRNA;				// input guide RNA
-vector<string> guideRNA_s;				//input guide RNA as strings;
-vector<vector<bitset<4>>> guideRNA_bit; //input guide RNA in bitset
+vector<string> guideRNA_s;				// input guide RNA as strings;
+vector<vector<bitset<4>>> guideRNA_bit; // input guide RNA in bitset
 int len_guide;
 int max_bulges = 0;
 bool pam_at_start;
 
-//Create matrix for profiling //num_thr = number of layers of the matrix. Each thr update his own layer
+// Create matrix for profiling //num_thr = number of layers of the matrix. Each thr update his own layer
 vector<vector<vector<int>>> profiling;
 
-//Create matrix for extended profiling
+// Create matrix for extended profiling
 vector<vector<vector<vector<vector<int>>>>> ext_profiling;
 
-//Create matrix for extended profiling dna and rna
+// Create matrix for extended profiling dna and rna
 vector<vector<vector<vector<int>>>> ext_profiling_dna;
 vector<vector<vector<vector<int>>>> ext_profiling_rna;
 
-//Matrix for dna profiling
+// Matrix for dna profiling
 vector<vector<vector<int>>> profiling_dna_mm;
 vector<vector<vector<int>>> profiling_dna;
 
-//Matrix for rna profiling
+// Matrix for rna profiling
 vector<vector<vector<int>>> profiling_rna_mm;
 vector<vector<vector<int>>> profiling_rna;
 
@@ -102,7 +102,7 @@ vector<vector<int>> indices, mismatches, bulgeSize, cluster_position;
 vector<vector<string>> chrName_glb;
 
 /**
- * Function that converts the read character (8 bits) into a IUPAC nucleotide character and a bitset<4> variable. 
+ * Function that converts the read character (8 bits) into a IUPAC nucleotide character and a bitset<4> variable.
  * @param in 8 bits character read from the .bin file
  * @param pairNuc Variable that saves the IUPAC characters converted from the read 8 bits character
  * @param pairNuc_bit Variable that saves the characters using a 4-bits representation
@@ -135,7 +135,7 @@ void readPair(vector<bitset<4>> &pairNuc_bit, char (&pairNuc)[2], char &in)
 		case 0x80:
 			pairNuc[0] = 'T';
 			break;
-		//case 0xF0: pairNuc[0] = 'N'; break;
+		// case 0xF0: pairNuc[0] = 'N'; break;
 		case 0x50:
 			pairNuc[0] = 'R';
 			break;
@@ -186,7 +186,7 @@ void readPair(vector<bitset<4>> &pairNuc_bit, char (&pairNuc)[2], char &in)
 		case 0x8:
 			pairNuc[1] = 'T';
 			break;
-		//case 0xF: pairNuc[1] = 'N'; break;
+		// case 0xF: pairNuc[1] = 'N'; break;
 		case 0x0F:
 			pairNuc[1] = '_';
 			break;
@@ -284,7 +284,7 @@ void deSerialize(vector<Tnode> &albero, ifstream &fileTree, vector<bitset<4>> &p
 	} // go to eqkid
 }
 
-int offset_guide_len; //Number to sum to the position column when i create a tree for a 20 len guide and i search a guide with != 20 len
+int offset_guide_len; // Number to sum to the position column when i create a tree for a 20 len guide and i search a guide with != 20 len
 
 /**
  * Function that recreates the TST starting from the .bin file. In the first part, the array of leaves is read and the PAM are converted
@@ -295,7 +295,7 @@ int offset_guide_len; //Number to sum to the position column when i create a tre
  * @param numNodes Number of nodes of the TST
  * @param numLeaves Number of leaves of the TST
  */
-void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNodes, int &numLeaves) //era Tleaf *
+void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNodes, int &numLeaves) // era Tleaf *
 {
 	int thr = omp_get_thread_num();
 	fileTree.open(path, ios::in | ios::binary);
@@ -304,7 +304,7 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 	targetOnDNA[thr].resize(numLeaves);
 
 	fileTree.read((char *)&offset_guide_len, sizeof(int));
-	//offset_guide_len = 20;
+	// offset_guide_len = 20;
 	offset_guide_len = offset_guide_len - len_guide;
 
 	char in = 0;
@@ -318,29 +318,29 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 		unsigned char mask = 0;
 		int k = 0;
 
-		//read first char of PAM seq before entering the for cycle
+		// read first char of PAM seq before entering the for cycle
 		fileTree.get(in);
 
 		for (int j = pamRNA.size() - 1; j > -1; j--)
 		{
-			if (k == 2) //when 2, one PAM char was read entirely
+			if (k == 2) // when 2, one PAM char was read entirely
 			{
 				fileTree.get(in);
 				k = 0;
 			}
-			
-			//if PAM size is uneven, necessary to shift the last char to read the last nt of PAM seq
-			if (j==0 && (pamRNA.size()%2))
+
+			// if PAM size is uneven, necessary to shift the last char to read the last nt of PAM seq
+			if (j == 0 && (pamRNA.size() % 2))
 				in <<= 4;
 
-			//mask to read each time the correct 4bits of the char containing the PAM nt
-			mask = in & 0xF0;//mask with 11110000
-			in <<= 4;//shift to read the correct 4 bits
+			// mask to read each time the correct 4bits of the char containing the PAM nt
+			mask = in & 0xF0; // mask with 11110000
+			in <<= 4;		  // shift to read the correct 4 bits
 
 			switch (mask)
 			{
 			case 0x0:
-				//cout << "Zero" ;
+				// cout << "Zero" ;
 				break;
 			case 0x10:
 				targetOnDNA[thr][i].guideDNA[j] = 'A';
@@ -362,55 +362,55 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("1000");
 				// cout << "T" <<endl;
 				break;
-			case 0x50: //R
+			case 0x50: // R
 				targetOnDNA[thr][i].guideDNA[j] = 'R';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("0101");
 				// cout << "R" ;
 				break;
-			case 0xA0: //Y
+			case 0xA0: // Y
 				targetOnDNA[thr][i].guideDNA[j] = 'Y';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("1010");
-				//cout << "Y";
+				// cout << "Y";
 				break;
-			case 0x60: //S
+			case 0x60: // S
 				targetOnDNA[thr][i].guideDNA[j] = 'S';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("0110");
-				//cout << "S" ;
+				// cout << "S" ;
 				break;
-			case 0x90: //W
+			case 0x90: // W
 				targetOnDNA[thr][i].guideDNA[j] = 'W';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("1001");
-				//cout << "W" ;
+				// cout << "W" ;
 				break;
-			case 0xC0: //K
+			case 0xC0: // K
 				targetOnDNA[thr][i].guideDNA[j] = 'K';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("1100");
-				//cout << "K" ;
+				// cout << "K" ;
 				break;
-			case 0x30: //M
+			case 0x30: // M
 				targetOnDNA[thr][i].guideDNA[j] = 'M';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("0011");
-				//cout << "M" ;
+				// cout << "M" ;
 				break;
-			case 0xE0: //B
+			case 0xE0: // B
 				targetOnDNA[thr][i].guideDNA[j] = 'B';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("1110");
-				//cout << "B" ;
+				// cout << "B" ;
 				break;
-			case 0xD0: //D
+			case 0xD0: // D
 				targetOnDNA[thr][i].guideDNA[j] = 'D';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("1101");
-				//cout << "D" ;
+				// cout << "D" ;
 				break;
-			case 0xB0: //H
+			case 0xB0: // H
 				targetOnDNA[thr][i].guideDNA[j] = 'H';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("1011");
-				//cout << "H";
+				// cout << "H";
 				break;
-			case 0x70: //V
+			case 0x70: // V
 				targetOnDNA[thr][i].guideDNA[j] = 'V';
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("0111");
-				//cout << "V";
+				// cout << "V";
 				break;
 			default:
 				cerr << "Error on reading the PAM, input char is not an IUPAC nucleotide: " << mask << endl;
@@ -418,7 +418,6 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 			}
 			k++;
 		}
-
 
 		// std::string str(targetOnDNA[thr][i].guideDNA);
 		// cout << "pam rna read " << str << endl;
@@ -463,14 +462,14 @@ double save_function, save_function_start, save_function_end;
 /**
  * Function that saves the found target (in the DNA). It recursively go into the leaf of the current TST branch where the target is found, and
  * creates the strings for the Guide and the Target. The appropriate array are filled with data about the Target (mismatches, bulges, position in
- * the DNA etc.), for all the occurencies of the Target in the DNA. 
+ * the DNA etc.), for all the occurencies of the Target in the DNA.
  * The detailedOutput functions then provide the profiling of the Guide and Target found.
  * @param p Current node of the TST
  * @param d Number of available mismatches
  * @param bD Number of available DNA bulges
  * @param bR Number of available RNA bulges
  * @param bulType Integer value that represents the type of the bulge: <0 is a RNA bulge, >0 is a DNA bulge, =0 means there are no bulges
- * (" X ") 
+ * (" X ")
  * @param inGuide Array of char that contains the Guide in input and possible bulges
  * @param targetOfGuide Array of char that contains the Target found and possible bulges
  */
@@ -546,7 +545,7 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 				reverse(t_bit.begin(), t_bit.begin() + len_guide + bulDNA - bD);
 			}
 
-			//Check what type of result to create
+			// Check what type of result to create
 			if (create_target)
 			{
 
@@ -582,11 +581,11 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
 					}
 					else if (bulType < 0)
-					{ //RNA case
+					{ // RNA case
 						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len - (bulRNA - bR));
 					}
 					else
-					{ //DNA case
+					{ // DNA case
 						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD));
 					}
 
@@ -600,7 +599,7 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 					}
 				}
 
-				//Profiling and profiling ext
+				// Profiling and profiling ext
 				if (create_profile)
 				{
 					if (bulType == 0)
@@ -618,7 +617,7 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 				}
 			}
 			else
-			{ //no target, only profile
+			{ // no target, only profile
 				if (bulType == 0)
 					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
 				else if (bulType > 0)
@@ -632,7 +631,7 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 		} while (index > -1);
 	}
 	else if (p->eqkid > 0)
-		saveIndices(&albero_glb[omp_get_thread_num()][p->eqkid], d, bD, bR, bulType); //go to eqkid
+		saveIndices(&albero_glb[omp_get_thread_num()][p->eqkid], d, bD, bR, bulType); // go to eqkid
 }
 
 void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
@@ -698,7 +697,7 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 			if (!pam_at_start)
 				reverse(t_bit.begin(), t_bit.begin() + len_guide + bulDNA - bD);
 
-			//Check what type of result to create
+			// Check what type of result to create
 			if (create_target)
 			{
 
@@ -707,13 +706,13 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 				{ // NO BULGE case
 					bulgeType[thr].emplace_back("X");
 					bulgeSize[thr].emplace_back(0);
-					//TODO inserire cluster position
+					// TODO inserire cluster position
 				}
 				else
 				{ // BULGE case
 					bulgeType[thr].emplace_back(bulType < 0 ? "RNA" : "DNA");
 					bulgeSize[thr].emplace_back(bulType < 0 ? bulRNA - bR : bulDNA - bD);
-					//TODO inserire cluster position
+					// TODO inserire cluster position
 				}
 				if (targetOnDNA[thr][index].guideIndex < 0)
 				{ // negative strand
@@ -736,11 +735,11 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
 					}
 					else if (bulType < 0)
-					{ //RNA case
+					{ // RNA case
 						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len - (bulRNA - bR));
 					}
 					else
-					{ //DNA case
+					{ // DNA case
 						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD));
 					}
 
@@ -754,7 +753,7 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 					}
 				}
 
-				//Profiling and profiling ext
+				// Profiling and profiling ext
 				if (create_profile)
 				{
 					if (bulType == 0)
@@ -772,7 +771,7 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 				}
 			}
 			else
-			{ //no target, only profile
+			{ // no target, only profile
 				if (bulType == 0)
 					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
 				else if (bulType > 0)
@@ -786,14 +785,14 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 		} while (index > -1);
 	}
 	else if (p->eqkid > 0)
-		saveIndices2(&albero_glb[omp_get_thread_num()][p->eqkid], d, bD, bR, bulType); //go to eqkid
+		saveIndices2(&albero_glb[omp_get_thread_num()][p->eqkid], d, bD, bR, bulType); // go to eqkid
 }
 
 // CONTROLLARE LA QUESTIONE BULGE CONTEMPORANEI IN DNA ED RNA
 /**
  * Function that, given a Guide in input, searches it inside the TST. At first it goes recursively to the left child, then to the right child
  * and then compares the node character with the current Guide character.
- * 
+ *
  */
 void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool goToLoHi, int bulType,
 				const int thr)
@@ -823,7 +822,7 @@ void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool
 		inGuide_bit[thr][gi[thr]] = guideRNA_bit[guideI[thr]][pos_in_guide];
 		gi[thr]++;
 		if ((guideRNA_bit[guideI[thr]][pos_in_guide] & p->splitchar_bit) != 0)
-		{												//MATCH CASE
+		{												// MATCH CASE
 			targetOfGuide[thr][ti[thr]] = p->splitchar; // save target character uppercase
 			targetOfGuide_bit[thr][ti[thr]] = p->splitchar_bit;
 			ti[thr]++;
@@ -850,7 +849,7 @@ void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool
 		if (bD > 0 && bulType > -1)
 		{													   // BULGE DNA case
 			inGuide[thr][gi[thr] - 1] = '-';				   // update last guide character with '-'
-			inGuide_bit[thr][gi[thr] - 1] = bitset<4>("0000"); //char '-'  //i've alredy inserted a char into inGuide, so it's updated with '-'
+			inGuide_bit[thr][gi[thr] - 1] = bitset<4>("0000"); // char '-'  //i've alredy inserted a char into inGuide, so it's updated with '-'
 			targetOfGuide[thr][ti[thr]] = p->splitchar;		   // save target character uppercase
 			targetOfGuide_bit[thr][ti[thr]] = p->splitchar_bit;
 			ti[thr]++;
@@ -861,8 +860,8 @@ void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool
 		gi[thr]--;
 	}
 	else if (p->eqkid < 1 && pos_in_guide == (len_guide - 1))
-	{ //current node is a leaf
-		//Questa porzione di codice serve (forse) per evitare di avere un bulge a inizio guida, eg -CTAAC...NNN
+	{ // current node is a leaf
+		// Questa porzione di codice serve (forse) per evitare di avere un bulge a inizio guida, eg -CTAAC...NNN
 
 		inGuide[thr][gi[thr]] = *s; // save guide character
 		inGuide_bit[thr][gi[thr]] = guideRNA_bit[guideI[thr]][pos_in_guide];
@@ -879,7 +878,7 @@ void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool
 
 			save_function_start = omp_get_wtime();
 
-			//saveIndices( p, d, bD, bR, bulType);
+			// saveIndices( p, d, bD, bR, bulType);
 			saveIndices2(p, d, bD, bR, bulType);
 
 			save_function_end = omp_get_wtime();
@@ -930,7 +929,7 @@ int main(int argc, char **argv)
 	transform(line.begin(), line.end(), line.begin(), ::toupper); // uppercase of the pam
 	int delimiter = line.find(" ");
 	string pam = line.substr(0, delimiter);
-	int pamlimit = stoi(line.substr(delimiter, line.length() - 1)); //number that identifies the PAM length: NNNNNNNNNNNNNNNNNNNNNGG (3)
+	int pamlimit = stoi(line.substr(delimiter, line.length() - 1)); // number that identifies the PAM length: NNNNNNNNNNNNNNNNNNNNNGG (3)
 	if (pamlimit < 0)
 	{
 		pam_at_start = true;
@@ -938,23 +937,23 @@ int main(int argc, char **argv)
 	}
 
 	// int pamlen = pam.length(); //length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
-	int pamlen = pamlimit; //length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
+	int pamlen = pamlimit; // length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
 	if (pam_at_start)
 	{
-		pamRNA = pam.substr(pamlimit);
+		pamRNA = pam.substr(0, pamlimit);
 	}
 	else
 	{
-		pamRNA = pam.substr(pam.length()-pamlimit);
+		pamRNA = pam.substr(pam.length() - pamlimit);
 	}
 
-	cout<<"pamrna "<<pamRNA<<endl;
+	// cout << "pamrna " << pamRNA << endl;
 
 	globalstart = omp_get_wtime(); // start global time
 	int numGuide;
 	string iguide;
 	vector<int> guide_lens;
-	int max_guide_len=0;
+	int max_guide_len = 0;
 	while (getline(fileGuide, line))
 	{
 		transform(line.begin(), line.end(), line.begin(), ::toupper); // toUpperCase
@@ -965,13 +964,13 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-			iguide = line.substr(0,line.length()-pamlimit);
+			iguide = line.substr(0, line.length() - pamlimit);
 		}
 
-		cout<<"guide "<<iguide<<endl;
+		// cout << "guide " << iguide << endl;
 
-		if (iguide.length()>max_guide_len)	
-			max_guide_len=iguide.length();
+		if (iguide.length() > max_guide_len)
+			max_guide_len = iguide.length();
 
 		guide_lens.push_back(iguide.length());
 
@@ -990,15 +989,15 @@ int main(int argc, char **argv)
 		// free(temp_char_guide);
 	}
 
-	for (int gg=0;gg<guide_lens.size();gg++)
+	for (int gg = 0; gg < guide_lens.size(); gg++)
 	{
-		if (guide_lens[gg]!=max_guide_len)
+		if (guide_lens[gg] != max_guide_len)
 		{
-			cout<<"Guides lengths are not constant, this can cause problems with profile reports and downstream analysis. Please avoid using guides with different lengths."<<endl;
+			cout << "Guides lengths are not constant, this can cause problems with profile reports and downstream analysis. Please avoid using guides with different lengths." << endl;
 		}
 	}
 
-	//Transform loaded guides into bitset
+	// Transform loaded guides into bitset
 	for (int i = 0; i < guideRNA.size(); i++)
 	{
 		vector<bitset<4>> tmp(guide_lens[i]);
@@ -1009,7 +1008,7 @@ int main(int argc, char **argv)
 		guideRNA_bit.push_back(tmp);
 	}
 
-	//Get all files from a directory
+	// Get all files from a directory
 	d = opendir(genome_dir);
 	if (d)
 	{
@@ -1038,14 +1037,14 @@ int main(int argc, char **argv)
 
 	sort(file_stats_vec.begin(), file_stats_vec.end(), compareBySize);
 
-	//file to save results and profiling
+	// file to save results and profiling
 	ofstream fileResults;
 	ofstream fileprofiling;
 	ofstream file_ext_profiling;
 	ofstream file_profiling_dna;
 	ofstream file_profiling_rna;
 	ofstream file_profiling_complete;
-	//Check the type_output
+	// Check the type_output
 	create_target = true;
 	create_profile = true;
 
@@ -1053,8 +1052,8 @@ int main(int argc, char **argv)
 	string profilewriting = "p";
 	if (argv[8] == resultwriting)
 	{
-		fileResults.open(name_result + ".targets.txt", std::ios_base::out); //out
-		fileResults << "#Bulge type\tcrRNA\tDNA\tChromosome\tPosition\tCluster Position\tDirection\tMismatches\tBulge Size\tTotal\n";
+		fileResults.open(name_result + ".targets.txt", std::ios_base::out); // out
+		fileResults << "#Bulge_type\tcrRNA\tDNA\tChromosome\tPosition\tCluster_Position\tDirection\tMismatches\tBulge_Size\tTotal\n";
 		create_profile = false;
 	}
 	else if (argv[8] == profilewriting)
@@ -1068,33 +1067,33 @@ int main(int argc, char **argv)
 	}
 	else
 	{
-		fileResults.open(name_result + ".targets.txt", std::ios_base::out); //out
+		fileResults.open(name_result + ".targets.txt", std::ios_base::out); // out
 		fileprofiling.open(name_result + ".profile.xls", std::ios_base::out);
 		file_ext_profiling.open(name_result + ".extended_profile.xls", std::ios_base::out);
 		file_profiling_dna.open(name_result + ".profile_dna.xls", std::ios_base::out);
 		file_profiling_rna.open(name_result + ".profile_rna.xls", std::ios_base::out);
 		file_profiling_complete.open(name_result + ".profile_complete.xls", std::ios_base::out);
-		fileResults << "#Bulge type\tcrRNA\tDNA\tChromosome\tPosition\tCluster Position\tDirection\tMismatches\tBulge Size\tTotal\n";
+		fileResults << "#Bulge_type\tcrRNA\tDNA\tChromosome\tPosition\tCluster_Position\tDirection\tMismatches\tBulge_Size\tTotal\n";
 	}
 
-	//Resize matrix for profiling //num_thr = number of layers of the matrix. Each thr update his own layer
+	// Resize matrix for profiling //num_thr = number of layers of the matrix. Each thr update his own layer
 	profiling.resize(max_guide_len + mm + 1, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
-	//en = guide length (BP cells), mm = number mismatches allowed (1mm, 2mm ... cells), +1 = cell for 0 mm
+	// en = guide length (BP cells), mm = number mismatches allowed (1mm, 2mm ... cells), +1 = cell for 0 mm
 
-	//Create matrix for extended profiling
+	// Create matrix for extended profiling
 	ext_profiling.resize(numGuide, vector<vector<vector<vector<int>>>>(mm + 1, vector<vector<vector<int>>>(4, vector<vector<int>>(max_guide_len, vector<int>(num_thr, 0)))));
-	//1 dim = id of guide, 2 dim = select matrix with an x number of mms in the target, 3 dim = select nucleotide (acgt), 4 dim = select position
+	// 1 dim = id of guide, 2 dim = select matrix with an x number of mms in the target, 3 dim = select nucleotide (acgt), 4 dim = select position
 
-	//Resize matrix for extended profiling dna and rna
+	// Resize matrix for extended profiling dna and rna
 	ext_profiling_dna.resize(numGuide, vector<vector<vector<int>>>(mm + 1, vector<vector<int>>(max_guide_len, vector<int>(num_thr, 0))));
 	ext_profiling_rna.resize(numGuide, vector<vector<vector<int>>>(mm + 1, vector<vector<int>>(max_guide_len, vector<int>(num_thr, 0))));
 
-	//Matrix for dna profiling
+	// Matrix for dna profiling
 	profiling_dna_mm.resize(max_guide_len + bulDNA + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
 	profiling_dna.resize(max_guide_len + bulDNA + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
-	//additional mm + 1 is for the column (x mismatches, 1 bulge -- x mismatches, 2 bulge)
+	// additional mm + 1 is for the column (x mismatches, 1 bulge -- x mismatches, 2 bulge)
 
-	//Matrix for rna profiling
+	// Matrix for rna profiling
 	profiling_rna_mm.resize(max_guide_len + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
 	profiling_rna.resize(max_guide_len + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
 
@@ -1130,8 +1129,8 @@ int main(int argc, char **argv)
 	int number_of_trees = file_stats_vec.size();
 	int counter = 0;
 
-	//#PARALLEL SECTION
-	//FOR ALL THE CHR
+	// #PARALLEL SECTION
+	// FOR ALL THE CHR
 #pragma omp parallel private(c_inGuide, c_targetOfGuide, numNodes, numLeaves, file, jk, i) num_threads(num_thr)
 	{
 #pragma omp for schedule(guided) nowait
@@ -1152,10 +1151,10 @@ int main(int argc, char **argv)
 
 			// create tree
 			vector<Tnode> albero;
-			//load tst
+			// load tst
 			loadTST(gen_dir + "/" + file_stats_vec[file].file_name, albero, fileTree, numNodes, numLeaves);
 
-			double guidecut = 50; //50;
+			double guidecut = 50; // 50;
 			double newguide = numGuide;
 			int group_guide = ceil(newguide / guidecut);
 			for (jk = 0; jk < group_guide; jk++)
@@ -1188,7 +1187,7 @@ int main(int argc, char **argv)
 
 				//}   //-> comment/uncomment to deactivate/activate saving every 50 guides
 
-				//Save results
+				// Save results
 
 				if (create_target)
 				{
@@ -1203,19 +1202,19 @@ int main(int argc, char **argv)
 						}
 					}
 
-					bulgeType[thr].clear();		   //bulgeType.resize(num_thr);
-					vecInGuide[thr].clear();	   //vecInGuide.resize(num_thr);
-					vecTargetOfGuide[thr].clear(); //vecTargetOfGuide.resize(num_thr);
-					chrName_glb[thr].clear();	   //chrName_glb.resize(num_thr);
-					indices[thr].clear();		   //indices.resize(num_thr);
+					bulgeType[thr].clear();		   // bulgeType.resize(num_thr);
+					vecInGuide[thr].clear();	   // vecInGuide.resize(num_thr);
+					vecTargetOfGuide[thr].clear(); // vecTargetOfGuide.resize(num_thr);
+					chrName_glb[thr].clear();	   // chrName_glb.resize(num_thr);
+					indices[thr].clear();		   // indices.resize(num_thr);
 					cluster_position[thr].clear();
-					directions[thr].clear(); //directions.resize(num_thr);
-					mismatches[thr].clear(); //mismatches.resize(num_thr);
-					bulgeSize[thr].clear();	 //bulgeSize.resize(num_thr);
+					directions[thr].clear(); // directions.resize(num_thr);
+					mismatches[thr].clear(); // mismatches.resize(num_thr);
+					bulgeSize[thr].clear();	 // bulgeSize.resize(num_thr);
 				}
-			} //uncomment/comment to activate/deactivate saving every 50 guides
+			} // uncomment/comment to activate/deactivate saving every 50 guides
 
-			//Free memory targetOnDNA
+			// Free memory targetOnDNA
 			for (i = 0; i < numLeaves; i++)
 			{
 				delete[] targetOnDNA[thr][i].guideDNA_bit;
@@ -1233,10 +1232,10 @@ int main(int argc, char **argv)
 			}
 		}
 	}
-	//Save profiling results
+	// Save profiling results
 	if (create_profile)
 	{
-		//Cols labels for profiling output file
+		// Cols labels for profiling output file
 		fileprofiling << "GUIDE\t";
 		for (int i = 0; i < len_guide; i++)
 		{
@@ -1250,7 +1249,7 @@ int main(int argc, char **argv)
 		}
 		fileprofiling << "\n";
 
-		//Cols labels for DNA profiling output file
+		// Cols labels for DNA profiling output file
 		file_profiling_dna << "GUIDE\t";
 		for (int i = 0; i < (len_guide); i++) //+bulDNA
 		{
@@ -1267,7 +1266,7 @@ int main(int argc, char **argv)
 		}
 		file_profiling_dna << "\n";
 
-		//Cols labels for RNA profiling output file
+		// Cols labels for RNA profiling output file
 		file_profiling_rna << "GUIDE\t";
 		for (int i = 0; i < (len_guide); i++)
 		{
@@ -1284,7 +1283,7 @@ int main(int argc, char **argv)
 		}
 		file_profiling_rna << "\n";
 
-		//Cols label for file_profiling_complete
+		// Cols label for file_profiling_complete
 		file_profiling_complete << "GUIDE\t";
 		for (int i = 0; i < (len_guide); i++)
 		{
