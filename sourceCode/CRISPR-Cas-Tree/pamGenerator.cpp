@@ -320,7 +320,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int len_guide, string genome_
 	vector<bitset<4>> pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
 	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
 
-	if (!pam_at_start) // pam al 5' quindi in fondo alla sequenza
+	if (!pam_at_start) // pam al 3' quindi in fondo alla sequenza
 	{
 		for (int nt = 0; nt < genome_sequence.length() - pam_limit; nt++)
 		{
@@ -365,7 +365,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int len_guide, string genome_
 			}
 		}
 	}
-	else // pam al 3' quindi in cima alla sequenza
+	else // pam al 5' quindi in cima alla sequenza
 	{
 		for (int nt = 0; nt < genome_sequence.length() - pam_limit; nt++)
 		{

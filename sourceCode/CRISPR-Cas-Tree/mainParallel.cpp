@@ -501,10 +501,10 @@ int main(int argc, char **argv)
 		pamRNA = pam.substr(pam.length() - pamlimit);
 	}
 
-	string pam_position = "5'";
+	string pam_position = "3'";
 	if (pam_at_start)
 	{
-		pam_position = "3'";
+		pam_position = "5'";
 	}
 	cout << "original pam is " << pam << endl;
 	cout << "PAM sequence is " << pamRNA << " at " << pam_position << endl;

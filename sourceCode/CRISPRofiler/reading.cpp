@@ -22,7 +22,7 @@ void reading_pam()
       pam = line.substr(0, space);
       pamlimit = stoi(line.substr(space, line.length() - 1));
 
-      // if pamlimit is negative in the file, pam is at start (3')
+      // if pamlimit is negative in the file, pam is at start (5')
       if (pamlimit < 0)
       {
          pam_at_start = true;
@@ -39,10 +39,10 @@ void reading_pam()
    {
       pam = pam.substr(pam.length() - pamlimit);
    }
-   string pam_position = "5'";
+   string pam_position = "3'";
    if (pam_at_start)
    {
-      pam_position = "3'";
+      pam_position = "5'";
    }
    cout << "PAM sequence is " << pam << " at " << pam_position << endl;
 }
@@ -59,7 +59,7 @@ void reading_guide()
       // Save guide into vector of guides (guide includes PAM with Ns)
       if (pam_at_start)
       {
-         guides.push_back(reversetarget(line)); // reverse-complement the guide if PAM is at start (3')
+         guides.push_back(reversetarget(line)); // reverse-complement the guide if PAM is at start (5')
       }
       else
       {
