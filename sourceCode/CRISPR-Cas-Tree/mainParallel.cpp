@@ -488,22 +488,24 @@ int main(int argc, char **argv)
 		pamlimit = pamlimit * -1;
 	}
 
-	int pamlen = pam.length(); //length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
-	len_guide_used = pamlen - pamlimit;
-	
-	if (!pam_at_start)
+	// int pamlen = pam.length(); //length of the total PAM: NGG is 3 (pamlimit is now equal to pamlen)
+	int pamlen = pamlimit; //length of the total PAM: NGG is 3 (pamlimit is now equal to pamlen)
+	len_guide_used = stoi(argv[5]); //allow up to argv[5]bps for guides
+
+	if (pam_at_start)
 	{
-		pamRNA = pam.substr(pamlen - pamlimit, pamlimit);
+		pamRNA=pam.substr(pamlimit);
 	}
 	else
 	{
-		pamRNA = pam.substr(0, pamlimit); // if pam_at_start is set, then PAM = TTTNNNNNNNNNNNNNNNNNNNNN -4, i select the first 4 chars
+		pamRNA=pam.substr(pam.length()-pamlimit);
 	}
 
 	// ------------------- SEARCH PAM IN THE CHROMOSOME -------------------
 	start = omp_get_wtime();
 	//search pam sequences on the target genome, necessary to extract all putative targets
-	pamIndices = searchPAMonGenome(pamRNA, pamlen, chrSeq, pamlimit, pam_at_start, max_bulges, max_mismatches_pam);
+	// pamIndices = searchPAMonGenome(pamRNA, pamlen, chrSeq, pamlimit, pam_at_start, max_bulges, max_mismatches_pam);
+	pamIndices = searchPAMonGenome(pamRNA, len_guide_used, chrSeq, pamlimit, pam_at_start, max_bulges, max_mismatches_pam);
 	end = omp_get_wtime();
 	cout << "Search PAM completed in " << end - start << "\n";
 
@@ -519,12 +521,11 @@ int main(int argc, char **argv)
 	{
 		for (i = 0; i < pamIndices.size(); i++)
 		{
-
 			string target;
 			if (pamIndices[i] < 0) //String found in positive strand (PAM AT BEGINNING case)
 			{
-				target = chrSeq.substr(pamIndices[i] * -1, pamlen + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
-				// cout << "check target " << target << endl;
+				target = chrSeq.substr(pamIndices[i] * -1, len_guide_used + pamlimit + max_bulges); //extract target + pam + max_bulges char for bulges from the chromosome
+				// cout << "check target positive pam at start " << target << endl;
 
 				if (target.find('N') != std::string::npos) //if 'N' is in the target, remove the target
 				{
@@ -538,15 +539,14 @@ int main(int argc, char **argv)
 					tmp_pam_str = target.substr(0, pamRNA.length());
 					reverse(tmp_pam_str.begin(), tmp_pam_str.end());
 
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges), target.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges).c_str(),
-														 tmp_pam_str,
-														 0}; //salvo l'indice del target
+					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length(), len_guide_used + max_bulges), target.substr(pamRNA.length(), len_guide_used + max_bulges).c_str(), tmp_pam_str, 0}; //salvo l'indice del target
+					// cout << "saved target positive pam at start " << target.substr(pamRNA.length(), len_guide_used + max_bulges) << endl;
 				}
 			}
 			else
 			{
-				target = chrSeq.substr((pamIndices[i]), pamlen + max_bulges);
-				// cout << "check target " << target << endl;
+				target = chrSeq.substr((pamIndices[i]), len_guide_used + pamlimit + max_bulges);
+				// cout << "check target negative strand pam at start " << target << endl;
 
 				if (target.find('N') != std::string::npos)
 				{
@@ -614,12 +614,10 @@ int main(int argc, char **argv)
 					tmp_pam_str = tmp.substr(0, pamRNA.length());
 					reverse(tmp_pam_str.begin(), tmp_pam_str.end());
 
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges), tmp.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges).c_str(),
-														 tmp_pam_str,
-														 0}; //salvo l'indice del target
+					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length(), len_guide_used + max_bulges), tmp.substr(pamRNA.length(), len_guide_used + max_bulges).c_str(), tmp_pam_str, 0}; //salvo l'indice del target
+					// cout << "saved target negative strand pam at start " << tmp.substr(pamRNA.length(), len_guide_used + max_bulges) << endl;
 				}
 			}
-
 			counter_index++;
 		}
 	}
@@ -630,8 +628,8 @@ int main(int argc, char **argv)
 			string target;
 			if (pamIndices[i] > 0)
 			{
-				target = chrSeq.substr(pamIndices[i], pamlen + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
-				// cout << "check target pam end positive" << target << endl;
+				target = chrSeq.substr(pamIndices[i], len_guide_used + pamlimit + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
+				// cout << "check target positive pam at end" << target << endl;
 
 				if (target.find('N') != std::string::npos) //if 'N' is in the target, remove the target
 				{
@@ -643,15 +641,15 @@ int main(int argc, char **argv)
 
 					reverse(target.begin(), target.end()); //reverse per aggiungere nell'albero
 
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length()), target.substr(pamRNA.length()).c_str(),
-														 target.substr(0, pamRNA.length()), 0}; //salvo l'indice del target
-																								// cout << "pam saved positive " << targetOnDNA[counter_index].pamDNA << endl;
+					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length()), target.substr(pamRNA.length()).c_str(), target.substr(0, pamRNA.length()), 0}; //salvo l'indice del target
+					// cout << "saved target positive pam at end" << target.substr(pamRNA.length()) << endl;
+
 				}
 			}
 			else
 			{
-				target = chrSeq.substr((pamIndices[i]) * -1, pamlen + max_bulges);
-				// cout << "check target pam end negative" << target << endl;
+				target = chrSeq.substr((pamIndices[i]) * -1, len_guide_used +pamlimit + max_bulges);
+				// cout << "check target negative pam at end" << target << endl;
 
 				if (target.find('N') != std::string::npos)
 				{
@@ -660,7 +658,6 @@ int main(int argc, char **argv)
 				}
 				else
 				{
-
 					string tmp;
 					for (char &c : target) //complemento dei nucleotidi per pam negativa
 						switch (c)
@@ -713,9 +710,8 @@ int main(int argc, char **argv)
 							break;
 						}
 
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length()), tmp.substr(pamRNA.length()).c_str(),
-														 tmp.substr(0, pamRNA.length()), 0};
-					// cout << "pam saved negative " << targetOnDNA[counter_index].pamDNA << endl;
+					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length()), tmp.substr(pamRNA.length()).c_str(), tmp.substr(0, pamRNA.length()), 0};
+					// cout << "saved target negative pam at end" << tmp.substr(pamRNA.length()) << endl;
 				}
 			}
 
@@ -741,7 +737,7 @@ int main(int argc, char **argv)
 
 	for (int jk = 0; jk < group_tst; jk++)
 	{
-		tree = new Tnode[TARG_IN_GROUP * (pamlen)];
+		tree = new Tnode[TARG_IN_GROUP * (len_guide_used+pamlimit)];
 		gruppo = jk + 1;
 		int inizio = jk * TARG_IN_GROUP;
 		int fine = MIN(((jk + 1) * TARG_IN_GROUP), counter_index);

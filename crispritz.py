@@ -46,9 +46,10 @@ def indexGenome():
               "\nEXAMPLE CALL: crispritz.py index-genome name_genome genomeDirectory(FASTA)/ pamFile.txt -bMax 2\n",
               "\n<name_genome>: Name of the genome to create",
               "\n<genomeDirectory>: Directory containing a genome in .fa or .fasta format, need to be separated into single chromosome files.",
-              "\n<pamFile>: Text file containing the PAM (including a number of Ns equal to the guide length) and a space separated number indicating the length of the PAM sequence",
-              "\n-bMax <maxBulges_num>: Number of bulges allowed for the search phase",
-              "\n-th <num_thread>: (Optional) Number of threads to use. Default uses 4 threads")
+              "\n<pamFile>: Text file containing the PAM and a space separated number indicating the length of the PAM sequence (e.g., NGG 3 for 5' or TTTN -4 for 3')",
+              "\n-guide_max_len <guideMaxLen_num>: Max length for any guide to use with this index (default 25bps)",
+              "\n-bMax <maxBulges_num>: Number of bulges allowed for the search phase (default 2)",
+              "\n-th <num_thread>: (Optional) Number of threads to use. Default uses 1 thread")
         sys.exit()
 
     nameGenome = sys.argv[2]								# save name of the genome
@@ -59,17 +60,20 @@ def indexGenome():
     filePAM = open(os.path.realpath(sys.argv[4]), "r")
     listChrs = os.listdir(dirGenome)						# save list of chromosomes
 
-    max_bulges = (sys.argv).index("-bMax") + 1
-    try:
-        max_bulges = sys.argv[max_bulges]
-    except IndexError:
-        print('ERROR! No value provided for the -bMax option, please provide a number')
-        sys.exit()
-    try:
-        int(max_bulges)
-    except ValueError:
-        print('ERROR! The value for the -bMax option is invalid, please provide a number')
-        sys.exit()
+    max_bulges=2
+    if "-bMax" in sys.argv[1:]: 
+        max_bulges = (sys.argv).index("-bMax") + 1
+        try:
+            max_bulges = sys.argv[max_bulges]
+        except IndexError:
+            print('ERROR! No value provided for the -bMax option, please provide a number')
+            sys.exit()
+        try:
+            int(max_bulges)
+        except ValueError:
+            print('ERROR! The value for the -bMax option is invalid, please provide a number')
+            sys.exit()
+        
     # retrive PAM
     PAM = filePAM.read()
     PAM_size = int(PAM.split()[1])
@@ -78,21 +82,30 @@ def indexGenome():
         PAM = PAM.split()[0][0:PAM_size]
     else:
         PAM = PAM.split()[0][-PAM_size:]
+        
+    max_guide_len=25
+    if "-guide_max_len" in sys.argv[1:]:
+        try:
+            max_guide_len = (sys.argv).index("-guide_max_len") + 1
+            max_guide_len = int(sys.argv[max_guide_len])
+            if max_guide_len < 10:
+                max_guide_len = 10
+        except:
+            print("ATTENTION! Max length for guide is not set correctly, please insert a number")
 
-    TSTgenome = PAM + "_" + max_bulges + "_" + \
-        nameGenome					# name of the genome in TST format
+    TSTgenome = PAM + "_" + max_bulges + "_" + str(max_guide_len) + "_" + nameGenome					# name of the genome in TST format
     dirTSTgenome = "./genome_library/" + TSTgenome		# dir of the genome in TST format
 
     print(TSTgenome, "Indexing generation:")
 
     # read number of threads
-    th = 4
+    th = 1
     if "-th" in sys.argv[1:]:
         try:
             th = (sys.argv).index("-th") + 1
             th = int(sys.argv[th])
-            if th < 1: #if th number is lower than 1 put to 4
-                th = 4
+            if th < 1: #if th number is lower than 1 put to 1
+                th = 1
         except:
             print(
                 "ATTENTION! Check the thread option: -th <th_num> (th_num is an integer)")
@@ -110,7 +123,7 @@ def indexGenome():
             continue
         print("Indexing:", f)
         subprocess.run([corrected_origin_path+"buildTST",
-                        str(dirGenome)+"/"+str(f), str(dirPAM), str(th), max_bulges])
+                        str(dirGenome)+"/"+str(f), str(dirPAM), str(th), max_bulges, str(max_guide_len)])
     print("Finish indexing")
     print("Indexing runtime: %s seconds" % (time.time() - start_time))
 
@@ -281,7 +294,7 @@ def searchBruteForce():
             sys.exit()
 
     # read number of mismatches
-    th = 1000
+    th = 1
     if "-th" in sys.argv[1:]:
         try:
             th = (sys.argv).index("-th") + 1
@@ -395,7 +408,7 @@ def annotateResults():
               # Bed file containing annotation
               "\n<annotationsFile>: Text file containing the annotations in .bed format",
               "\n<outputFile>: Name of output file",
-              "\n--change-ID <sampleIDfile> : (Optional) Change the samples, population and superpopulation IDs. DEFAULT: the default IDs are taken from the 1000 genome project (used for Human Genome hg19 and hg38)"
+              "\n-change-ID <sampleIDfile> : (Optional) Change the samples, population and superpopulation IDs. DEFAULT: the default IDs are taken from the 1000 genome project (used for Human Genome hg19 and hg38)"
               )
         sys.exit()
 
@@ -409,8 +422,8 @@ def annotateResults():
 
     sampleIDfile = corrected_origin_path + \
         'Python_Scripts/ProcessData/samples_1000genomeproject.txt'
-    if "--change-ID" in sys.argv[1:]:
-        sampleIDfile = (sys.argv).index("--change-ID") + 1
+    if "-change-ID" in sys.argv[1:]:
+        sampleIDfile = (sys.argv).index("-change-ID") + 1
         try:
             sampleIDfile = os.path.realpath(sys.argv[sampleIDfile])
         except:
@@ -443,7 +456,8 @@ def genomeEnrichment():
         print("WARNING: Too few arguments to function add-variants. Please provide:",
               "\nEXAMPLE CALL: crispritz.py add-variants vcfFilesDirectory/ genomeDirectory/\n",
               "\n\n<vcfFilesDirectory> : Directory containing VCF files, need to be separated into single chromosome files (multi-sample files will be collapsed into one fake individual)",
-              "\n\n<genomeDirectory> : Directory containing a genome in .fa or .fasta format, need to be separated into single chromosome files.")
+              "\n\n<genomeDirectory> : Directory containing a genome in .fa or .fasta format, need to be separated into single chromosome files."
+              "\n-th <num_thread>: (Optional) Number of threads to use. Default uses 1 thread.")
         sys.exit()
 
     dirVCFFiles = os.path.realpath(sys.argv[2])
@@ -455,6 +469,18 @@ def genomeEnrichment():
     checkExistance(dirGenome, 'd')
     listChrs = os.listdir(dirVCFFiles)
     # listChrs = glob.glob(dirVCFFiles+'/*.vcf.gz')
+    
+    th=1
+    if "-th" in sys.argv[1:]:
+        try:
+            th = (sys.argv).index("-th") + 1
+            th = int(sys.argv[th])
+            if th < 1: #if th number is lower than 1 put to 1
+                th = 1
+        except:
+            print(
+                "ATTENTION! Check the thread option: -th <th_num> (th_num is an integer)")
+            sys.exit()
     
     for file in listChrs:
         if file.endswith('.tbi'): #remove .tbi files
@@ -498,15 +524,13 @@ def genomeEnrichment():
     os.chdir("./INDELs_genome/")
 
     memo = open('change_version.txt', 'w')
-
-    memo.write('CRISPRitz indels process is now obsolete and has been removed, if you want to process indels you can download our new tool CRISPRme, https://github.com/samuelecancellieri/CRISPRme'+'\n')
+    memo.write('CRISPRitz indels process is now obsolete and has been removed, if you want to process indels you can download our new tool CRISPRme, https://github.com/pinellolab/CRISPRme'+'\n')
     memo.write('Thank you')
-
     memo.close()
 
     os.chdir('../')
     # os.chdir(dirParsedFiles)
-    pool = multiprocessing.Pool(4)
+    pool = multiprocessing.Pool(th)
 
     print("Variants Extraction and Processing START")
     start_time = time.time()
@@ -521,7 +545,7 @@ def genomeEnrichment():
         #altfile = str(chrom + '.alt')
         altfile = dirVCFFiles+"/"+elem
         genfile = str(dirGenome+'/' + chrom + contains_enr + '.fa')
-        # pool to process 4 vcf file in parallel
+        # pool to process vcf file in parallel (1 process by default)
         pool.apply_async(genomeEnrichment_subprocess_VCF, args=(
             altfile, genfile, dirGenome, doit, dirVCFFiles))
     # wait until all threads are completed than join

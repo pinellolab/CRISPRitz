@@ -8,25 +8,7 @@ int genlen, pamlen, guidelen, pamlimit, totalguides;
 string pam, genome, chrnames;
 vector<string> guides, listPam;
 extern string fastaname, pamname, guidename;
-extern bool pamdirection;
-
-//generate all pam and automata construction
-// void pamGeneration()
-// {
-//    //generate all PAMs
-//    if (!pamdirection)
-//    {
-//       //genero lista comprensiva di PAM
-//       listPam = generatePam(pam.substr(pamlen - pamlimit, pamlimit));
-//    }
-//    else
-//    {
-//       listPam = generatePam(pam.substr(0, pamlimit));
-//    }
-
-//    //generate the automata for PAM search
-//    buildMachine();
-// }
+extern bool pam_at_start;
 
 void reading_pam()
 {
@@ -39,41 +21,54 @@ void reading_pam()
       int space = line.find(" ");
       pam = line.substr(0, space);
       pamlimit = stoi(line.substr(space, line.length() - 1));
+
+      // if pamlimit is negative in the file, pam is at start (3')
       if (pamlimit < 0)
       {
-         pamdirection = 1;
+         pam_at_start = true;
          pamlimit = pamlimit * -1;
       }
-      pamlen = pam.length();
+      pamlen = pamlimit;
    }
-
-   // pamGeneration();
+   // extract PAM in correct position if pamlimit is negative (at start) and reverse-complement it
+   if (pam_at_start)
+   {
+      pam = reversetarget(pam.substr(0, pamlimit));
+   }
+   else
+   {
+      pam = pam.substr(pam.length() - pamlimit);
+   }
+   string pam_position = "5'";
+   if (pam_at_start)
+   {
+      pam_position = "3'";
+   }
+   cout << "PAM sequence is " << pam << " at " << pam_position << endl;
 }
 
 void reading_guide()
 {
    ifstream guidefile(guidename);
    string line;
+   guidelen = 0; // guidelen includes PAM in bps
 
    while (getline(guidefile, line))
    {
-      string guida;
       transform(line.begin(), line.end(), line.begin(), ::toupper);
-      guida = line.substr(0, pamlen);
-
-      if (guida.length() == pamlen)
+      // Save guide into vector of guides (guide includes PAM with Ns)
+      if (pam_at_start)
       {
-         guides.push_back(guida);
+         guides.push_back(reversetarget(line)); // reverse-complement the guide if PAM is at start (3')
       }
       else
       {
-         cerr << "SOME GUIDE IS NOT THE SAME LENGTH AS PAM, PLEASE CHECK" << endl;
-         exit(0);
+         guides.push_back(line);
       }
+      // set guidelen to max length possibile of any guide
+      if (line.length() > guidelen)
+         guidelen = line.length();
    }
-
-   guidelen = guides[0].size();
-   totalguides = guides.size();
    guidesbitconversion();
 }
 
@@ -109,7 +104,7 @@ void reading_chromosomes(char **argv)
    }
    else
    {
-      //reading folder of chromosomes
+      // reading folder of chromosomes
       int i = 0;
       d = opendir(argv[1]);
       if (d)
@@ -128,7 +123,7 @@ void reading_chromosomes(char **argv)
             fileList.push_back(dir->d_name);
          }
          int filenumber = fileList.size();
-         //reading every fasta file in the folder and call analysis for every fasta file
+         // reading every fasta file in the folder and call analysis for every fasta file
          for (int i = 0; i < filenumber; i++)
          {
             fastaname = argv[1];

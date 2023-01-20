@@ -937,30 +937,43 @@ int main(int argc, char **argv)
 		pamlimit = pamlimit * -1;
 	}
 
-	int pamlen = pam.length(); //length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
-	if (!pam_at_start)
+	// int pamlen = pam.length(); //length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
+	int pamlen = pamlimit; //length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
+	if (pam_at_start)
 	{
-		pamRNA = pam.substr(pamlen - pamlimit, pamlimit);
+		pamRNA = pam.substr(pamlimit);
 	}
 	else
 	{
-		pamRNA = pam.substr(0, pamlimit); // if pam_at_start is set, then PAM = TTTNNNNNNNNNNNNNNNNNNNNN -4, i select the first 4 chars
+		pamRNA = pam.substr(pam.length()-pamlimit);
 	}
+
+	cout<<"pamrna "<<pamRNA<<endl;
+
 	globalstart = omp_get_wtime(); // start global time
 	int numGuide;
 	string iguide;
+	vector<int> guide_lens;
+	int max_guide_len=0;
 	while (getline(fileGuide, line))
 	{
 		transform(line.begin(), line.end(), line.begin(), ::toupper); // toUpperCase
 
-		if (!pam_at_start)
+		if (pam_at_start)
 		{
-			iguide = line.substr(0, pamlen - pamlimit); // retrive Guide
+			iguide = line.substr(pamlimit); // retrive Guide
 		}
 		else
 		{
-			iguide = line.substr(pamlimit, pamlen - pamlimit);
+			iguide = line.substr(0,line.length()-pamlimit);
 		}
+
+		cout<<"guide "<<iguide<<endl;
+
+		if (iguide.length()>max_guide_len)	
+			max_guide_len=iguide.length();
+
+		guide_lens.push_back(iguide.length());
 
 		guideRNA_s.push_back(iguide);
 		if (!pam_at_start)
@@ -968,20 +981,28 @@ int main(int argc, char **argv)
 			reverse(iguide.begin(), iguide.end());
 		}
 
-		char *temp_char_guide = (char *)malloc((pamlen - pamlimit) * sizeof(char));
+		char *temp_char_guide = (char *)malloc((iguide.length()) * sizeof(char));
 		// guideRNA.push_back((char *)malloc((pamlen - pamlimit) * sizeof(char)));
 		guideRNA.push_back(temp_char_guide);
 		copy(iguide.begin(), iguide.end(), guideRNA[numGuide]); // save Guide
-		guideRNA[numGuide][(pamlen - pamlimit) + 1] = '\0';
+		guideRNA[numGuide][(iguide.length()) + 1] = '\0';
 		numGuide++;
 		// free(temp_char_guide);
+	}
+
+	for (int gg=0;gg<guide_lens.size();gg++)
+	{
+		if (guide_lens[gg]!=max_guide_len)
+		{
+			cout<<"Guides lengths are not constant, this can cause problems with profile reports and downstream analysis. Please avoid using guides with different lengths."<<endl;
+		}
 	}
 
 	//Transform loaded guides into bitset
 	for (int i = 0; i < guideRNA.size(); i++)
 	{
-		vector<bitset<4>> tmp(pamlen - pamlimit);
-		for (int j = 0; j < (pamlen - pamlimit); j++)
+		vector<bitset<4>> tmp(guide_lens[i]);
+		for (int j = 0; j < guide_lens[i]; j++)
 		{
 			tmp[j] = bitset<4>(convertCharToBitset(guideRNA[i][j]));
 		}
@@ -1057,25 +1078,25 @@ int main(int argc, char **argv)
 	}
 
 	//Resize matrix for profiling //num_thr = number of layers of the matrix. Each thr update his own layer
-	profiling.resize(pamlen - pamlimit + mm + 1, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
+	profiling.resize(max_guide_len + mm + 1, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
 	//en = guide length (BP cells), mm = number mismatches allowed (1mm, 2mm ... cells), +1 = cell for 0 mm
 
 	//Create matrix for extended profiling
-	ext_profiling.resize(numGuide, vector<vector<vector<vector<int>>>>(mm + 1, vector<vector<vector<int>>>(4, vector<vector<int>>(pamlen - pamlimit, vector<int>(num_thr, 0)))));
+	ext_profiling.resize(numGuide, vector<vector<vector<vector<int>>>>(mm + 1, vector<vector<vector<int>>>(4, vector<vector<int>>(max_guide_len, vector<int>(num_thr, 0)))));
 	//1 dim = id of guide, 2 dim = select matrix with an x number of mms in the target, 3 dim = select nucleotide (acgt), 4 dim = select position
 
 	//Resize matrix for extended profiling dna and rna
-	ext_profiling_dna.resize(numGuide, vector<vector<vector<int>>>(mm + 1, vector<vector<int>>(pamlen - pamlimit, vector<int>(num_thr, 0))));
-	ext_profiling_rna.resize(numGuide, vector<vector<vector<int>>>(mm + 1, vector<vector<int>>(pamlen - pamlimit, vector<int>(num_thr, 0))));
+	ext_profiling_dna.resize(numGuide, vector<vector<vector<int>>>(mm + 1, vector<vector<int>>(max_guide_len, vector<int>(num_thr, 0))));
+	ext_profiling_rna.resize(numGuide, vector<vector<vector<int>>>(mm + 1, vector<vector<int>>(max_guide_len, vector<int>(num_thr, 0))));
 
 	//Matrix for dna profiling
-	profiling_dna_mm.resize(pamlen - pamlimit + bulDNA + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
-	profiling_dna.resize(pamlen - pamlimit + bulDNA + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
+	profiling_dna_mm.resize(max_guide_len + bulDNA + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
+	profiling_dna.resize(max_guide_len + bulDNA + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
 	//additional mm + 1 is for the column (x mismatches, 1 bulge -- x mismatches, 2 bulge)
 
 	//Matrix for rna profiling
-	profiling_rna_mm.resize(pamlen - pamlimit + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
-	profiling_rna.resize(pamlen - pamlimit + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
+	profiling_rna_mm.resize(max_guide_len + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
+	profiling_rna.resize(max_guide_len + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
 
 	vecTargetOfGuide.resize(num_thr);
 	vecInGuide.resize(num_thr);
@@ -1093,7 +1114,7 @@ int main(int argc, char **argv)
 	gi.resize(num_thr);
 	inGuide_bit.resize(num_thr);
 	targetOfGuide_bit.resize(num_thr);
-	len_guide = pamlen - pamlimit;
+	len_guide = max_guide_len;
 	inGuide.resize(num_thr);
 	targetOfGuide.resize(num_thr);
 
@@ -1134,7 +1155,7 @@ int main(int argc, char **argv)
 			//load tst
 			loadTST(gen_dir + "/" + file_stats_vec[file].file_name, albero, fileTree, numNodes, numLeaves);
 
-			double guidecut = 200; //50;
+			double guidecut = 50; //50;
 			double newguide = numGuide;
 			int group_guide = ceil(newguide / guidecut);
 			for (jk = 0; jk < group_guide; jk++)

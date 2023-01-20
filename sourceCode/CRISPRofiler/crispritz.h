@@ -30,7 +30,7 @@ string reverse(string pamInput);
 vector<string> getProducts(string s[], int s_size);
 vector<string> generatePam(string pamInput);
 string reversetarget(string targetfound);
-string missmatching(string targetfound,string guidapassata,int guidafound);
+string missmatching(string targetfound, string guidapassata, int guidafound, int reverse);
 void checkguide(int guidaprima);
 void guide_searching();
 void profiler();
