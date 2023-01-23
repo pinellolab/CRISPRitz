@@ -443,7 +443,8 @@ def genomeEnrichment():
         print("WARNING: Too few arguments to function add-variants. Please provide:",
               "\nEXAMPLE CALL: crispritz.py add-variants vcfFilesDirectory/ genomeDirectory/\n",
               "\n\n<vcfFilesDirectory> : Directory containing VCF files, need to be separated into single chromosome files (multi-sample files will be collapsed into one fake individual)",
-              "\n\n<genomeDirectory> : Directory containing a genome in .fa or .fasta format, need to be separated into single chromosome files.")
+              "\n\n<genomeDirectory> : Directory containing a genome in .fa or .fasta format, need to be separated into single chromosome files.",
+              "\n\n-th <num_thread>: (Optional) Number of threads to use. Default uses 1 thread")
         sys.exit()
 
     dirVCFFiles = os.path.realpath(sys.argv[2])
@@ -481,10 +482,16 @@ def genomeEnrichment():
     chr_wihtout_vcf = set([f.split(contains_enr + '.fa')[0]
                            for f in listdir(dirGenome) if isfile(join(dirGenome, f))]) - chr_with_vcf
 
-    # dirParsedFiles = "./parsed_vcf_files/"
-
-    # if not (os.path.isdir(dirParsedFiles)):
-    #     os.makedirs(dirParsedFiles)
+    # read number of mismatches
+    th = 1
+    if "-th" in sys.argv[1:]:
+        try:
+            th = (sys.argv).index("-th") + 1
+            th = int(sys.argv[th])
+        except:
+            print(
+                "ATTENTION! Check the thread option: -th <th_num> (th_num must be an integer)")
+            sys.exit()
 
     dirEnrichedGenome = "./variants_genome/"
     if not (os.path.isdir(dirEnrichedGenome)):
@@ -506,7 +513,7 @@ def genomeEnrichment():
 
     os.chdir('../')
     # os.chdir(dirParsedFiles)
-    pool = multiprocessing.Pool(4)
+    pool = multiprocessing.Pool(th)
 
     print("Variants Extraction and Processing START")
     start_time = time.time()
@@ -521,7 +528,7 @@ def genomeEnrichment():
         #altfile = str(chrom + '.alt')
         altfile = dirVCFFiles+"/"+elem
         genfile = str(dirGenome+'/' + chrom + contains_enr + '.fa')
-        # pool to process 4 vcf file in parallel
+        # pool to process TH vcf file in parallel
         pool.apply_async(genomeEnrichment_subprocess_VCF, args=(
             altfile, genfile, dirGenome, doit, dirVCFFiles))
     # wait until all threads are completed than join
@@ -534,44 +541,6 @@ def genomeEnrichment():
 
     print("Variants Extraction and Processing END")
     print("Runtime: %s seconds" % (time.time() - start_time))
-
-    # os.chdir("../")
-    # listChrs = os.listdir(dirParsedFiles)
-    # dirEnrichedGenome = "./variants_genome/"
-
-    # if not (os.path.isdir(dirEnrichedGenome)):
-    #     os.makedirs(dirEnrichedGenome)
-
-    # os.chdir(dirEnrichedGenome)
-    # if not (os.path.isdir("./SNPs_genome/")):
-    #     os.makedirs("./SNPs_genome/")
-    # if not (os.path.isdir("./INDELs_genome/")):
-    #     os.makedirs("./INDELs_genome/")
-
-    # print("Variants Adding START")
-
-    # start_time = time.time()
-    # for f in listChrs:
-    #     splitf = f.split('.')
-    #     altfile = str('../'+dirParsedFiles+splitf[0]+'.alt')
-    #     genfile = str(dirGenome+'/'+splitf[0] + contains_enr + '.fa')
-    #     if not isfile(genfile) and not isfile(str(dirGenome+'/'+splitf[0] + contains_enr + '.fasta')):
-    #         continue
-    #     print("Adding Variants to:", splitf[0])
-    #     subprocess.run([corrected_origin_path + 'Python_Scripts/Enrichment/enricher.py',
-    #                     altfile, genfile, dirGenome.split('/')[-1]])
-
-    # for f in chr_wihtout_vcf:  # Move chromosomes without vcf to enriched directory and change name adding '.enriched.'
-    #     subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends, './SNPs_genome/' +
-    #                     dirGenome.split('/')[-1] + '_enriched/' + f + '.enriched.' + file_ends])
-    #     # subprocess.run(['cp', dirGenome + '/' + f + contains_enr + '.' + file_ends,
-    #     #                 './INDELs_genome/' + dirGenome.split('/')[-1] + '_enriched/' + f + '.indels.' + file_ends])
-
-    # print("Variants Adding END")
-    # print("Runtime: %s seconds" % (time.time() - start_time))
-
-    # os.chdir("../")
-    # shutil.rmtree(dirParsedFiles) DO NOT REMOVE ALT FILE TO REUSE THEM LATER
 
 
 def generateReport():
