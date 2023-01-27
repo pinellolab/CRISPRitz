@@ -45,7 +45,7 @@ typedef struct tleaf
 #define MAXWORDS 32000000
 #define MAXCHARS (MAXWORDS * 30)
 
-const int TARG_IN_GROUP = 5000000; // number of strings for each TST; Change to have smaller or bigger TSTs
+const int TARG_IN_GROUP = 2000000000; // number of strings for each TST; Change to have smaller or bigger TSTs
 
 Tptr tree;
 int nodeUsed; // number of nodes
@@ -740,9 +740,8 @@ int main(int argc, char **argv)
 	cout << end - start << "\n";
 
 	// Create tree
-	double ONE = 1; // create double ONE to avoid creating multiple trees
 	// int group_tst = ceil(counter_index / (double)TARG_IN_GROUP); // if a tree is too big, divide it into group_tst smaller trees
-	int group_tst = ONE; // if a tree is too big, divide it into group_tst smaller trees
+	int group_tst = 1; // create one single TST per chr
 
 	for (int jk = 0; jk < group_tst; jk++)
 	{
