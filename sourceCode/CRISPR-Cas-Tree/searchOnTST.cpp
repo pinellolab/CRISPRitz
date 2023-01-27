@@ -947,7 +947,7 @@ int main(int argc, char **argv)
 		pamRNA = pam.substr(pam.length() - pamlimit);
 	}
 
-	// cout << "pamrna " << pamRNA << endl;
+	cout << "pamrna " << pamRNA << endl;
 
 	globalstart = omp_get_wtime(); // start global time
 	int numGuide;
