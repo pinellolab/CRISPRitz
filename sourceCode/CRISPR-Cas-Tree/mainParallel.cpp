@@ -742,7 +742,7 @@ int main(int argc, char **argv)
 	// Create tree
 	double ONE = 1; // create double ONE to avoid creating multiple trees
 	// int group_tst = ceil(counter_index / (double)TARG_IN_GROUP); // if a tree is too big, divide it into group_tst smaller trees
-	int group_tst = ceil(counter_index / ONE); // if a tree is too big, divide it into group_tst smaller trees
+	int group_tst = ONE; // if a tree is too big, divide it into group_tst smaller trees
 
 	for (int jk = 0; jk < group_tst; jk++)
 	{
