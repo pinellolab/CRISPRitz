@@ -393,7 +393,8 @@ void guide_searching()
 	//parallel region to find all targets on a selected chromosome
 #pragma omp parallel num_threads(threads) private(respos_private, guidepos_private, resneg_private, guideneg_private)
 	{
-#pragma omp for simd schedule(static) nowait
+// #pragma omp for simd schedule(static) nowait
+#pragma omp for
 		for (int i = 0; i < pampossize; i++) //ciclo sugli indici trovati precendetemente, PAM
 		{
 			for (int guidecount = 0; guidecount < totalguides; guidecount++) //ciclo le guide, su tutti gli indici
@@ -417,7 +418,8 @@ void guide_searching()
 			}
 		}
 
-#pragma omp for simd schedule(static) nowait
+// #pragma omp for simd schedule(static) nowait
+#pragma omp for
 		for (int i = 0; i < pamnegsize; i++)
 		{
 			for (int guidecount = 0; guidecount < totalguides; guidecount++)
