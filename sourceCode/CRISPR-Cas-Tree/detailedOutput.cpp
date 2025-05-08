@@ -15,13 +15,12 @@
  * @param mm: number of mismatches allowed
  * @param profiling: an len_guide + mm + 1 x numGuides matrix for profiling.Cells 0-(len_guide-1) (eg 0 - 19) are for counting positional
  * mms, cell 20 for 0MM, cell 21+ for total string count mms
- * devo farmi passare usando & anche le matrici di salvataggio finale
  * @param ext_profiling: matrix for extended profiling. The first dimension selects the guideI, the second dimension selects
  * the matrix to fill w.r.t. the number of mms in the target, the third dimension select the nucleotide (A,C,G,T) and the 
  * fourth dimension selects the position in which there's the mm
  */
 void detailedOutputFast(int guideI, std::vector<std::bitset<4>> guide_bit, std::vector<std::bitset<4>> target_bit, std::string &g, std::string &t,
-                        int bulType, int mm, int len_guide, std::vector<std::vector<std::vector<int>>> &profiling, std::vector<std::vector<std::vector<std::vector<std::vector<int>>>>> &ext_profiling,
+                        int mm, int len_guide, std::vector<std::vector<std::vector<int>>> &profiling, std::vector<std::vector<std::vector<std::vector<std::vector<int>>>>> &ext_profiling,
                         std::vector<std::string> &vec_guides, std::vector<std::string> &vec_targets, bool pam_at_start)
 {
     // std::cout << "profiling size: " << profiling.size() << std::endl;
@@ -70,7 +69,7 @@ void detailedOutputFast(int guideI, std::vector<std::bitset<4>> guide_bit, std::
 }
 
 void detailedOutputFastBulgeDNA(int guideI, std::vector<std::bitset<4>> guide_bit, std::vector<std::bitset<4>> target_bit, std::string &g, std::string &t,
-                                int bulType, int mm, int max_bulges, int len_guide, int bD, int bulDNA, std::vector<std::vector<std::vector<int>>> &profiling_dna,
+                                int mm, int max_bulges, int len_guide, int bD, int bulDNA, std::vector<std::vector<std::vector<int>>> &profiling_dna,
                                 std::vector<std::vector<std::vector<int>>> &profiling_dna_mm,
                                 std::vector<std::string> &vec_guides, std::vector<std::string> &vec_targets, bool pam_at_start,
                                 std::vector<std::vector<std::vector<std::vector<int>>>> &ext_profiling_dna,
@@ -84,7 +83,6 @@ void detailedOutputFastBulgeDNA(int guideI, std::vector<std::bitset<4>> guide_bi
     std::vector<std::pair<std::bitset<4>, int>> save_mm_pos; //array for the pair (base mm in bit, pos)
     for (int i = 0; i < guide_bit.size(); i++)
     {
-
         if (i < len_guide + bulDNA - bD)
             if ((guide_bit[i] & target_bit[i]) == 0)
             { //mismatch case
@@ -136,7 +134,7 @@ void detailedOutputFastBulgeDNA(int guideI, std::vector<std::bitset<4>> guide_bi
 }
 
 void detailedOutputFastBulgeRNA(int guideI, std::vector<std::bitset<4>> guide_bit, std::vector<std::bitset<4>> target_bit, std::string &g, std::string &t,
-                                int bulType, int mm, int max_bulges, int len_guide, int bD, int bulDNA, std::vector<std::vector<std::vector<int>>> &profiling_rna,
+                                int mm, int max_bulges, int len_guide, int bD, int bulDNA, std::vector<std::vector<std::vector<int>>> &profiling_rna,
                                 std::vector<std::vector<std::vector<int>>> &profiling_rna_mm,
                                 std::vector<std::string> &vec_guides, std::vector<std::string> &vec_targets, bool pam_at_start,
                                 std::vector<std::vector<std::vector<std::vector<int>>>> &ext_profiling_rna,
@@ -194,6 +192,94 @@ void detailedOutputFastBulgeRNA(int guideI, std::vector<std::bitset<4>> guide_bi
     vec_guides.push_back(g);
     vec_targets.push_back(t);
 }
+
+
+void detailedOutputFastBulgeDNARNA(int guideI, std::vector<std::bitset<4>> guide_bit, std::vector<std::bitset<4>> target_bit, std::string &g, std::string &t,
+                                   int mm, int max_bulges, int len_guide, int bD, int bulDNA, std::vector<std::vector<std::vector<int>>> &profiling_dna, std::vector<std::vector<std::vector<int>>> &profiling_rna,
+                                   std::vector<std::vector<std::vector<int>>> &profiling_dna_mm, std::vector<std::vector<std::vector<int>>> &profiling_rna_mm, std::vector<std::string> &vec_guides,
+                                   std::vector<std::string> &vec_targets, bool pam_at_start, std::vector<std::vector<std::vector<std::vector<int>>>> &ext_profiling_dna, std::vector<std::vector<std::vector<std::vector<int>>>> &ext_profiling_rna,
+                                   std::vector<std::vector<std::vector<std::vector<std::vector<int>>>>> &ext_profiling)
+{   
+    
+    int thr = omp_get_thread_num();
+    int mm_inside_string = 0;
+    int bul_dna_inside = 0;
+    int bul_rna_inside = 0;
+
+    std::vector<int> pos_dna_bulges;
+    std::vector<int> pos_rna_bulges;
+    std::vector<std::pair<std::bitset<4>, int>> save_mm_pos;
+
+
+    for (int i = 0; i < guide_bit.size(); i++) {
+        if (i < len_guide + bulDNA - bD) { //avoid overflow to the PAM region
+            if ((guide_bit[i] & target_bit[i]) == 0) {
+                // DNA bulge (guide empty)
+                if (guide_bit[i].none()) {
+                    //int pos = (i >= len_guide + bul_dna_inside + bul_rna_inside) ? i - bul_dna_inside - bul_rna_inside - 1 : i - bul_dna_inside - bul_rna_inside;
+                    int pos = i - bul_rna_inside;
+                    profiling_dna[pos][guideI][thr]++;
+                    pos_dna_bulges.push_back(pos);
+                    bul_dna_inside++;
+                    continue;
+                }
+
+                // RNA bulge (target empty)
+                if (target_bit[i].none()) {
+                    int pos = i - bul_dna_inside;
+                    profiling_rna[pos][guideI][thr]++;
+                    pos_rna_bulges.push_back(pos);
+                    bul_rna_inside++;
+                    continue;
+                }
+
+                // mismatch case
+                int pos = i - bul_dna_inside - bul_rna_inside;
+                mm_inside_string++;
+                profiling_dna_mm[i][guideI][thr]++;
+                profiling_rna_mm[i][guideI][thr]++;
+                save_mm_pos.push_back(std::make_pair(target_bit[i], pos));
+            }
+        }
+    }
+    int total_bulges = bul_dna_inside + bul_rna_inside;
+    //profiling_mm[len_guide + mm_inside_string * max_bulges + (total_bulges - 1)][guideI][thr]++;
+    profiling_dna_mm[len_guide + bulDNA + mm_inside_string * max_bulges + (bul_dna_inside - 1)][guideI][thr]++;
+    profiling_rna_mm[len_guide + mm_inside_string * max_bulges + (bul_rna_inside - 1)][guideI][thr]++;
+
+    for (auto p : pos_dna_bulges) {
+        ext_profiling_dna[guideI][mm_inside_string][p][thr]++;
+    }
+
+    for (auto p : pos_rna_bulges) {
+        ext_profiling_rna[guideI][mm_inside_string][p][thr]++;
+    }
+
+    
+    for (int i = 0; i < save_mm_pos.size(); i++) {
+
+        if (save_mm_pos[i].first[0])
+        
+            ext_profiling[guideI][mm_inside_string][0][save_mm_pos[i].second][thr]++;
+        if (save_mm_pos[i].first[1])
+
+            ext_profiling[guideI][mm_inside_string][1][save_mm_pos[i].second][thr]++;
+
+        if (save_mm_pos[i].first[2])
+
+            ext_profiling[guideI][mm_inside_string][2][save_mm_pos[i].second][thr]++;
+
+        if (save_mm_pos[i].first[3])
+
+            ext_profiling[guideI][mm_inside_string][3][save_mm_pos[i].second][thr]++;
+
+    }
+
+    vec_guides.push_back(g);
+    vec_targets.push_back(t);
+}
+
+
 void saveProfileGuide(std::string guide, int guideI, int mism, int max_bulges, int len_guide, int bulDNA, std::vector<std::vector<std::vector<int>>> &profiling,
                       std::vector<std::vector<std::vector<std::vector<std::vector<int>>>>> &ext_profiling,
                       std::vector<std::vector<std::vector<int>>> &profiling_dna, std::vector<std::vector<std::vector<int>>> &profiling_dna_mm,

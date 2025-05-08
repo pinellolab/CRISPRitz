@@ -469,17 +469,17 @@ double save_function, save_function_start, save_function_end;
  * @param d Number of available mismatches
  * @param bD Number of available DNA bulges
  * @param bR Number of available RNA bulges
- * @param bulType Integer value that represents the type of the bulge: <0 is a RNA bulge, >0 is a DNA bulge, =0 means there are no bulges
+ * @param bulTypeRNA Integer value that represents the type of the bulge: <0 is a RNA bulge, >0 is a DNA bulge, =0 means there are no bulges
  * (" X ") 
  * @param inGuide Array of char that contains the Guide in input and possible bulges
  * @param targetOfGuide Array of char that contains the Target found and possible bulges
  */
-void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
+void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA)
 {
 	if (p->lokid > 0)
-		saveIndices(&albero_glb[omp_get_thread_num()][p->lokid], d, bD, bR, bulType); // go to lokid
+		saveIndices(&albero_glb[omp_get_thread_num()][p->lokid], d, bD, bR, bulTypeRNA, bulTypeDNA); // go to lokid
 	if (p->hikid > 0)
-		saveIndices(&albero_glb[omp_get_thread_num()][p->hikid], d, bD, bR, bulType); // go to hikid
+		saveIndices(&albero_glb[omp_get_thread_num()][p->hikid], d, bD, bR, bulTypeRNA, bulTypeDNA); // go to hikid
 
 	if (p->eqkid < 0)
 	{ // node is a leaf, save index and strand
@@ -515,10 +515,10 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 		do
 		{
 
-			string t(targetOfGuide[thr]);
+			string t(targetOfGuide[thr]);     // take all the string
 			// cout << "t subito assignment " << t << endl;
 
-			t = t.substr(0, len_guide + bulDNA - bD);
+			t = t.substr(0, len_guide + bulDNA - bD); // take a substring of the string 
 			// cout << "t substring " << t << endl;
 
 			if (pam_at_start)
@@ -551,15 +551,22 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 			{
 
 				mismatches[thr].emplace_back(mm - d); // save mismatches
-				if (bulType == 0)
+				if (bulTypeRNA == 0 && bulTypeDNA == 0)
 				{ // NO BULGE case
 					bulgeType[thr].emplace_back("X");
 					bulgeSize[thr].emplace_back(0);
 				}
 				else
 				{ // BULGE case
-					bulgeType[thr].emplace_back(bulType < 0 ? "RNA" : "DNA");
-					bulgeSize[thr].emplace_back(bulType < 0 ? bulRNA - bR : bulDNA - bD);
+					if (bulTypeRNA != 0 && bulTypeDNA != 0){
+						bulgeType[thr].emplace_back("RNA,DNA");
+					}
+					else
+					{
+						bulgeType[thr].emplace_back(bulTypeRNA > 0 ? "RNA" : "DNA");
+					}
+
+					bulgeSize[thr].emplace_back((bulRNA - bR) + (bulDNA - bD));
 				}
 				if (targetOnDNA[thr][index].guideIndex < 0)
 				{ // negative strand
@@ -577,17 +584,21 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 				else
 				{ // strand positive
 					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
-					if (bulType == 0)
+					if (bulTypeRNA == 0 && bulTypeDNA == 0)
 					{ // X case
 						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
 					}
-					else if (bulType < 0)
+					else if (bulTypeRNA > 0 && bulTypeDNA == 0)
 					{ //RNA case
 						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len - (bulRNA - bR));
 					}
-					else
+					else if (bulTypeRNA == 0 && bulTypeDNA > 0)
 					{ //DNA case
 						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD));
+					}
+					else
+					{ //DNA case and RNA case
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD) - (bulRNA - bR));
 					}
 
 					if (pam_at_start)
@@ -603,12 +614,22 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 				//Profiling and profiling ext
 				if (create_profile)
 				{
-					if (bulType == 0)
-						detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
-					else if (bulType > 0)
-						detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
-					else
-						detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
+					if (bulTypeRNA == 0 && bulTypeDNA == 0){
+						printf("\nno bulge\n");
+						detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
+					}
+					else if (bulTypeRNA == 0 && bulTypeDNA > 0){
+						printf("\nbulge DNA\n");
+						detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
+					}
+					else if (bulTypeRNA > 0 && bulTypeDNA == 0){
+						printf("\nbulge RNA\n");
+						detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
+					}
+					else{
+						printf("\nboth RNA and DNA bulges\n");
+						detailedOutputFastBulgeDNARNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_rna, profiling_dna_mm, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling_rna, ext_profiling);
+					}
 				}
 				else
 				{
@@ -618,13 +639,16 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 				}
 			}
 			else
-			{ //no target, only profile
-				if (bulType == 0)
-					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
-				else if (bulType > 0)
-					detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
-				else
-					detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
+			{ //no target, only profile  !!!TO EDIT!!!!
+				if (bulTypeRNA == 0 && bulTypeDNA == 0)
+					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
+				else if (bulTypeRNA == 0 && bulTypeDNA > 0)
+					detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
+				else if (bulTypeRNA > 0 && bulTypeDNA == 0)
+					detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
+				else{
+					detailedOutputFastBulgeDNARNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_rna, profiling_dna_mm, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling_rna, ext_profiling);
+				}
 			}
 
 			index = (targetOnDNA[thr][index].next + 1) * -1;
@@ -632,10 +656,10 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulType)
 		} while (index > -1);
 	}
 	else if (p->eqkid > 0)
-		saveIndices(&albero_glb[omp_get_thread_num()][p->eqkid], d, bD, bR, bulType); //go to eqkid
+		saveIndices(&albero_glb[omp_get_thread_num()][p->eqkid], d, bD, bR, bulTypeRNA, bulTypeDNA); //go to eqkid
 }
 
-void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
+void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA)
 {
 
 	if (p->eqkid < 0)
@@ -703,7 +727,7 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 			{
 
 				mismatches[thr].emplace_back(mm - d); // save mismatches
-				if (bulType == 0)
+				if (bulTypeRNA == 0 && bulTypeDNA == 0)
 				{ // NO BULGE case
 					bulgeType[thr].emplace_back("X");
 					bulgeSize[thr].emplace_back(0);
@@ -711,10 +735,17 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 				}
 				else
 				{ // BULGE case
-					bulgeType[thr].emplace_back(bulType < 0 ? "RNA" : "DNA");
-					bulgeSize[thr].emplace_back(bulType < 0 ? bulRNA - bR : bulDNA - bD);
-					//TODO inserire cluster position
+					if (bulTypeRNA != 0 && bulTypeDNA != 0){
+						bulgeType[thr].emplace_back("RNA,DNA");
+					}
+					else
+					{
+						bulgeType[thr].emplace_back(bulTypeRNA > 0 ? "RNA" : "DNA");
+					}
+
+					bulgeSize[thr].emplace_back((bulRNA - bR) + (bulDNA - bD));
 				}
+
 				if (targetOnDNA[thr][index].guideIndex < 0)
 				{ // negative strand
 					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1);
@@ -731,17 +762,21 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 				else
 				{ // strand positive
 					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
-					if (bulType == 0)
+					if (bulTypeRNA == 0 && bulTypeDNA == 0)
 					{ // X case
 						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
 					}
-					else if (bulType < 0)
+					else if (bulTypeRNA > 0 && bulTypeDNA == 0)
 					{ //RNA case
 						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len - (bulRNA - bR));
 					}
-					else
+					else if (bulTypeRNA == 0 && bulTypeDNA > 0)
 					{ //DNA case
 						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD));
+					}
+					else
+					{ //DNA case and RNA case
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD) - (bulRNA - bR));
 					}
 
 					if (pam_at_start)
@@ -757,12 +792,22 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 				//Profiling and profiling ext
 				if (create_profile)
 				{
-					if (bulType == 0)
-						detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
-					else if (bulType > 0)
-						detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
-					else
-						detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
+					if (bulTypeRNA == 0 && bulTypeDNA == 0){
+						printf("\nno bulge\n");
+						detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
+					}
+					else if (bulTypeRNA == 0 && bulTypeDNA > 0){
+						printf("\nbulge DNA\n");
+						detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
+					}
+					else if (bulTypeRNA > 0 && bulTypeDNA == 0){
+						printf("\nbulge RNA\n");
+						detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
+					}				
+					else{
+						printf("\nboth RNA and DNA bulges\n");
+						detailedOutputFastBulgeDNARNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_rna, profiling_dna_mm, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling_rna, ext_profiling);
+					}
 				}
 				else
 				{
@@ -773,12 +818,15 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 			}
 			else
 			{ //no target, only profile
-				if (bulType == 0)
-					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
-				else if (bulType > 0)
-					detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
-				else
-					detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
+				if (bulTypeRNA == 0 && bulTypeDNA == 0)
+					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
+				else if (bulTypeRNA == 0 && bulTypeDNA > 0)
+					detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
+				else if (bulTypeRNA > 0 && bulTypeDNA == 0)
+					detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
+				else{
+					detailedOutputFastBulgeDNARNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_rna, profiling_dna_mm, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling_rna, ext_profiling);
+				}
 			}
 
 			index = (targetOnDNA[thr][index].next + 1) * -1;
@@ -786,33 +834,32 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulType)
 		} while (index > -1);
 	}
 	else if (p->eqkid > 0)
-		saveIndices2(&albero_glb[omp_get_thread_num()][p->eqkid], d, bD, bR, bulType); //go to eqkid
+		saveIndices2(&albero_glb[omp_get_thread_num()][p->eqkid], d, bD, bR, bulTypeRNA, bulTypeDNA); //go to eqkid
 }
 
-// CONTROLLARE LA QUESTIONE BULGE CONTEMPORANEI IN DNA ED RNA
 /**
  * Function that, given a Guide in input, searches it inside the TST. At first it goes recursively to the left child, then to the right child
  * and then compares the node character with the current Guide character.
  * 
  */
-void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool goToLoHi, int bulType,
+void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool goToLoHi, int bulTypeRNA, int bulTypeDNA,
 				const int thr)
 {
 	if (p->lokid > 0 && goToLoHi && (d > 0 || bD > 0 || bR > 0 || *s < p->splitchar))
 	{ // go to lokid
-		nearsearch(s, &albero_glb[thr][p->lokid], pos_in_guide, d, bD, bR, true, bulType, thr);
+		nearsearch(s, &albero_glb[thr][p->lokid], pos_in_guide, d, bD, bR, true, bulTypeRNA, bulTypeDNA, thr);
 	}
 
 	if (p->hikid > 0 && goToLoHi && (d > 0 || bD > 0 || bR > 0 || *s > p->splitchar))
 	{ // go to hikid
-		nearsearch(s, &albero_glb[thr][p->hikid], pos_in_guide, d, bD, bR, true, bulType, thr);
+		nearsearch(s, &albero_glb[thr][p->hikid], pos_in_guide, d, bD, bR, true, bulTypeRNA, bulTypeDNA, thr);
 	}
 
-	if (ti[thr] == (len_guide + bulDNA - bD))
+	if (ti[thr] == (len_guide + bulDNA - bD) )
 	{
 
 		save_function_start = omp_get_wtime();
-		saveIndices(p, d, bD, bR, bulType);
+		saveIndices(p, d, bD, bR, bulTypeRNA, bulTypeDNA);
 		save_function_end = omp_get_wtime();
 		save_function += save_function_end - save_function_start;
 	}
@@ -820,14 +867,14 @@ void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool
 	{ // go to eqkid
 
 		inGuide[thr][gi[thr]] = *s; // save guide character
-		inGuide_bit[thr][gi[thr]] = guideRNA_bit[guideI[thr]][pos_in_guide];
+		inGuide_bit[thr][gi[thr]] = guideRNA_bit[guideI[thr]][pos_in_guide];  // guideRNA_bit = guideRNA in bitset
 		gi[thr]++;
 		if ((guideRNA_bit[guideI[thr]][pos_in_guide] & p->splitchar_bit) != 0)
 		{												//MATCH CASE
 			targetOfGuide[thr][ti[thr]] = p->splitchar; // save target character uppercase
 			targetOfGuide_bit[thr][ti[thr]] = p->splitchar_bit;
 			ti[thr]++;
-			nearsearch(s + 1, &albero_glb[thr][p->eqkid], pos_in_guide + 1, d, bD, bR, true, bulType, thr);
+			nearsearch(s + 1, &albero_glb[thr][p->eqkid], pos_in_guide + 1, d, bD, bR, true, bulTypeRNA, bulTypeDNA, thr);
 			ti[thr]--;
 		}
 		else if (d > 0)
@@ -835,57 +882,56 @@ void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool
 			targetOfGuide[thr][ti[thr]] = p->splitchar + 32; // save target character lowercase
 			targetOfGuide_bit[thr][ti[thr]] = p->splitchar_bit;
 			ti[thr]++;
-			nearsearch(s + 1, &albero_glb[thr][p->eqkid], pos_in_guide + 1, d - 1, bD, bR, true, bulType, thr);
+			nearsearch(s + 1, &albero_glb[thr][p->eqkid], pos_in_guide + 1, d - 1, bD, bR, true, bulTypeRNA, bulTypeDNA, thr);
 			ti[thr]--;
 		}
 
-		if (bR > 0 && (pos_in_guide + 1) < len_guide && bulType < 1)
+		if (bR > 0)            // bulge in the guide 
 		{														 // BULGE RNA case
 			targetOfGuide[thr][ti[thr]] = '-';					 // update last target character with '-'
 			targetOfGuide_bit[thr][ti[thr]] = bitset<4>("0000"); // char '-'
 			ti[thr]++;
-			nearsearch(s + 1, p, pos_in_guide + 1, d, bD, bR - 1, false, bulType - 1, thr);
+			nearsearch(s + 1, p, pos_in_guide + 1, d, bD, bR - 1, false, bulTypeRNA+1 , bulTypeDNA, thr);
 			ti[thr]--;
 		}
-		if (bD > 0 && bulType > -1)
+		if (bD > 0)
 		{													   // BULGE DNA case
 			inGuide[thr][gi[thr] - 1] = '-';				   // update last guide character with '-'
 			inGuide_bit[thr][gi[thr] - 1] = bitset<4>("0000"); //char '-'  //i've alredy inserted a char into inGuide, so it's updated with '-'
 			targetOfGuide[thr][ti[thr]] = p->splitchar;		   // save target character uppercase
 			targetOfGuide_bit[thr][ti[thr]] = p->splitchar_bit;
 			ti[thr]++;
-			nearsearch(s, &albero_glb[thr][p->eqkid], pos_in_guide, d, bD - 1, bR, true, bulType + 1, thr);
+			nearsearch(s, &albero_glb[thr][p->eqkid], pos_in_guide, d, bD - 1, bR, true, bulTypeRNA, bulTypeDNA+1, thr);
 
 			ti[thr]--;
 		}
 		gi[thr]--;
 	}
-	else if (p->eqkid < 1 && pos_in_guide == (len_guide - 1))
+	else if (p->eqkid < 1 && pos_in_guide == (len_guide - 1)) // 
 	{ //current node is a leaf
-		//Questa porzione di codice serve (forse) per evitare di avere un bulge a inizio guida, eg -CTAAC...NNN
 
 		inGuide[thr][gi[thr]] = *s; // save guide character
 		inGuide_bit[thr][gi[thr]] = guideRNA_bit[guideI[thr]][pos_in_guide];
 		gi[thr]++;
-		targetOfGuide[thr][ti[thr]] = (guideRNA_bit[guideI[thr]][pos_in_guide] & p->splitchar_bit) != 0 ? p->splitchar : p->splitchar + 32;
+		targetOfGuide[thr][ti[thr]] = (guideRNA_bit[guideI[thr]][pos_in_guide] & p->splitchar_bit) != 0 ? p->splitchar : p->splitchar + 32; // check if last char is match or mismatch
 
-		targetOfGuide_bit[thr][ti[thr]] = p->splitchar_bit;
+		targetOfGuide_bit[thr][ti[thr]] = p->splitchar_bit; //
 		ti[thr]++;
 
-		d = (guideRNA_bit[guideI[thr]][pos_in_guide] & p->splitchar_bit) != 0 ? d : d - 1; // update distance
+		d = (guideRNA_bit[guideI[thr]][pos_in_guide] & p->splitchar_bit) != 0 ? d : d - 1; // update distance where d is the number of mismatch
 
-		if (d > -1 && ti[thr] == (len_guide + bulDNA - bD))
+		if (d > -1 && ti[thr] == (len_guide + bulDNA - bD)) // if all the mismatch were used (no more mismatches) and end of the guide
 		{ // save results
 
 			save_function_start = omp_get_wtime();
 
 			//saveIndices( p, d, bD, bR, bulType);
-			saveIndices2(p, d, bD, bR, bulType);
+			saveIndices2(p, d, bD, bR, bulTypeRNA, bulTypeDNA);
 
 			save_function_end = omp_get_wtime();
 			save_function += save_function_end - save_function_start;
 		}
-		d = (guideRNA_bit[guideI[thr]][pos_in_guide] & p->splitchar_bit) != 0 ? d : d + 1;
+		d = (guideRNA_bit[guideI[thr]][pos_in_guide] & p->splitchar_bit) != 0 ? d : d + 1; // traceback 
 		ti[thr]--;
 		gi[thr]--;
 	}
@@ -898,9 +944,7 @@ bool compareBySize(const file_stats_struct &a, file_stats_struct &b)
 
 int main(int argc, char **argv)
 {
-	// cout << "VERSIONE DI TEST PER PAM INIZIO -> done"<< endl;
-	// cout << "VERSIONE DI TEST PER CONTROLLO SALVATAGGIO OGNI 50 GUIDE -> (attiva)"<< endl;
-	// cout << "VERSIONE DI TEST PER AGGIUNTA COLONNA CLUSTER POSITION -> done"  << endl;
+
 	DIR *d;
 	dirent *dir;
 	struct stat file_stats;
@@ -908,6 +952,7 @@ int main(int argc, char **argv)
 	string line;
 	double globalstart, globalend; // start and end time, global start and end time
 
+    
 	char *genome_dir = argv[1];
 	ifstream fileGuide(argv[2]);
 	mm = atoi(argv[3]);
@@ -920,6 +965,7 @@ int main(int argc, char **argv)
 	int num_thr = stoi(num_thr_s);
 	pam_at_start = false;
 
+
 	string max_bulges_string = argv[10];
 	max_bulges = stoi(max_bulges_string);
 	if (omp_get_max_threads() < num_thr)
@@ -930,6 +976,9 @@ int main(int argc, char **argv)
 	transform(line.begin(), line.end(), line.begin(), ::toupper); // uppercase of the pam
 	int delimiter = line.find(" ");
 	string pam = line.substr(0, delimiter);
+    printf("------------------------\n");
+    printf("%s\n", pam.c_str());
+
 	int pamlimit = stoi(line.substr(delimiter, line.length() - 1)); //number that identifies the PAM length: NNNNNNNNNNNNNNNNNNNNNGG (3)
 	if (pamlimit < 0)
 	{
@@ -1029,7 +1078,7 @@ int main(int argc, char **argv)
 	create_profile = true;
 
 	string resultwriting = "r";
-	string profilewriting = "p";
+	string profilewriting = "p";	
 	if (argv[8] == resultwriting)
 	{
 		fileResults.open(name_result + ".targets.txt", std::ios_base::out); //out
@@ -1154,8 +1203,10 @@ int main(int argc, char **argv)
 					gi[thr] = 0;
 					guideI[thr] = i;
 
-					nearsearch(guideRNA[i], &albero_glb[thr][0], 0, mm2, bulDNA2, bulRNA2, true, 0, thr);
+
+					nearsearch(guideRNA[i], &albero_glb[thr][0], 0, mm2, bulDNA2, bulRNA2, true, 0, 0, thr);
 				}
+                printf("SEARCH COMPLETED");
 
 				if (create_target)
 				{
@@ -1171,6 +1222,7 @@ int main(int argc, char **argv)
 
 				if (create_target)
 				{
+                
 
 #pragma omp critical
 					{
@@ -1208,7 +1260,7 @@ int main(int argc, char **argv)
 			++counter;
 #pragma omp critical
 			{
-				cout << "ANALYZING CHROMOSOME " << chrName << " (Total progress: " << fixed << std::setprecision(1) << (100.0 * counter / number_of_trees) << "%)\n";
+				cout << " ANALYZING CHROMOSOME " << chrName << " (Total progress: " << fixed << std::setprecision(1) << (100.0 * counter / number_of_trees) << "%)\n";
 			}
 		}
 	}
