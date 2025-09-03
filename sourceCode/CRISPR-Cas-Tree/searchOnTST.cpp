@@ -1368,7 +1368,7 @@ int main(int argc, char **argv)
 	fileResults.close();
 
 	// Remove duplicated lines in targets.txt file
-	removeDuplicates(name_result + ".targets.txt", name_result + ".targets.unique.txt");
+	removeDuplicates(name_result + ".targets.txt", name_result + ".targets.txt");
 
 	globalend = omp_get_wtime(); // end global time
 	cout << "-----------------------"
