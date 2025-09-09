@@ -57,4 +57,7 @@ void pamGeneration();
 vector<bitset<4>> genome_bit_conversion(string genome); //converto il genoma dal fasta alla versione bit
 vector<bitset<4>> pam_bit_conversion(string PAM);       //converto la pam in input da nt alla versione bit
 string reversenuc(string pam);
-void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges, int max_mismatches);
+//void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges, int max_mismatches);
+void searchPAMonGenome(std::string pam_sequence, int pam_len,
+                       std::string genome_sequence, int pam_limit,
+                       bool pam_at_start, int max_bulges, int max_mismatches);
