@@ -98,10 +98,15 @@ vector<vector<vector<int>>> profiling_dna;
 vector<vector<vector<int>>> profiling_rna_mm;
 vector<vector<vector<int>>> profiling_rna;
 
+vector<vector<vector<int>>> profiling_both_mm;
+
 vector<vector<string>> vecTargetOfGuide, vecInGuide, bulgeType;
 vector<vector<char>> directions;
 vector<vector<int>> indices, mismatches, bulgeSize, cluster_position;
 vector<vector<string>> chrName_glb;
+
+
+
 
 /**
  * Function that removes duplicate lines from a text file containing search results.  
@@ -647,18 +652,20 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 				//Profiling and profiling ext
 				if (create_profile)
 				{
-					if (bulTypeRNA == 0 && bulTypeDNA == 0)
+					if (bulTypeRNA == 0 && bulTypeDNA == 0){
 						printf("\nno bulge\n");
-						//detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, bulTypeRNA, bulTypeDNA, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
-					else if (bulTypeRNA == 0 && bulTypeDNA > 0)
+						detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);}
+					else if (bulTypeRNA == 0 && bulTypeDNA > 0){
 						printf("\nbulge DNA\n");
-						//detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
-					else if (bulTypeRNA > 0 && bulTypeDNA == 0)
+						detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);}
+					else if (bulTypeRNA > 0 && bulTypeDNA == 0){
 						printf("\nbulge RNA\n");
-						//detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
+						detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);}
 					else{
 						printf("\nboth RNA and DNA bulges\n");
-					}
+						detailedOutputFastBulgeBoth( guideI[thr], g_bit, t_bit, g, t, mm, max_bulges,len_guide,bD,bulDNA,profiling_dna,profiling_dna_mm,profiling_rna,profiling_rna_mm,
+							profiling_both_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling_rna, ext_profiling);
+						}
 				}
 				else
 				{
@@ -669,12 +676,21 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 			}
 			else
 			{ //no target, only profile  !!!TO EDIT!!!!
-				//if (bulType == 0)
-				//	detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
-				//else if (bulType > 0)
-				//	detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
-				//else
-				//	detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
+			
+				if (bulTypeRNA == 0 && bulTypeDNA == 0){
+					printf("\nno bulge\n");
+					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);}
+				else if (bulTypeRNA == 0 && bulTypeDNA > 0){
+					printf("\nbulge DNA\n");
+					detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);}
+				else if (bulTypeRNA > 0 && bulTypeDNA == 0){
+					printf("\nbulge RNA\n");
+					detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);}
+				else{
+					printf("\nboth RNA and DNA bulges\n");
+					detailedOutputFastBulgeBoth( guideI[thr], g_bit, t_bit, g, t, mm, max_bulges,len_guide,bD,bulDNA,profiling_dna,profiling_dna_mm,profiling_rna,profiling_rna_mm,
+						profiling_both_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling_rna, ext_profiling);
+					}
 			}
 
 			index = (targetOnDNA[thr][index].next + 1) * -1;
@@ -819,17 +835,19 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 				//Profiling and profiling ext
 				if (create_profile)
 				{
-					if (bulTypeRNA == 0 && bulTypeDNA == 0)
-						printf("\nno bulge\n");
-						//detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, bulTypeRNA, bulTypeDNA, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
-					else if (bulTypeRNA == 0 && bulTypeDNA > 0)
-						printf("\nbulge DNA\n");
-						//detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
-					else if (bulTypeRNA > 0 && bulTypeDNA == 0)
-						printf("\nbulge RNA\n");
-						//detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
-					else{
-						printf("\nboth RNA and DNA bulges\n");
+				if (bulTypeRNA == 0 && bulTypeDNA == 0){
+					printf("\nno bulge\n");
+					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);}
+				else if (bulTypeRNA == 0 && bulTypeDNA > 0){
+					printf("\nbulge DNA\n");
+					detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);}
+				else if (bulTypeRNA > 0 && bulTypeDNA == 0){
+					printf("\nbulge RNA\n");
+					detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);}
+				else{
+					printf("\nboth RNA and DNA bulges\n");
+					detailedOutputFastBulgeBoth( guideI[thr], g_bit, t_bit, g, t, mm, max_bulges,len_guide,bD,bulDNA,profiling_dna,profiling_dna_mm,profiling_rna,profiling_rna_mm,
+						profiling_both_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling_rna, ext_profiling);
 					}
 				}
 				else
@@ -841,12 +859,20 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 			}
 			else
 			{ //no target, only profile
-				//if (bulType == 0)
-				//	detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, bulType, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);
-				//else if (bulType > 0)
-				//	detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);
-				//else
-				//	detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, bulType, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);
+				if (bulTypeRNA == 0 && bulTypeDNA == 0){
+					printf("\nno bulge\n");
+					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);}
+				else if (bulTypeRNA == 0 && bulTypeDNA > 0){
+					printf("\nbulge DNA\n");
+					detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);}
+				else if (bulTypeRNA > 0 && bulTypeDNA == 0){
+					printf("\nbulge RNA\n");
+					detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);}
+				else{
+					printf("\nboth RNA and DNA bulges\n");
+					detailedOutputFastBulgeBoth( guideI[thr], g_bit, t_bit, g, t, mm, max_bulges,len_guide,bD,bulDNA,profiling_dna,profiling_dna_mm,profiling_rna,profiling_rna_mm,
+						profiling_both_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling_rna, ext_profiling);
+				}
 			}
 
 			index = (targetOnDNA[thr][index].next + 1) * -1;
@@ -1007,7 +1033,7 @@ int main(int argc, char **argv)
 		pamlimit = pamlimit * -1;
 	}
 
-	int pamlen = pam.length(); 
+	int pamlen = pam.length(); //length of the total PAM: (NNNNNNNNNNNNNNNNNNNNNGG) is 23
 	if (!pam_at_start)
 	{
 		pamRNA = pam.substr(pamlen - pamlimit, pamlimit);
@@ -1017,7 +1043,7 @@ int main(int argc, char **argv)
 		pamRNA = pam.substr(0, pamlimit); // if pam_at_start is set, then PAM = TTTNNNNNNNNNNNNNNNNNNNNN -4, i select the first 4 chars
 	}
 	globalstart = omp_get_wtime(); // start global time
-	int numGuide;
+	int numGuide = 0;
 	string iguide;
 	while (getline(fileGuide, line))
 	{
@@ -1096,7 +1122,7 @@ int main(int argc, char **argv)
 	ofstream file_profiling_complete;
 	//Check the type_output
 	create_target = true;
-	create_profile = false;
+	create_profile = true;
 
 	string resultwriting = "r";
 	string profilewriting = "p";
@@ -1104,7 +1130,7 @@ int main(int argc, char **argv)
 	{
 		fileResults.open(name_result + ".targets.txt", std::ios_base::out); //out
 		fileResults << "#Bulge type\tcrRNA\tDNA\tChromosome\tPosition\tCluster Position\tDirection\tMismatches\tBulge Size\tTotal\n";
-		create_profile = false;
+		create_profile = true;
 	}
 	else if (argv[8] == profilewriting)
 	{
@@ -1147,6 +1173,8 @@ int main(int argc, char **argv)
 	profiling_rna_mm.resize(pamlen - pamlimit + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
 	profiling_rna.resize(pamlen - pamlimit + (mm + 1) * max_bulges, vector<vector<int>>(numGuide, vector<int>(num_thr, 0)));
 
+
+
 	vecTargetOfGuide.resize(num_thr);
 	vecInGuide.resize(num_thr);
 	bulgeType.resize(num_thr);
@@ -1166,6 +1194,13 @@ int main(int argc, char **argv)
 	len_guide = pamlen - pamlimit;
 	inGuide.resize(num_thr);
 	targetOfGuide.resize(num_thr);
+
+	//Matrix for joint DNA+RNA profiling
+	int bins_both = len_guide + bulDNA + (mm + 1) * (max_bulges + 1) * (max_bulges + 1);
+	profiling_both_mm.resize(
+		bins_both,
+		vector<vector<int>>(numGuide, vector<int>(num_thr, 0))
+	);
 
 	int numNodes;
 	int numLeaves;
@@ -1291,6 +1326,8 @@ int main(int argc, char **argv)
 	//Save profiling results
 	if (create_profile)
 	{
+		cout << "ENTERED PROFILE" << "\n";
+
 		//Cols labels for profiling output file
 		fileprofiling << "GUIDE\t";
 		for (int i = 0; i < len_guide; i++)
@@ -1355,8 +1392,19 @@ int main(int argc, char **argv)
 
 		for (int i = 0; i < numGuide; i++)
 		{
-			saveProfileGuide(guideRNA_s[i], i, mm, max_bulges, len_guide, bulDNA, profiling, ext_profiling, profiling_dna, profiling_dna_mm, profiling_rna, profiling_rna_mm,
-							 fileprofiling, file_ext_profiling, file_profiling_dna, file_profiling_rna, file_profiling_complete, num_thr, pamRNA.size(), pam_at_start, ext_profiling_dna, ext_profiling_rna);
+			saveProfileGuide(
+				guideRNA_s[i], i,
+				mm, max_bulges, len_guide, bulDNA,
+				profiling,               // base (pos & mm-only summary)
+				ext_profiling,           // extended nuc×pos per mm
+				profiling_dna, profiling_dna_mm,
+				profiling_rna, profiling_rna_mm,
+				profiling_both_mm,       // <-- NEW joint bins (mm, bulgeDNA, bulgeRNA)
+				fileprofiling, file_ext_profiling,
+				file_profiling_dna, file_profiling_rna, file_profiling_complete,
+				num_thr, (int)pamRNA.size(), pam_at_start,
+				ext_profiling_dna, ext_profiling_rna
+			);
 		}
 		fileprofiling.close();
 		file_ext_profiling.close();
@@ -1368,7 +1416,7 @@ int main(int argc, char **argv)
 	fileResults.close();
 
 	// Remove duplicated lines in targets.txt file
-	removeDuplicates(name_result + ".targets.txt", name_result + ".targets.txt");
+	removeDuplicates(name_result + ".targets.txt", name_result + ".targets.unique.txt");
 
 	globalend = omp_get_wtime(); // end global time
 	cout << "-----------------------"
