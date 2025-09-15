@@ -109,34 +109,40 @@ vector<vector<string>> chrName_glb;
 
 
 /**
- * Function that removes duplicate lines from a text file containing search results.  
- * It reads the input file line by line, keeps track of unique lines, and writes them 
- * into a new output file, discarding duplicates.
+ * This function reads all lines from the given file, keeps only the first occurrence
+ * of each unique line (preserving the original order), and then rewrites the file 
+ * without duplicates. The operation is performed in place: the input file is both
+ * the source and the destination.
  *
- * @param inputFile  Path of the input file (e.g. "results.targets.txt") that may contain duplicates
- * @param outputFile Path of the output file where only unique lines will be saved (e.g. "results.targets.unique.txt")
+ * @param path Path of the text file to clean from duplicate lines 
+ *             (e.g. "results.targets.txt").
  */
 
-void removeDuplicates(const string &inputFile, const string &outputFile) {
-    ifstream in(inputFile);
-    ofstream out(outputFile);
-
-    if (!in.is_open() || !out.is_open()) {
-        cerr << "Error opening file in removeDuplicates" << endl;
+void removeDuplicatesInPlace(const std::string &path){
+    std::ifstream in(path);
+    if (!in.is_open()) {
+        std::cerr << "Error opening file for reading: " << path << std::endl;
         return;
     }
 
-    unordered_set<string> seen;
-    string line;
-    while (getline(in, line)) {
-        if (seen.find(line) == seen.end()) {
-            seen.insert(line);
-            out << line << "\n";
+    std::unordered_set<std::string> seen;
+    std::vector<std::string> unique_lines;
+    unique_lines.reserve(1024);
+
+    std::string line;
+    while (std::getline(in, line)) {
+        if (seen.insert(line).second) { 
+            unique_lines.push_back(std::move(line));
         }
     }
+    in.close(); 
 
-    in.close();
-    out.close();
+    std::ofstream out(path, std::ios::trunc);
+    if (!out.is_open()) {
+        std::cerr << "Error opening file for writing: " << path << std::endl;
+        return;
+    }
+    for (const auto &l : unique_lines) out << l << '\n';
 }
 
 /**
@@ -1416,8 +1422,7 @@ int main(int argc, char **argv)
 	fileResults.close();
 
 	// Remove duplicated lines in targets.txt file
-	removeDuplicates(name_result + ".targets.txt", name_result + ".targets.txt");
-
+	removeDuplicatesInPlace(name_result + ".targets.txt");
 	globalend = omp_get_wtime(); // end global time
 	cout << "-----------------------"
 		 << "\n";
