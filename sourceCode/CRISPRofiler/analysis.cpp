@@ -16,11 +16,15 @@ void analysis()
 
 	//start pam searching
 	// searchPam();
+	cout << "RUN SEARCH PAM: " << endl;
+
 	searchPAMonGenome(pam, pamlen, genome, pamlimit, pamdirection, 0, 0);
 	// vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges, int max_mismatches)
+	cout << "END SEARCH PAM: " << endl;
 
 	//start guides searching, executed number of guides times
 	guide_searching();
+	cout << "END SEARCH GUIDE: " << endl;
 
 	//clear the genome string for the next genome analysis
 	genome.clear();

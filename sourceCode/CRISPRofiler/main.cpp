@@ -62,13 +62,13 @@ int main(int argc, char **argv)
       extentedprofile.open(extendedprofilename);
       results << "#Bulge_type\tcrRNA\tDNA\tChromosome\tPosition\tCluster Position\tDirection\tMismatches\tBulge_Size\tTotal\n";
    }
-
+   
    //reading pam
    reading_pam();
 
    //reading guides
    reading_guide();
-
+   
    //profiler setting
    profilersetting();
 
@@ -78,11 +78,12 @@ int main(int argc, char **argv)
    reading_chromosomes(argv); //inizio la ricerca sui cromosomi
 
    //profiling guides
-   profiler(); //scrivo la profilazione
+   profiler(); 
 
    //close the results file
    if (argc > 7 && (argv[7] == resultwriting))
    {
+
       results.close(); //chiudo il file result se era aperto
    }
    else if (argc > 7 && (argv[7] == profilewriting)) //chiudo i file di profili
