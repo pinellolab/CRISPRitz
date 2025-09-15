@@ -653,16 +653,16 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 				if (create_profile)
 				{
 					if (bulTypeRNA == 0 && bulTypeDNA == 0){
-						printf("\nno bulge\n");
+						//printf("\nno bulge\n");
 						detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);}
 					else if (bulTypeRNA == 0 && bulTypeDNA > 0){
-						printf("\nbulge DNA\n");
+						//printf("\nbulge DNA\n");
 						detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);}
 					else if (bulTypeRNA > 0 && bulTypeDNA == 0){
-						printf("\nbulge RNA\n");
+						//printf("\nbulge RNA\n");
 						detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);}
 					else{
-						printf("\nboth RNA and DNA bulges\n");
+						//printf("\nboth RNA and DNA bulges\n");
 						detailedOutputFastBulgeBoth( guideI[thr], g_bit, t_bit, g, t, mm, max_bulges,len_guide,bD,bulDNA,profiling_dna,profiling_dna_mm,profiling_rna,profiling_rna_mm,
 							profiling_both_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling_rna, ext_profiling);
 						}
@@ -678,16 +678,16 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 			{ //no target, only profile  !!!TO EDIT!!!!
 			
 				if (bulTypeRNA == 0 && bulTypeDNA == 0){
-					printf("\nno bulge\n");
+					//printf("\nno bulge\n");
 					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);}
 				else if (bulTypeRNA == 0 && bulTypeDNA > 0){
-					printf("\nbulge DNA\n");
+					//printf("\nbulge DNA\n");
 					detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);}
 				else if (bulTypeRNA > 0 && bulTypeDNA == 0){
 					printf("\nbulge RNA\n");
 					detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);}
 				else{
-					printf("\nboth RNA and DNA bulges\n");
+					//printf("\nboth RNA and DNA bulges\n");
 					detailedOutputFastBulgeBoth( guideI[thr], g_bit, t_bit, g, t, mm, max_bulges,len_guide,bD,bulDNA,profiling_dna,profiling_dna_mm,profiling_rna,profiling_rna_mm,
 						profiling_both_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling_rna, ext_profiling);
 					}
@@ -836,16 +836,16 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 				if (create_profile)
 				{
 				if (bulTypeRNA == 0 && bulTypeDNA == 0){
-					printf("\nno bulge\n");
+					//printf("\nno bulge\n");
 					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);}
 				else if (bulTypeRNA == 0 && bulTypeDNA > 0){
-					printf("\nbulge DNA\n");
+					//printf("\nbulge DNA\n");
 					detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);}
 				else if (bulTypeRNA > 0 && bulTypeDNA == 0){
-					printf("\nbulge RNA\n");
+					//printf("\nbulge RNA\n");
 					detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);}
 				else{
-					printf("\nboth RNA and DNA bulges\n");
+					//printf("\nboth RNA and DNA bulges\n");
 					detailedOutputFastBulgeBoth( guideI[thr], g_bit, t_bit, g, t, mm, max_bulges,len_guide,bD,bulDNA,profiling_dna,profiling_dna_mm,profiling_rna,profiling_rna_mm,
 						profiling_both_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling_rna, ext_profiling);
 					}
@@ -860,16 +860,16 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 			else
 			{ //no target, only profile
 				if (bulTypeRNA == 0 && bulTypeDNA == 0){
-					printf("\nno bulge\n");
+					//printf("\nno bulge\n");
 					detailedOutputFast(guideI[thr], g_bit, t_bit, g, t, mm, len_guide, profiling, ext_profiling, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start);}
 				else if (bulTypeRNA == 0 && bulTypeDNA > 0){
-					printf("\nbulge DNA\n");
+					//printf("\nbulge DNA\n");
 					detailedOutputFastBulgeDNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_dna, profiling_dna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling);}
 				else if (bulTypeRNA > 0 && bulTypeDNA == 0){
-					printf("\nbulge RNA\n");
+					//printf("\nbulge RNA\n");
 					detailedOutputFastBulgeRNA(guideI[thr], g_bit, t_bit, g, t, mm, max_bulges, len_guide, bD, bulDNA, profiling_rna, profiling_rna_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_rna, ext_profiling);}
 				else{
-					printf("\nboth RNA and DNA bulges\n");
+					//printf("\nboth RNA and DNA bulges\n");
 					detailedOutputFastBulgeBoth( guideI[thr], g_bit, t_bit, g, t, mm, max_bulges,len_guide,bD,bulDNA,profiling_dna,profiling_dna_mm,profiling_rna,profiling_rna_mm,
 						profiling_both_mm, vecInGuide[thr], vecTargetOfGuide[thr], pam_at_start, ext_profiling_dna, ext_profiling_rna, ext_profiling);
 				}
@@ -1416,7 +1416,7 @@ int main(int argc, char **argv)
 	fileResults.close();
 
 	// Remove duplicated lines in targets.txt file
-	removeDuplicates(name_result + ".targets.txt", name_result + ".targets.unique.txt");
+	removeDuplicates(name_result + ".targets.txt", name_result + ".targets.txt");
 
 	globalend = omp_get_wtime(); // end global time
 	cout << "-----------------------"
