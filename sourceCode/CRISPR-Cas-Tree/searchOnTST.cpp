@@ -709,8 +709,6 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 
 void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA)
 {
-   	cout << "Entrato in saveindices 2" << endl;
-
 	if (p->eqkid < 0)
 	{ // node is a leaf, save index and strand
 		int thr = omp_get_thread_num();
@@ -1029,8 +1027,6 @@ int main(int argc, char **argv)
 	transform(line.begin(), line.end(), line.begin(), ::toupper); // uppercase of the pam
 	int delimiter = line.find(" ");
 	string pam = line.substr(0, delimiter);
-    printf("------------------------\n");
-    printf("%s\n", pam.c_str());
 
 	int pamlimit = stoi(line.substr(delimiter, line.length() - 1)); //number that identifies the PAM length: NNNNNNNNNNNNNNNNNNNNNGG (3)
 	if (pamlimit < 0)
@@ -1219,7 +1215,7 @@ int main(int argc, char **argv)
 
 	int number_of_trees = file_stats_vec.size();
 	int counter = 0;
-	std::cout << "numGuide = " << numGuide << std::endl;
+
 	//#PARALLEL SECTION
 	//FOR ALL THE CHR
 #pragma omp parallel private(c_inGuide, c_targetOfGuide, numNodes, numLeaves, file, jk, i) num_threads(num_thr)
@@ -1270,7 +1266,6 @@ int main(int argc, char **argv)
 					
 					
 				}
-                printf("SEARCH COMPLETED");
 
 				if (create_target)
 				{

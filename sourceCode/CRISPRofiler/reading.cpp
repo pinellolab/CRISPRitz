@@ -150,14 +150,10 @@ void reading_chromosomes(char **argv)
             genlen = genome.length();
 
             cout << "ANALYZING CHROMOSOME " << chrnames << " (Total progress: " << fixed << std::setprecision(1) << (100.0 * (i + 1) / filenumber) << "%)" << endl;
-            cout << "RUN BIT CONVERSION: " << endl;
 
             genomebitconversion();
-            cout << "END BIT CONVERSION: " << chrnames << endl;
 
             analysis();
-            cout << "END ANALYSIS: " << chrnames << endl;
-
 
          }
          closedir(d);
