@@ -44,6 +44,7 @@ void reading_pam()
          pamdirection = 1;
          pamlimit = pamlimit * -1;
       }
+
       pamlen = pam.length();
    }
 
@@ -98,10 +99,8 @@ void reading_chromosomes(char **argv)
             genome += line;
          }
       }
-
+      
       genlen = genome.length();
-
-      cout << "ANALYZING CHROMOSOME: " << chrnames << endl;
 
       genomebitconversion();
 
@@ -155,6 +154,7 @@ void reading_chromosomes(char **argv)
             genomebitconversion();
 
             analysis();
+
          }
          closedir(d);
       }

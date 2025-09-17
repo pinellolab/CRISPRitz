@@ -1,4 +1,4 @@
-// #include "include/crispritz.h"
+//#include "include/crispritz.h"
 
 // using namespace std;
 
@@ -551,7 +551,9 @@ void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence,
 	//extract the PAM from the whole sequence
 	if (!pam_at_start)
 	{
-		pam_sequence = pam_sequence.substr(pam_len - pam_limit, pam_len);
+		pam_sequence = pam_sequence.substr(pam_len - pam_limit, pam_limit);
+
+// 		pam_sequence = pam_sequence.substr(pam_len - pam_limit, pam_len);
 	}
 	else
 	{
@@ -563,7 +565,8 @@ void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence,
 	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
 
 	if (!pam_at_start) //pam al 3' quindi in fondo alla sequenza
-	{
+	{	
+
 		for (int nt = 0; nt < genome_sequence.length() - pam_limit; ++nt)
 		{
 			bool found_positive = true;
@@ -572,7 +575,8 @@ void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence,
 			int negative_mismatches = max_mismatches;
 
 			for (int pam_nt = 0; pam_nt < pam_limit; ++pam_nt)
-			{
+			{	
+
 				if ((genome_bit[nt + pam_nt] & pam_bit[pam_nt]) == 0)
 				{
 					positive_mismatches--;
@@ -586,6 +590,7 @@ void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence,
 						found_negative = false;
 				}
 			}
+
 			if (found_positive)
 			{
 				if (((nt + pam_limit - 1) - (pam_len - 1 + max_bulges)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
@@ -644,6 +649,95 @@ void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence,
 	}
 	// return indices;
 }
+
+
+// void searchPAMonGenome(std::string pam_sequence,
+//                        int          pam_len,
+//                        std::string genome_sequence,
+//                        int          pam_limit,
+//                        bool         pam_at_start,
+//                        int          max_bulges,
+//                        int          max_mismatches)
+// {
+//     if (!pam_at_start) {
+//         if (pam_len < pam_limit) {
+//             std::cerr << "ERROR: pam_len < pam_limit\n";
+//             return;
+//         }
+//         pam_sequence = pam_sequence.substr(pam_len - pam_limit, pam_limit);
+//     } else {
+//         if (pam_len < pam_limit) {
+//             std::cerr << "ERROR: pam_len < pam_limit\n";
+//             return;
+//         }
+//         pam_sequence = pam_sequence.substr(0, pam_limit);
+//     }
+
+//     const auto pam_bit         = pam_bit_conversion(pam_sequence);
+//     const auto pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
+//     const auto genome_bit      = genome_bit_conversion(genome_sequence);
+
+//     const int G  = static_cast<int>(genome_bit.size());
+//     const int P  = static_cast<int>(pam_bit.size());
+//     const int PR = static_cast<int>(pam_bit_reverse.size());
+
+//     if (P != pam_limit || PR != pam_limit) {
+//         std::cerr << "ERROR: pam_bit size mismatch (P=" << P
+//                   << ", PR=" << PR << ", pam_limit=" << pam_limit << ")\n";
+//         return;
+//     }
+//     if (G < P) {
+//         std::cerr << "ERROR: genome shorter than PAM window (G=" << G
+//                   << ", P=" << P << ")\n";
+//         return;
+//     }
+
+//     for (int nt = 0; nt <= G - P; ++nt) {
+//         bool found_pos = true;
+//         bool found_neg = true;
+//         int  mm_pos    = max_mismatches;
+//         int  mm_neg    = max_mismatches;
+
+//         for (int k = 0; k < P; ++k) {
+//             if ( (genome_bit[nt + k] & pam_bit[k]).none() ) {
+//                 if (--mm_pos < 0) found_pos = false;
+//             }
+//             if ( (genome_bit[nt + k] & pam_bit_reverse[k]).none() ) {
+//                 if (--mm_neg < 0) found_neg = false;
+//             }
+
+//             if (!found_pos && !found_neg) break;
+//         }
+//         if (!pam_at_start) {
+
+//             if (found_pos) {
+//                 const int pos = (nt + pam_limit - 1) - (pam_len - 1 + max_bulges);
+//                 if (pos >= 0) {
+//                     pamindices.push_back(pos);
+//                 }
+//             }
+//             if (found_neg) {
+//                 if (nt <= (G - (pam_len + max_bulges))) {
+//                     pamindicesreverse.push_back(nt);
+//                 }
+//             }
+//         } else {
+//             if (found_pos) {
+//                 if (nt <= (G - (pam_len + max_bulges))) {
+//                     pamindicesreverse.push_back(nt);
+//                 }
+//             }
+//             if (found_neg) {
+//                 const int pos = (nt + pam_limit - 1) - (pam_len - 1 + max_bulges);
+//                 if (pos >= 0) {
+//                     pamindices.push_back(pos);
+//                 }
+//             }
+//         }
+//     }
+// }
+
+
 // Given a pam and a automaton it fill the automaton with each pam possible
 // vector<string> generatePam(string pamInput)
 // {

@@ -16,6 +16,7 @@ void analysis()
 
 	//start pam searching
 	// searchPam();
+
 	searchPAMonGenome(pam, pamlen, genome, pamlimit, pamdirection, 0, 0);
 	// vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges, int max_mismatches)
 
