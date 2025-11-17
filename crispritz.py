@@ -1,24 +1,32 @@
 #!/usr/bin/env python
 
-# Python Program to search CRISPR/Cas complex into a genome
-import subprocess  # run c++ executable
-import time
-import os  # instructions manage directories
-from os import listdir
-from os.path import isfile, join, isdir
-import shutil  # remove directory and its content
-import sys  # input argv
-from subprocess import Popen, PIPE
-import glob
-import pandas as pd
+from typing import Dict, Union, List, Set
+from glob import glob
+
 import multiprocessing
+import subprocess  # run c++ executable
+import shutil  # remove directory and its content
+import pysam
+import time
+import sys  # input argv
+import os  # instructions manage directories
+
 
 # path where this file is located
 origin_path = os.path.dirname(os.path.realpath(__file__))
 # conda path
 conda_path = "opt/crispritz/"
 
-VERSION = "2.6.6"
+# crispritz version
+VERSION = "2.7.1"
+
+# enriched genome folders
+GENENRDIR = "variants_genome"
+GENSNPDIR = "SNPs_genome"
+GENINDELSDIR = "INDELs_genome"
+
+# enrichment script
+ENRICHER = "Python_Scripts/Enrichment/enricher.py"
 
 if "--debug" in sys.argv[1:]:
     # for quick local tests
@@ -30,11 +38,11 @@ else:
 
 def checkExistance(f_path, element):
     if element == "f":  # check file
-        if not isfile(f_path):
+        if not os.path.isfile(f_path):
             print("ERROR! " + f_path + " is not a file.")
             sys.exit()
     else:  # check directory
-        if not isdir(f_path):
+        if not os.path.isdir(f_path):
             print("ERROR! " + f_path + " is not a directory.")
             sys.exit()
 
@@ -259,8 +267,8 @@ def searchTST():
     # Check input correctness
     file_correct_ext = [
         f
-        for f in listdir(dirTSTgenome)
-        if isfile(join(dirTSTgenome, f)) and not f.endswith(".bin")
+        for f in os.listdir(dirTSTgenome)
+        if os.path.isfile(os.path.join(dirTSTgenome, f)) and not f.endswith(".bin")
     ]  # Get files not ending with .bin
     if len(file_correct_ext) != 0:  # Some files do not have .bin
         print(
@@ -402,8 +410,8 @@ def searchBruteForce():
 
     file_correct_ext = [
         f
-        for f in listdir(genomeDir)
-        if isfile(join(genomeDir, f))
+        for f in os.listdir(genomeDir)
+        if os.path.isfile(os.path.join(genomeDir, f))
         and not (f.endswith(".fa") or f.endswith(".fasta") or f.endswith(".fai"))
     ]
 
@@ -560,158 +568,172 @@ def annotateResults():
         print("Annotation runtime: %s seconds" % (time.time() - start_time))
 
 
-def genomeEnrichment_subprocess_VCF(altfile, genfile, dirGenome, doit, dirVCFFiles):
-    subprocess.run(
-        [
-            corrected_origin_path + "Python_Scripts/Enrichment/enricher.py",
-            altfile,
-            genfile,
-            dirGenome.split("/")[-1],
-            str(doit),
-            dirVCFFiles,
-        ]
+def genome_enrichment_help() -> None:
+    sys.stdout.write(
+        "WARNING: Too few arguments to function add-variants. Please provide:\n"
+        "\nEXAMPLE CALL: crispritz.py add-variants vcfFilesDirectory/ genomeDirectory/\n"
+        "\n\n<vcfFilesDirectory> : Directory containing VCF files, need to be "
+        "separated into single chromosome files (multi-sample files will be "
+        "collapsed into one fake individual)"
+        "\n\n<genomeDirectory> : Directory containing a genome in .fa or .fasta "
+        "format, need to be separated into single chromosome files."
+        "\n\n-th <num_thread>: (Optional) Number of threads to use. Default uses "
+        "1 thread\n",
     )
+    sys.exit()
+
+
+def _check_threads(args: List[str]) -> int:
+    threads = 1  # default, use one single thread
+    if "-th" in args:
+        try:
+            threads = int(args[args.index("-th") + 1])
+        except Exception:
+            sys.stderr.write(
+                "ATTENTION! Check the thread option: -th <th_num> (th_num must "
+                "be an integer)\n"
+            )
+            sys.exit(1)
+    return threads
+
+def _polish_contig(contig: Union[str, int]) -> str:
+    if isinstance(contig, str):
+        return contig if contig.startswith("chr") else f"chr{contig}"
+    return f"chr{contig}"
+
+def _retrieve_vcf_files(vcfdir: str) -> Dict[str, str]:
+    # sourcery skip: remove-redundant-if, remove-unreachable-code, simplify-len-comparison
+    vcf_fnames = glob(os.path.join(vcfdir, "*.vcf.gz"))  # retrieve vcf files
+    if not vcf_fnames:  # no vcf file in input folder?
+        return {}
+    vcfs: Dict[str, str] = {}   # use pysam to retrieve contigs in each vcf (must be at most one)
+    for vcf_fname in vcf_fnames:
+        with pysam.VariantFile(vcf_fname, mode="r") as vcf:  # read vcf
+            contigs = list(vcf.header.contigs)
+            if len(contigs) != 1:
+                raise ValueError(
+                    f"Input VCF {vcf_fname} has more no contig or than one contig "
+                    "associated. Input VCFs must be chromosome-separated!"
+                )
+            contig = _polish_contig(contigs[0])  # keep unique contig
+            if contig in vcfs:
+                raise ValueError(
+                    f"Duplicate contig '{contig}' found in {vcfdir}: {vcfs[contig]} " 
+                    f"and {vcf_fname}"
+                )
+            vcfs[contig] = vcf_fname
+    return vcfs
+
+
+def _retrieve_fasta_files(fastadir: str) -> Dict[str, str]:
+    # retrieve fasta files
+    fasta_fnames = glob(os.path.join(fastadir, "*.fa")) + glob(os.path.join(fastadir, "*.fasta"))  
+    if not fasta_fnames:  # no vcf file in input folder?
+        return {}
+    fasta: Dict[str, str] = {}   # use pysam to retrieve contigs in each fasta (must be at most one)
+    for fasta_fname in fasta_fnames:
+        with pysam.FastaFile(fasta_fname) as f:  # read fasta
+            if f.nreferences != 1:
+                raise ValueError(
+                    f"Input FASTA {fasta_fname} has more no contig or than one "
+                    "contig associated. Input FASTA must be chromosome-separated!"
+                )
+            contig = _polish_contig(f.references[0])  # keep unique contig
+            if contig in fasta:
+                raise ValueError(
+                    f"Duplicate contig '{contig}' found in {fastadir}: {fasta[contig]} " 
+                    f"and {fasta_fname}"
+                )
+            fasta[contig] = fasta_fname
+    return fasta
+
+def _write_indels_memo(fname: str) -> None:
+    try:
+        with open(fname, mode="w") as fout:
+            fout.write(
+                "CRISPRitz indels process is now obsolete and has been removed, "
+                "if you want to process indels you can download our new tool "
+                "CRISPRme: https://github.com/pinellolab/CRISPRme\n"
+            )
+    except (IOError, Exception) as e:
+        raise OSError("Failed writing indels memo") from e
+    assert os.path.isfile(fname) and os.stat(fname).st_size > 0
+
+    
+
+
+def _create_genome_enrichement_dirtree() -> None:
+    # create genome enrichment directories tree
+    #
+    # variants_genome/
+    #   |
+    #   --- SNPs_genome/
+    #   |
+    #   --- INDELs_genome/
+    if not os.path.isdir(GENENRDIR):  
+        os.makedirs(GENENRDIR)  # if not present, create genome enrichment folder
+    snpsdir = os.path.join(GENENRDIR, GENSNPDIR)
+    if not os.path.isdir(snpsdir):
+        os.makedirs(snpsdir)  # snps genome folder
+    indelsdir = os.path.join(GENENRDIR, GENINDELSDIR)
+    if not os.path.isdir(indelsdir):
+        os.makedirs(indelsdir)  # indels genome folder
+    _write_indels_memo(os.path.join(indelsdir, "change_version.txt"))
+    
+    
+
+def _enrich_genome(fasta_fname: str, vcf_fname: str, genomedir: str, doit: str, vcfdir: str) -> None:
+    code = subprocess.call(
+        f"{os.path.join(corrected_origin_path, ENRICHER)} {vcf_fname} {fasta_fname} "
+        f"{genomedir.split('/')[-1]} {doit} {vcfdir}",
+        shell=True
+    )
+    if code != 0:
+        raise subprocess.SubprocessError(f"Enrichment for {fasta_fname} failed!")
+    
+
+def enrich_genome(chroms_to_enrich: Set[str], chroms_to_skip: Set[str], vcfs: Dict[str, str], fastas: Dict[str, str], genomedir: str, vcfdir: str, doit: str, threads: int) -> None:
+    with multiprocessing.Pool(threads) as pool:  # enrich contigs with vcf data
+        for chrom in chroms_to_enrich:
+            pool.apply_async(
+                _enrich_genome, args=(fastas[chrom], vcfs[chrom], genomedir, doit, vcfdir)
+            )
+    snpsgendir = os.path.join(
+        GENENRDIR, GENSNPDIR, f"{genomedir.split('/')[-1]}_enriched"
+    )
+    for chrom in chroms_to_skip:  # copy contigs without vcf data
+        chrom_enriched = f"{os.path.basename(fastas[chrom])}.enriched.fa"
+        code = subprocess.call(
+            f"cp {fastas[chrom]} {os.path.join(snpsgendir, chrom_enriched)}",
+            shell=True
+        )
+        if code != 0:
+            raise subprocess.SubprocessError(f"Failed enrichment for {fastas[chrom]}")
+
 
 
 def genomeEnrichment():
-    """
-    Enrich the genome by parsing the vcf files and then replacing the nucleotides in the reference genome sequence. Compatible with indels
-    """
     if len(sys.argv) < 4 or "help" in sys.argv[1:]:
-        print(
-            "WARNING: Too few arguments to function add-variants. Please provide:",
-            "\nEXAMPLE CALL: crispritz.py add-variants vcfFilesDirectory/ genomeDirectory/\n",
-            "\n\n<vcfFilesDirectory> : Directory containing VCF files, need to be separated into single chromosome files (multi-sample files will be collapsed into one fake individual)",
-            "\n\n<genomeDirectory> : Directory containing a genome in .fa or .fasta format, need to be separated into single chromosome files.",
-            "\n\n-th <num_thread>: (Optional) Number of threads to use. Default uses 1 thread",
-        )
-        sys.exit()
-
-    dirVCFFiles = os.path.realpath(sys.argv[2])
-    dirGenome = os.path.realpath(sys.argv[3])
-    doit = "no"
-    if len(sys.argv) > 4 and sys.argv[4] == "true":
-        doit = "yes"
+        genome_enrichment_help()
+    dirVCFFiles = os.path.realpath(sys.argv[2])  # vcfs folder
+    dirGenome = os.path.realpath(sys.argv[3])  # genome folder
+    threads = _check_threads(sys.argv[1:])  # threads number 
+    doit = "yes" if len(sys.argv) > 4 and sys.argv[4] == "true" else "no"
+    # check vcf and genome folders
     checkExistance(dirVCFFiles, "d")
     checkExistance(dirGenome, "d")
-    listChrs = os.listdir(dirVCFFiles)
-    # listChrs = glob.glob(dirVCFFiles+'/*.vcf.gz')
-
-    for file in listChrs:
-        if file.endswith(".tbi"):  # remove .tbi files
-            listChrs.remove(file)
-        # if 'tbi' in elem:  # remove .tbi files in vcf dir to avoid errors in exec
-        # listChrs.remove(elem)
-
-    # print(listChrs)
-
-    chr_with_vcf = set()
-    # VCF file must contain '.chrN.' with N = number or letter of chr
-    for vcf_chr in [
-        f
-        for f in listdir(dirVCFFiles)
-        if isfile(join(dirVCFFiles, f)) and "vcf.gz" in f
-    ]:
-        for x in vcf_chr.split("."):
-            if "chr" in x:
-                chr_with_vcf.add(x)
-    list_file_ends = [f for f in listdir(dirGenome) if isfile(join(dirGenome, f))]
-    file_ends = list_file_ends[0].split(".")[-1]  # For .fa or .fasta
-    contains_enr = ""
-    if ".enriched." in list_file_ends[0]:
-        contains_enr = ".enriched"
-    elif ".indels." in list_file_ends[0]:
-        contains_enr = ".indels"
-    chr_wihtout_vcf = (
-        set(
-            [
-                f.split(contains_enr + ".fa")[0]
-                for f in listdir(dirGenome)
-                if isfile(join(dirGenome, f))
-            ]
-        )
-        - chr_with_vcf
-    )
-
-    # read number of mismatches
-    th = 1
-    if "-th" in sys.argv[1:]:
-        try:
-            th = (sys.argv).index("-th") + 1
-            th = int(sys.argv[th])
-        except:
-            print(
-                "ATTENTION! Check the thread option: -th <th_num> (th_num must be an integer)"
-            )
-            sys.exit()
-
-    dirEnrichedGenome = "./variants_genome/"
-    if not (os.path.isdir(dirEnrichedGenome)):
-        os.makedirs(dirEnrichedGenome)
-
-    os.chdir(dirEnrichedGenome)
-    if not (os.path.isdir("./SNPs_genome/")):
-        os.makedirs("./SNPs_genome/")
-    if not (os.path.isdir("./INDELs_genome/")):
-        os.makedirs("./INDELs_genome/")
-    os.chdir("./INDELs_genome/")
-
-    memo = open("change_version.txt", "w")
-
-    memo.write(
-        "CRISPRitz indels process is now obsolete and has been removed, if you want to process indels you can download our new tool CRISPRme, https://github.com/pinellolab/CRISPRme"
-        + "\n"
-    )
-    memo.write("Thank you")
-
-    memo.close()
-
-    os.chdir("../")
-    # os.chdir(dirParsedFiles)
-    pool = multiprocessing.Pool(th)
-
+    vcfs = _retrieve_vcf_files(dirVCFFiles)  # hash map for contig - vcf
+    fastas = _retrieve_fasta_files(dirGenome)  # hash map for contig - fasta
+    # find contigs with associated vcfs (to enrich) and those without
+    chroms_to_enrich = set(vcfs.keys()).intersection(set(fastas.keys()))
+    chroms_to_skip = set(fastas.keys()).difference(chroms_to_enrich)
+    _create_genome_enrichement_dirtree()  # create enriched genome dirtree
+    os.chdir(GENENRDIR)  # switch folder to variants_genome
     print("Variants Extraction and Processing START")
-    start_time = time.time()
-    for elem in listChrs:
-        # os.chdir(dirParsedFiles) #enter in parsed file directory
-        chrom = ""
-        for cut in elem.split("."):
-            if "chr" in cut:
-                chrom = cut
-        # subprocess.run([corrected_origin_path +
-        #                'Python_Scripts/Enrichment/bcf_query.sh', dirVCFFiles+"/"+elem, chrom])
-        # altfile = str(chrom + '.alt')
-        altfile = dirVCFFiles + "/" + elem
-        genfile = str(dirGenome + "/" + chrom + contains_enr + ".fa")
-        # pool to process TH vcf file in parallel
-        pool.apply_async(
-            genomeEnrichment_subprocess_VCF,
-            args=(altfile, genfile, dirGenome, doit, dirVCFFiles),
-        )
-    # wait until all threads are completed than join
-    pool.close()
-    pool.join()
-
-    for (
-        f
-    ) in (
-        chr_wihtout_vcf
-    ):  # Move chromosomes without vcf to enriched directory and change name adding '.enriched.'
-        subprocess.run(
-            [
-                "cp",
-                dirGenome + "/" + f + contains_enr + "." + file_ends,
-                "./SNPs_genome/"
-                + dirGenome.split("/")[-1]
-                + "_enriched/"
-                + f
-                + ".enriched."
-                + file_ends,
-            ]
-        )
-
+    start = time.time()
+    enrich_genome(chroms_to_enrich, chroms_to_skip, vcfs, fastas, dirGenome, dirVCFFiles, doit, threads)
     print("Variants Extraction and Processing END")
-    print("Runtime: %s seconds" % (time.time() - start_time))
+    print(f"Runtime: {time.time() - start:.2f} seconds")
 
 
 def generateReport():
