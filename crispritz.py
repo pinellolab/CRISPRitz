@@ -131,7 +131,7 @@ def indexGenome():
                 str(dirGenome) + "/" + str(f),
                 str(dirPAM),
                 str(th),
-                max_bulges,
+                str(int(max_bulges) + 1),
             ]
         )
     print("Finish indexing")
@@ -698,9 +698,10 @@ def enrich_genome(chroms_to_enrich: Set[str], chroms_to_skip: Set[str], vcfs: Di
             pool.apply_async(
                 _enrich_genome, args=(fastas[chrom], vcfs[chrom], genomedir, doit, vcfdir)
             )
-    snpsgendir = os.path.join(
-        GENENRDIR, GENSNPDIR, f"{genomedir.split('/')[-1]}_enriched"
-    )
+        pool.close()
+        pool.join()
+    snpsgendir = os.path.join(GENSNPDIR, f"{genomedir.split('/')[-1]}_enriched")
+    assert os.path.isdir(snpsgendir), os.path.abspath(snpsgendir)
     for chrom in chroms_to_skip:  # copy contigs without vcf data
         chrom_enriched = f"{os.path.splitext(os.path.basename(fastas[chrom]))[0]}.enriched.fa"
         code = subprocess.call(
