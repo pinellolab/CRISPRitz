@@ -702,7 +702,7 @@ def enrich_genome(chroms_to_enrich: Set[str], chroms_to_skip: Set[str], vcfs: Di
         GENENRDIR, GENSNPDIR, f"{genomedir.split('/')[-1]}_enriched"
     )
     for chrom in chroms_to_skip:  # copy contigs without vcf data
-        chrom_enriched = f"{os.path.basename(fastas[chrom])}.enriched.fa"
+        chrom_enriched = f"{os.path.splitext(os.path.basename(fastas[chrom]))[0]}.enriched.fa"
         code = subprocess.call(
             f"cp {fastas[chrom]} {os.path.join(snpsgendir, chrom_enriched)}",
             shell=True
