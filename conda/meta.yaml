@@ -32,8 +32,8 @@ requirements:
     - tk
     - openmp
     - libdeflate
-    - python
-    
+    - python >=3.11
+
   run:
     - intervaltree
     - matplotlib
@@ -47,8 +47,8 @@ requirements:
     - tk
     - openmp
     - libdeflate
-    - python
-    
+    - python >=3.11
+
 test:
   commands:
     - crispritz.py

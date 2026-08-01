@@ -13,7 +13,20 @@
 import multiprocessing
 import itertools
 import string
-import azimuth.model_comparison
+# The azimuth on-target (Doench 2016) scoring package is legacy code that
+# depends on sklearn ~0.21 pickled models (module paths such as
+# ``sklearn.ensemble.gradient_boosting`` removed in sklearn >=0.22). It does
+# not run on modern Python/sklearn. Import it defensively so that CFD
+# (off-target) scoring -- the part CRISPRme relies on -- still works. When
+# azimuth is unavailable, Doench scores degrade to 0. See issues #17/#18.
+try:
+    import azimuth.model_comparison
+    _AZIMUTH_AVAILABLE = True
+    _AZIMUTH_IMPORT_ERROR = None
+except Exception as _azimuth_err:  # noqa: BLE001 - any import-time failure
+    azimuth = None
+    _AZIMUTH_AVAILABLE = False
+    _AZIMUTH_IMPORT_ERROR = _azimuth_err
 import subprocess
 import numpy as np
 from os.path import isfile, join
@@ -187,8 +200,23 @@ if '.fasta' in chromosome_files[0]:
 #   if'+' in enr[-2]:
 #     enr_str = '.enriched'
 
-with open(os.path.dirname(os.path.realpath(__file__)) + "/azimuth/saved_models/V3_model_nopos.pickle", 'rb') as f:
-    model = pickle.load(f)
+# Load the azimuth (Doench 2016) model only if the package imported and the
+# pickle is loadable under the current sklearn. Any failure disables on-target
+# scoring but leaves CFD off-target scoring fully functional.
+model = None
+if _AZIMUTH_AVAILABLE:
+    try:
+        with open(os.path.dirname(os.path.realpath(__file__)) + "/azimuth/saved_models/V3_model_nopos.pickle", 'rb') as f:
+            model = pickle.load(f)
+    except Exception as _model_err:  # noqa: BLE001
+        _AZIMUTH_AVAILABLE = False
+        _AZIMUTH_IMPORT_ERROR = _model_err
+if not _AZIMUTH_AVAILABLE:
+    sys.stderr.write(
+        "WARNING: azimuth on-target (Doench 2016) scoring is unavailable "
+        "(%s). CFD off-target scoring will still be computed; Doench scores "
+        "will be reported as 0.\n" % (_AZIMUTH_IMPORT_ERROR,)
+    )
 max_doench = 0
 sum_cfd = 0
 
@@ -373,7 +401,8 @@ with open(score_filename, 'w+') as res, open(sys.argv[4], 'r') as guides:
         if g not in guides_dict:
             guides_dict[g] = 0
     # for k in guides_dict.keys():
-        if g not in targets_for_doench:
+        if g not in targets_for_doench or not _AZIMUTH_AVAILABLE:
+            # No targets to score, or azimuth on-target scoring is disabled.
             guides_dict_doench[g] = 0
         else:
             if len(targets_for_doench[g]) > SIZE_DOENCH:
