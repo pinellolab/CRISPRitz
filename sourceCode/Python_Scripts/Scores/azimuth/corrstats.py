@@ -17,7 +17,7 @@ For details, please refer to: http://www.philippsinger.info/?p=347
 """
 
 
-from __future__ import division
+
 
 __author__ = 'psinger'
 

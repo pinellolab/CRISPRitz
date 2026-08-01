@@ -21,56 +21,56 @@ def gp_on_fold(feature_sets, train, test, y, y_all, inputs, dim, dimsum, learn_o
 
     if 'drug' in feature_sets:
         Q = feature_sets['drug'].values.shape[1]
-        kern += GPy.kern.Linear(Q, active_dims=range(current_dim, current_dim+Q), name='drug_lin')
+        kern += GPy.kern.Linear(Q, active_dims=list(range(current_dim, current_dim+Q)), name='drug_lin')
         X = np.concatenate((X, feature_sets['drug'].values), axis=1)
         current_dim += Q
         assert X.shape[1] == current_dim
 
     if 'gene effect' in feature_sets:
         Q = feature_sets['gene effect'].values.shape[1]
-        kern += GPy.kern.Linear(Q, active_dims=range(current_dim, current_dim+Q), name='gene_lin')
+        kern += GPy.kern.Linear(Q, active_dims=list(range(current_dim, current_dim+Q)), name='gene_lin')
         X = np.concatenate((X, feature_sets['gene effect'].values), axis=1)
         current_dim += Q
         assert X.shape[1] == current_dim
 
     if "Percent Peptide" in feature_sets:
         Q = feature_sets['Percent Peptide'].values.shape[1]
-        kern += GPy.kern.RBF(Q, active_dims=range(current_dim, current_dim+Q), name='percent_pept')
+        kern += GPy.kern.RBF(Q, active_dims=list(range(current_dim, current_dim+Q)), name='percent_pept')
         X = np.concatenate((X, feature_sets['Percent Peptide'].values), axis=1)
         current_dim += Q
         assert X.shape[1] == current_dim
 
     if "Nucleotide cut position" in feature_sets:
         Q = feature_sets['Nucleotide cut position'].values.shape[1]
-        kern += GPy.kern.RBF(Q, active_dims=range(current_dim, current_dim+Q), name='nucleo_cut')
+        kern += GPy.kern.RBF(Q, active_dims=list(range(current_dim, current_dim+Q)), name='nucleo_cut')
         X = np.concatenate((X, feature_sets['Nucleotide cut position'].values), axis=1)
         current_dim += Q
         assert X.shape[1] == current_dim
 
     if "Strand effect" in feature_sets:
         Q = feature_sets['Strand effect'].values.shape[1]
-        kern += GPy.kern.Linear(Q, active_dims=range(current_dim, current_dim+Q), name='strand')
+        kern += GPy.kern.Linear(Q, active_dims=list(range(current_dim, current_dim+Q)), name='strand')
         X = np.concatenate((X, feature_sets['Strand effect'].values), axis=1)
         current_dim += Q
         assert X.shape[1] == current_dim
 
     if "NGGX" in feature_sets:
         Q = feature_sets['NGGX'].values.shape[1]
-        kern += GPy.kern.Linear(Q, active_dims=range(current_dim, current_dim+Q), name='NGGX')
+        kern += GPy.kern.Linear(Q, active_dims=list(range(current_dim, current_dim+Q)), name='NGGX')
         X = np.concatenate((X, feature_sets['NGGX'].values), axis=1)
         current_dim += Q
         assert X.shape[1] == current_dim
 
     if "TM" in feature_sets:
         Q = feature_sets['TM'].values.shape[1]
-        kern += GPy.kern.RBF(Q, ARD=True, active_dims=range(current_dim, current_dim+Q), name='TM')
+        kern += GPy.kern.RBF(Q, ARD=True, active_dims=list(range(current_dim, current_dim+Q)), name='TM')
         X = np.concatenate((X, feature_sets['TM'].values), axis=1)
         current_dim += Q
         assert X.shape[1] == current_dim
 
     if "gene features" in feature_sets:
         Q = feature_sets['gene features'].values.shape[1]
-        kern += GPy.kern.Linear(Q, ARD=True, active_dims=range(current_dim, current_dim+Q), name='genefeat')
+        kern += GPy.kern.Linear(Q, ARD=True, active_dims=list(range(current_dim, current_dim+Q)), name='genefeat')
         X = np.concatenate((X, feature_sets['gene features'].values), axis=1)
         current_dim += Q
         assert X.shape[1] == current_dim
@@ -100,8 +100,8 @@ def gp_on_fold(feature_sets, train, test, y, y_all, inputs, dim, dimsum, learn_o
         plt.figure('kernel')
         plt.title('kernel')
         plt.imshow(m.kern.K(X,X))
-        print m
-        print "%.3f variance explained" % (m.Gaussian_noise.variance/y[train].var())
+        print(m)
+        print("%.3f variance explained" % (m.Gaussian_noise.variance/y[train].var()))
         import ipdb; ipdb.set_trace()
         plt.close('all')
     else:

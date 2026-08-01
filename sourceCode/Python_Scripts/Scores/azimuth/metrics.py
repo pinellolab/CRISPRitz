@@ -10,12 +10,10 @@ http://www.stanford.edu/class/cs276/handouts/EvaluationNew-handout-6-per.pdf
 http://hal.archives-ouvertes.fr/docs/00/72/67/60/PDF/07-busa-fekete.pdf
 Learning to Rank for Information Retrieval (Tie-Yan Liu)
 """
-#import np as np    #commented because no module np for conda
 import numpy as np
 import scipy as sp
 import scipy.stats
-#import util as ut          #py2
-from . import util as np  #py3
+from . import util as ut
 import time
 
 def mean_reciprocal_rank(rs):
@@ -501,10 +499,10 @@ def ndcg_at_k_swap_perm_test(preds1, preds2, true_labels, nperm, method, k, norm
         return pval, real_ndcg_diff, perm_ndcg_diff, ndcg1, ndcg2
 
 if __name__ == "__main__":
-    import cPickle as pickle
+    import pickle as pickle
     import matplotlib.pyplot as plt
     import elevation.metrics
-    import corrstats
+    from . import corrstats
 
     simulated_data = True
     permute_real_data = True
@@ -532,9 +530,9 @@ if __name__ == "__main__":
     allp = np.nan*np.zeros((len(theta_range) + 1, T))
 
     if not simulated_data:
-        print("loading up saved data...") # two-fold CV data from CRISPR off-target GUIDE-SEQ)
+        print("loading up saved data...") # two-fold CV data from CRISPR off-target GUIDE-SEQ
         with open(r'\\nerds5\kevin\from_nicolo\gs.pickle','rb') as f:  predictions, truth_all = pickle.load(f)
-        print ("done.")
+        print("done.")
         N = len(truth_all[0])
             
     for t in range(T):
@@ -630,10 +628,10 @@ if __name__ == "__main__":
     pval, real_ndcg_diff,  perm_ndcg_diff, ndcg1, ndcg2 = ndcg_at_k_swap_perm_test(pred1, pred2, truth, nperm, method, k, normalize_from_below_too, theta=theta)
     print("ndcg1=%f, ndcg2=%f, ndcg_diff=%f, p=%f" % (ndcg1, ndcg2, real_ndcg_diff, pval))
     
-    pval, real_ndcg_diff,  perm_ndcg_diff, ndcg1, ndcg2 = ndcg_at_k_swap_perm_test(pred1, pred1, truth, nperm, method, k, normalize_from_below_too, theta=theta)
+    pval, real_ndcg_diff,  perm_ndcg_diff, ndcg1, ndcg2 = ndcg_at_k_swap_perm_test(pred1, pred1, truth, nperm, method, k, normalize_from_below_too, theta=theta)    
     print("ndcg1=%f, ndcg2=%f, ndcg_diff=%f, p=%f" % (ndcg1, ndcg2, real_ndcg_diff, pval))
 
-    pval, real_ndcg_diff,  perm_ndcg_diff, ndcg1, ndcg2 = ndcg_at_k_swap_perm_test(pred1, pred4, truth, nperm, method, k, normalize_from_below_too, theta=theta)
+    pval, real_ndcg_diff,  perm_ndcg_diff, ndcg1, ndcg2 = ndcg_at_k_swap_perm_test(pred1, pred4, truth, nperm, method, k, normalize_from_below_too, theta=theta)    
     print("ndcg1=%f, ndcg2=%f, ndcg_diff=%f, p=%f" % (ndcg1, ndcg2, real_ndcg_diff, pval))
 
     pval, real_ndcg_diff,  perm_ndcg_diff, ndcg1, ndcg2 = ndcg_at_k_swap_perm_test(pred1, pred5, truth, nperm, method, k, normalize_from_below_too, theta=theta)    

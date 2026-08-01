@@ -43,7 +43,7 @@ Here we summarize the steps to install CRISPRitz with Docker and Conda.
     conda config --add channels defaults
     conda config --add channels bioconda
     conda config --add channels conda-forge
-    conda install python=3.8
+    conda install python=3.11
     ```
 - Now, you can install CRISPRitz by typing the command:
     ```

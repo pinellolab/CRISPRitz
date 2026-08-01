@@ -9,3 +9,9 @@ searchBruteForce
 *.zip
 *.gz
 *.xls
+
+# Python bytecode / caches (do not commit compiled artifacts; stale
+# cpython-3.5/3.6 .pyc shadowing source caused "bad magic number", issue #17)
+__pycache__/
+*.py[cod]
+*$py.class
