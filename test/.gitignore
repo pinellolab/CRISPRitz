@@ -1,0 +1,6 @@
+# The repo-root .gitignore ignores *.txt and *.fa globally. These test
+# fixtures must be committed so CI needs no downloads, so re-include them here.
+!fixtures/guide.txt
+!fixtures/pamNGG.txt
+!fixtures/pamWTN.txt
+!fixtures/genome/chr1.fa

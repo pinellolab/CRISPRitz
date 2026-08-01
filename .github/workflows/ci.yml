@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    name: build + minimal search test (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+
+      - name: Run minimal test (NGG)
+        run: bash test/run_minimal_test.sh
+        env:
+          PAM: NGG
+
+  asan:
+    name: AddressSanitizer (#105 regression guard, WTN + DNA bulge)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+
+      # searchOnTST.cpp had a heap-buffer-overflow (CRISPRme #105) that
+      # AddressSanitizer aborts on when combined with a degenerate odd-length
+      # PAM (WTN) and a DNA bulge. This job compiles with ASan and runs exactly
+      # that repro: it MUST pass on the fixed code and would fail on the
+      # unfixed code, locking in the fix.
+      - name: Run ASan test (WTN + DNA bulge)
+        run: bash test/run_minimal_test.sh
+        env:
+          PAM: WTN
+          BDNA: "1"
+          OMP_NUM_THREADS: "1"
+          CXXFLAGS: "-fsanitize=address -g -O1"
+          # No leak detection: we only guard against memory-safety errors
+          # (heap-buffer-overflow / invalid free), and abort on any ASan error.
+          ASAN_OPTIONS: "detect_leaks=0:abort_on_error=1"
+
+  arm64-build:
+    name: native arm64 build + test (Apple Silicon / aarch64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU (arm64 emulation)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      # Compile and run the minimal NGG test natively for linux/arm64 inside a
+      # gcc container under QEMU. This proves CRISPRitz builds and runs on
+      # aarch64, which is what keeps the CRISPRme arm64 Docker image and Apple
+      # Silicon (M1/M2/M3) usage safe. Kept tiny so it stays fast under QEMU.
+      - name: Build + run minimal test on linux/arm64
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD":/src -w /src \
+            gcc:12 bash test/run_minimal_test.sh
+        env:
+          PAM: NGG

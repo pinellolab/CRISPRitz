@@ -1,0 +1,37 @@
+name: Docker multi-arch build
+
+# Keeps the root Dockerfile healthy for both linux/amd64 and linux/arm64
+# (Apple Silicon / aarch64) by building — but NOT pushing — a multi-arch image.
+#
+# The Dockerfile installs CRISPRitz from bioconda; bioconda publishes a
+# linux-aarch64 build, so the image is expected to build for both arches.
+# This job is intentionally kept separate from the source-level CI (ci.yml):
+# the compile + ASan + arm64-source jobs there are the hard guarantees, while
+# this one is an early-warning for image/base-image/bioconda drift and is
+# allowed to be the thing that breaks first without hiding the core signal.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  buildx:
+    name: buildx amd64 + arm64 (no push)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build multi-arch image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
