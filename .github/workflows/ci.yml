@@ -21,6 +21,29 @@ jobs:
         env:
           PAM: NGG
 
+  golden:
+    name: golden search regression (Cas9 NGG + Cas12a TTTV)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+
+      # Byte-for-byte lock of the searchTST output for BOTH a Cas9 (NGG, 3' PAM)
+      # and a Cas12a (TTTV, 5' PAM) guide over the committed synthetic genome,
+      # with mismatches + a DNA bulge. The expected outputs live in
+      # test/fixtures/golden/ and were generated with the #105-fixed binary.
+      # Any drift in the search engine (mismatch/bulge/PAM handling, ordering,
+      # or a #105-style regression) fails this job. This is the search-engine
+      # analog of CRISPRme's two precomputed brute-force benchmarks.
+      - name: Run golden search regression (Cas9 + Cas12a)
+        run: bash test/run_golden_test.sh
+        env:
+          OMP_NUM_THREADS: "1"
+
   asan:
     name: AddressSanitizer (#105 regression guard, WTN + DNA bulge)
     runs-on: ubuntu-latest

@@ -4,3 +4,11 @@
 !fixtures/pamNGG.txt
 !fixtures/pamWTN.txt
 !fixtures/genome/chr1.fa
+# Cas9 + Cas12a golden search regression fixtures.
+!fixtures/guide_cas9.txt
+!fixtures/guide_cas12a.txt
+!fixtures/pam_cas9.txt
+!fixtures/pam_cas12a.txt
+!fixtures/golden/
+!fixtures/golden/cas9.targets.txt
+!fixtures/golden/cas12a.targets.txt
