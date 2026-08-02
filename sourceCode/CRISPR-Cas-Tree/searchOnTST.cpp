@@ -1066,11 +1066,11 @@ int main(int argc, char **argv)
 			reverse(iguide.begin(), iguide.end());
 		}
 
-		char *temp_char_guide = (char *)malloc((pamlen - pamlimit) * sizeof(char));
+		char *temp_char_guide = (char *)malloc((pamlen - pamlimit + 1) * sizeof(char));
 		// guideRNA.push_back((char *)malloc((pamlen - pamlimit) * sizeof(char)));
 		guideRNA.push_back(temp_char_guide);
 		copy(iguide.begin(), iguide.end(), guideRNA[numGuide]); // save Guide
-		guideRNA[numGuide][(pamlen - pamlimit) + 1] = '\0';
+		guideRNA[numGuide][pamlen - pamlimit] = '\0';
 		numGuide++;
 		// free(temp_char_guide);
 	}
