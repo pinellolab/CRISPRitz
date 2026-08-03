@@ -9,6 +9,7 @@
 // Usage: enricher <vcf.gz> <chrom.fa> <argv3prefix> <yes|no> <argv5path>
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -549,9 +550,10 @@ int main(int argc, char **argv) {
     std::string fakeDir;
     if (doYes) {
         fakeDir = "fake_" + vcfName + "_" + currentChr;
-        struct stat st;
-        if (stat(fakeDir.c_str(), &st) != 0) {
-            mkdir(fakeDir.c_str(), 0777);
+        // race-safe: concurrent workers may create this dir; treat EEXIST as OK.
+        if (mkdir(fakeDir.c_str(), 0777) != 0 && errno != EEXIST) {
+            fprintf(stderr, "ERROR: cannot create %s\n", fakeDir.c_str());
+            return 1;
         }
     }
 
@@ -598,9 +600,11 @@ int main(int argc, char **argv) {
         return 1;
     }
     {
-        struct stat st;
-        if (stat(dir_enr_name.c_str(), &st) != 0) {
-            mkdir(dir_enr_name.c_str(), 0777);
+        // race-safe: this shared <dirGenome>_enriched dir is created by every
+        // concurrent worker; treat EEXIST as success.
+        if (mkdir(dir_enr_name.c_str(), 0777) != 0 && errno != EEXIST) {
+            fprintf(stderr, "ERROR: cannot create %s\n", dir_enr_name.c_str());
+            return 1;
         }
         // genomeHeader[1:(len-1)] : strip leading '>' and trailing '\n'
         std::string hcore;
