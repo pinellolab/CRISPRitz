@@ -560,10 +560,26 @@ def annotateResults():
         print("Annotation runtime: %s seconds" % (time.time() - start_time))
 
 
+def _enricher_command():
+    """Resolve the enrichment executable, preferring the compiled binary.
+
+    Order: a binary named ``enricher`` on PATH, then the compiled binary shipped
+    alongside the reference implementation, else the Python reference script.
+    Returns a list suitable to prepend to the 5 positional enricher args.
+    """
+    found = shutil.which("enricher")
+    if found:
+        return [found]
+    compiled = corrected_origin_path + "Python_Scripts/Enrichment/enricher"
+    if os.path.isfile(compiled) and os.access(compiled, os.X_OK):
+        return [compiled]
+    return [corrected_origin_path + "Python_Scripts/Enrichment/enricher.py"]
+
+
 def genomeEnrichment_subprocess_VCF(altfile, genfile, dirGenome, doit, dirVCFFiles):
     subprocess.run(
-        [
-            corrected_origin_path + "Python_Scripts/Enrichment/enricher.py",
+        _enricher_command()
+        + [
             altfile,
             genfile,
             dirGenome.split("/")[-1],
@@ -571,6 +587,29 @@ def genomeEnrichment_subprocess_VCF(altfile, genfile, dirGenome, doit, dirVCFFil
             dirVCFFiles,
         ]
     )
+
+
+def _enrichment_workers(th_from_flag, th_provided, n_chroms):
+    """Choose the number of enrichment workers under a memory budget.
+
+    Each worker loads ~one chromosome, so unbounded fan-out can exhaust RAM.
+    Mirrors the CRISPRme post-analysis cap (CRISPRME_MAX_MEM_GB, default 64).
+    """
+    import os
+
+    try:
+        budget = float(os.environ.get("CRISPRME_MAX_MEM_GB", "64"))
+    except ValueError:
+        budget = 64.0
+    try:
+        per = float(os.environ.get("CRISPRME_ENRICH_WORKER_GB", "3"))
+    except ValueError:
+        per = 3.0
+    if per <= 0:
+        per = 3.0
+    mem_cap = max(1, int(budget // per))
+    base = th_from_flag if th_provided else (os.cpu_count() or 1)
+    return max(1, min(base, mem_cap, n_chroms))
 
 
 def genomeEnrichment():
@@ -635,6 +674,7 @@ def genomeEnrichment():
 
     # read number of mismatches
     th = 1
+    th_provided = "-th" in sys.argv[1:]
     if "-th" in sys.argv[1:]:
         try:
             th = (sys.argv).index("-th") + 1
@@ -668,7 +708,28 @@ def genomeEnrichment():
 
     os.chdir("../")
     # os.chdir(dirParsedFiles)
-    pool = multiprocessing.Pool(th)
+    n_workers = _enrichment_workers(th, th_provided, len(listChrs))
+    print(
+        "add-variants: enriching %d chromosome(s) with %d worker(s) "
+        "(mem budget %s GB, ~%s GB/worker)"
+        % (
+            len(listChrs),
+            n_workers,
+            os.environ.get("CRISPRME_MAX_MEM_GB", "64"),
+            os.environ.get("CRISPRME_ENRICH_WORKER_GB", "3"),
+        ),
+        file=sys.stderr,
+    )
+    # Use a 'fork' context: crispritz.py runs its command dispatch at module
+    # scope (no __main__ guard), so a 'spawn' start method would re-import and
+    # re-invoke add-variants inside every worker. 'fork' is the Linux default
+    # (the CRISPRme production platform); we request it explicitly so parallel
+    # enrichment behaves identically on macOS.
+    try:
+        mp_ctx = multiprocessing.get_context("fork")
+    except ValueError:
+        mp_ctx = multiprocessing
+    pool = mp_ctx.Pool(n_workers)
 
     print("Variants Extraction and Processing START")
     start_time = time.time()
