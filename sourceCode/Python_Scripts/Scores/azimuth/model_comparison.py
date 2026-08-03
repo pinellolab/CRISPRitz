@@ -1,19 +1,19 @@
-import azimuth.predict as pd
+from . import predict as pd
 import copy
 import os
 import numpy as np
-import azimuth.util
-import shutil
+from . import util
 import pickle
-import pylab as plt
 import pandas
-import azimuth.local_multiprocessing
-import azimuth.load_data
-import azimuth.features.featurization as feat
+from . import local_multiprocessing
+from . import load_data
+from .features import featurization
+import warnings 
+warnings.filterwarnings("ignore")
 
 def check_feature_set_dims(feature_sets):
     F2 = None
-    for set in feature_sets.keys():
+    for set in list(feature_sets.keys()):
         F = feature_sets[set].shape[0]
         if F2 is None: F = F2
         assert F == F2, "not same # individuals for feature %s" % set
@@ -22,7 +22,7 @@ def check_feature_set_dims(feature_sets):
 
 
 def set_target(learn_options, classification):
-    assert 'target_name' not in learn_options.keys() or learn_options['target_name'] is not None, "changed it to be automatically set here"
+    assert 'target_name' not in list(learn_options.keys()) or learn_options['target_name'] is not None, "changed it to be automatically set here"
     if not classification:
         learn_options["target_name"] = learn_options['rank-transformed target name']
         learn_options["training_metric"] = 'spearmanr'
@@ -61,7 +61,7 @@ def L1_setup(learn_options, set_target_fn=set_target):
     learn_options["method"] = "linreg"
     learn_options["penalty"] = "L1"
     learn_options["feature_select"] = False
-    if "alpha" not in learn_options.keys():
+    if "alpha" not in list(learn_options.keys()):
         learn_options["alpha"] = np.array([1e-6*pow(1.3,x) for x in range(0,100)])
     learn_options["loss"] = "squared"
 
@@ -72,7 +72,7 @@ def L2_setup(learn_options, set_target_fn=set_target):
     learn_options["method"] = "linreg"
     learn_options["penalty"] = "L2"
     learn_options["feature_select"] = False
-    if "alpha" not in learn_options.keys():
+    if "alpha" not in list(learn_options.keys()):
         learn_options["alpha"] = np.array([1e-6*pow(1.3,x) for x in range(0,100)])
     learn_options["loss"] = "squared"
 
@@ -94,7 +94,7 @@ def elasticnet_setup(learn_options, set_target_fn=set_target):
     learn_options["penalty"] = "EN"
     learn_options["feature_select"] = False
     learn_options["loss"] = "squared"
-    if "alpha" not in learn_options.keys():
+    if "alpha" not in list(learn_options.keys()):
         learn_options["alpha"] = np.array([1e-5*pow(2,x) for x in range(0,30)])
     return learn_options
 
@@ -124,7 +124,7 @@ def linreg_setup(learn_options, set_target_fn=set_target):
     learn_options["method"] = "linreg"
     learn_options["penalty"] = "L1"
     learn_options["feature_select"] = False
-    if "alpha" not in learn_options.keys():
+    if "alpha" not in list(learn_options.keys()):
         learn_options["alpha"] = np.array([0.0])
     learn_options["loss"] = "squared"
     learn_options = set_target_fn(learn_options, classification=False)
@@ -136,9 +136,9 @@ def logregL1_setup(learn_options, set_target_fn=set_target):
     learn_options["method"] = "logregL1"
     learn_options["penalty"] = "L1"
     learn_options["feature_select"] = False
-    if "alpha" not in learn_options.keys():
+    if "alpha" not in list(learn_options.keys()):
         learn_options["alpha"] = np.array([1e-6*pow(1.3,x) for x in range(0,100)])
-    if not learn_options.has_key("fit_intercept"):
+    if "fit_intercept" not in learn_options:
         learn_options["fit_intercept"] = True
     return learn_options
 
@@ -147,7 +147,7 @@ def LASSOs_ensemble_setup(learn_options, set_target_fn=set_target):
     learn_options["method"] = "lasso_ensemble"
     learn_options["penalty"] = "L1"
     learn_options["feature_select"] = False
-    if "alpha" not in learn_options.keys():
+    if "alpha" not in list(learn_options.keys()):
         learn_options["alpha"] = np.array([1e-6*pow(1.3,x) for x in range(0,100)])
     learn_options["loss"] = "squared"
 
@@ -171,9 +171,9 @@ def adaboost_setup(learn_options, num_estimators=100, max_depth=3, learning_rate
         raise Exception("model must be either AdaBoost or AdaBoost Classifier")
     learn_options['adaboost_version'] = 'python' # "R" or "python"
 
-    if 'adaboost_loss' not in learn_options.keys() and model=="AdaBoostRegressor":
+    if 'adaboost_loss' not in list(learn_options.keys()) and model=="AdaBoostRegressor":
         learn_options['adaboost_loss'] = 'ls' # alternatives: "lad", "huber", "quantile", see scikit docs for details
-    if 'adaboost_alpha' not in learn_options.keys():
+    if 'adaboost_alpha' not in list(learn_options.keys()):
         learn_options['adaboost_alpha'] = 0.5 # this parameter is only used by the huber and quantile loss functions.
 
     if not learn_options['adaboost_CV']:
@@ -187,46 +187,46 @@ def adaboost_setup(learn_options, num_estimators=100, max_depth=3, learning_rate
 
 
 def shared_setup(learn_options, order, test):
-    if 'num_proc' not in learn_options.keys():
+    if 'num_proc' not in list(learn_options.keys()):
         learn_options['num_proc'] = None
-    if 'num_thread_per_proc' not in learn_options.keys():
+    if 'num_thread_per_proc' not in list(learn_options.keys()):
         learn_options['num_thread_per_proc'] = None
 
-    num_proc = azimuth.local_multiprocessing.configure(TEST=test, num_proc=learn_options["num_proc"],
+    num_proc = local_multiprocessing.configure(TEST=test, num_proc=learn_options["num_proc"],
                                                 num_thread_per_proc=learn_options["num_thread_per_proc"])
     learn_options["num_proc"] = num_proc
 
     learn_options["order"] = order  # gets used many places in code, not just here
 
-    if "cv" not in learn_options.keys():
+    if "cv" not in list(learn_options.keys()):
         # if no CV preference is specified, use leave-one-gene-out
         learn_options["cv"] = "gene"
 
-    if "normalize_features" not in learn_options.keys():
+    if "normalize_features" not in list(learn_options.keys()):
         # if no CV preference is specified, use leave-one-gene-out
         learn_options["normalize_features"] = True
 
-    if "weighted" not in learn_options.keys():
+    if "weighted" not in list(learn_options.keys()):
         learn_options['weighted'] = None
 
-    if "all pairs" not in learn_options.keys():
+    if "all pairs" not in list(learn_options.keys()):
         learn_options["all pairs"] = False
 
-    if "include_known_pairs" not in learn_options.keys():
+    if "include_known_pairs" not in list(learn_options.keys()):
         learn_options["include_known_pairs"] = False
 
-    if "include_gene_guide_feature" not in learn_options.keys():
+    if "include_gene_guide_feature" not in list(learn_options.keys()):
         learn_options["include_gene_guide_feature"] = 0 #used as window size, so 0 is none
 
     #these should default to true to match experiments before they were options:
-    if "gc_features" not in learn_options.keys():
+    if "gc_features" not in list(learn_options.keys()):
         learn_options["gc_features"] = True
-    if "nuc_features" not in learn_options.keys():
+    if "nuc_features" not in list(learn_options.keys()):
         learn_options["nuc_features"] = True
 
-    if 'train_genes' not in learn_options.keys():
+    if 'train_genes' not in list(learn_options.keys()):
         learn_options["train_genes"] = None
-    if 'test_genes' not in learn_options.keys():
+    if 'test_genes' not in list(learn_options.keys()):
         learn_options["test_genes"] = None
 
     if "num_proc" not in learn_options:
@@ -255,11 +255,11 @@ def setup(test=False, order=1, learn_options=None, data_file=None, pam_audit=Tru
 
     num_proc = shared_setup(learn_options, order, test)
 
-    assert "testing_non_binary_target_name" in learn_options.keys(), "need this in order to get metrics, though used to be not needed, so you may newly see this error"
+    assert "testing_non_binary_target_name" in list(learn_options.keys()), "need this in order to get metrics, though used to be not needed, so you may newly see this error"
     if learn_options["testing_non_binary_target_name"] not in ['ranks', 'raw', 'thrs']:
         raise Exception('learn_otions["testing_non_binary_target_name"] must be in ["ranks", "raw", "thrs"]')
 
-    Xdf, Y, gene_position, target_genes = azimuth.load_data.from_file(data_file, learn_options)
+    Xdf, Y, gene_position, target_genes = load_data.from_file(data_file, learn_options)
     learn_options['all_genes'] = target_genes
 
     if test:
@@ -268,19 +268,19 @@ def setup(test=False, order=1, learn_options=None, data_file=None, pam_audit=Tru
     if 'convert_30mer_to_31mer' in learn_options and learn_options['convert_30mer_to_31mer'] is True:
         print("WARNING!!! converting 30 mer to 31 mer (and then cutting off first nucleotide to go back to 30mer with a right shift)")
         for i in range(Xdf.shape[0]):
-            Xdf['30mer'].iloc[i] = azimuth.util.convert_to_thirty_one(Xdf.iloc[i]["30mer"], Xdf.index.values[i][1], Xdf.iloc[i]["Strand"])
+            Xdf['30mer'].iloc[i] = util.convert_to_thirty_one(Xdf.iloc[i]["30mer"], Xdf.index.values[i][1], Xdf.iloc[i]["Strand"])
         # to_keep = Xdf['30mer'].isnull() == False
         # Xdf = Xdf[to_keep]
         # gene_position = gene_position[to_keep]
         # Y = Y[to_keep]
         Xdf["30mer"] = Xdf["30mer"].apply(lambda x: x[1:]) # chop the first nucleotide
 
-    if learn_options.has_key('left_right_guide_ind') and learn_options['left_right_guide_ind'] is not None:
+    if 'left_right_guide_ind' in learn_options and learn_options['left_right_guide_ind'] is not None:
         seq_start, seq_end, expected_length = learn_options['left_right_guide_ind']
         assert len(Xdf["30mer"].values[0]) == expected_length
         Xdf['30mer'] = Xdf['30mer'].apply(lambda seq: seq[seq_start:seq_end])
 
-    feature_sets = feat.featurize_data(Xdf, learn_options, Y, gene_position, pam_audit=pam_audit, length_audit=length_audit)
+    feature_sets = featurization.featurize_data(Xdf, learn_options, Y, gene_position, pam_audit=pam_audit, length_audit=length_audit)
     np.random.seed(learn_options['seed'])
 
     return Y, feature_sets, target_genes, learn_options, num_proc
@@ -308,17 +308,17 @@ def run_models(models, orders, GP_likelihoods=['gaussian', 'warped'], WD_kernel_
 
     if not CV:
         print("Received option CV=False, so I'm training using all of the data")
-        assert len(learn_options_set.keys()) == 1, "when CV is False, only 1 set of learn options is allowed"
+        assert len(list(learn_options_set.keys())) == 1, "when CV is False, only 1 set of learn options is allowed"
         assert len(models) == 1, "when CV is False, only 1 model is allowed"
 
 
-    for learn_options_str in learn_options_set.keys():
+    for learn_options_str in list(learn_options_set.keys()):
         # these options get augmented in setup
         partial_learn_opt = learn_options_set[learn_options_str]
         # if the model requires encoded features
         for model in models:
             # models requiring explicit featurization
-            if model in feat_models_short.keys():
+            if model in list(feat_models_short.keys()):
                 for order in orders:
                     print("running %s, order %d for %s" % (model, order, learn_options_str))
 
@@ -394,7 +394,7 @@ def pickle_runner_results(exp_name, results, all_learn_options, relpath="/../" +
         os.makedirs(dname)
         print("Created directory: %s" % str(dname))
     if exp_name is None:
-        exp_name = results.keys()[0]
+        exp_name = list(results.keys())[0]
     myfile = dname+'/'+ exp_name + '.pickle'
     with open(myfile, 'wb') as f:
         print("writing results to %s" % myfile)
@@ -404,8 +404,8 @@ def runner(models, learn_options, GP_likelihoods=None, orders=None, WD_kernel_de
 
     if where == 'local':
         results, all_learn_options = run_models(models, orders=orders, GP_likelihoods=GP_likelihoods, learn_options_set=learn_options, WD_kernel_degrees=WD_kernel_degrees, test=test, **kwargs)
-        all_metrics, gene_names = azimuth.util.get_all_metrics(results, learn_options)
-        azimuth.util.plot_all_metrics(all_metrics, gene_names, all_learn_options, save=True)
+        all_metrics, gene_names = util.get_all_metrics(results, learn_options)
+        util.plot_all_metrics(all_metrics, gene_names, all_learn_options, save=True)
 
         # for non-local (i.e. cluster), the comparable code is in cli_run_model.py
         pickle_runner_results(exp_name, results, all_learn_options)
@@ -413,7 +413,7 @@ def runner(models, learn_options, GP_likelihoods=None, orders=None, WD_kernel_de
         return results, all_learn_options, all_metrics, gene_names
 
     elif where == 'cluster':
-        import cluster_job
+        from . import cluster_job
 
         # create random cluster directory, dump learn options, and create cluster file
         tempdir, user, clust_filename = cluster_job.create(cluster_user, models, orders, WD_kernel_degrees, GP_likelihoods, exp_name=exp_name, learn_options=learn_options, **kwargs)
@@ -438,8 +438,8 @@ def save_final_model_V3(filename=None, include_position=True, learn_options=None
     if learn_options is None:
         if include_position:
             learn_options = {"V": 3,
-                        'train_genes': azimuth.load_data.get_V3_genes(),
-                        'test_genes': azimuth.load_data.get_V3_genes(),
+                        'train_genes': load_data.get_V3_genes(),
+                        'test_genes': load_data.get_V3_genes(),
                         "testing_non_binary_target_name": 'ranks',
                         'include_pi_nuc_feat': True,
                         "gc_features": True,
@@ -465,8 +465,8 @@ def save_final_model_V3(filename=None, include_position=True, learn_options=None
                         }
         else:
             learn_options = {"V": 3,
-                'train_genes': azimuth.load_data.get_V3_genes(),
-                'test_genes': azimuth.load_data.get_V3_genes(),
+                'train_genes': load_data.get_V3_genes(),
+                'test_genes': load_data.get_V3_genes(),
                 "testing_non_binary_target_name": 'ranks',
                 'include_pi_nuc_feat': True,
                 "gc_features": True,
@@ -496,7 +496,7 @@ def save_final_model_V3(filename=None, include_position=True, learn_options=None
                                             adaboost_max_depths=[3], adaboost_num_estimators=[100],
                                             learn_options_set=learn_options_set,
                                             test=test, CV=False, pam_audit=length_audit, length_audit=length_audit)
-    model = results.values()[0][3][0]
+    model = list(results.values())[0][3][0]
 
     with open(filename, 'wb') as f:
         pickle.dump((model, learn_options), f, -1)
@@ -504,10 +504,19 @@ def save_final_model_V3(filename=None, include_position=True, learn_options=None
     return model
 
 
-def predict(seq, aa_cut=-1, percent_peptide=-1, model=None, model_file=None, pam_audit=True, length_audit=False, learn_options_override=None):
+def predict(seq, aa_cut=None, percent_peptide=None, model=None, model_file=None, pam_audit=False, length_audit=False, learn_options_override=None):
     """
-    if pam_audit==False, then it will not check for GG in the expected position
-    this is useful if predicting on PAM mismatches, such as with off-target
+    Args:
+        seq: numpy array of 30 nt sequences.
+        aa_cut: numpy array of amino acid cut positions (optional).
+        percent_peptide: numpy array of percent peptide (optional).
+        model: model instance to use for prediction (optional).
+        model_file: file name of pickled model to use for prediction (optional).
+        pam_audit: check PAM of each sequence.
+        length_audit: check length of each sequence.
+        learn_options_override: a dictionary indicating which learn_options to override (optional).
+
+    Returns: a numpy array of predictions.
     """
     # assert not (model is None and model_file is None), "you have to specify either a model or a model_file"
     assert isinstance(seq, (np.ndarray)), "Please ensure seq is a numpy array"
@@ -526,13 +535,12 @@ def predict(seq, aa_cut=-1, percent_peptide=-1, model=None, model_file=None, pam
 
 
     if model_file is None:
-        azimuth_saved_model_dir = os.path.join(os.path.dirname(azimuth.__file__), 'saved_models')
-        #print(azimuth_saved_model_dir)
+        azimuth_saved_model_dir = os.path.join(os.path.dirname(__file__), 'saved_models')
         if np.any(percent_peptide == -1) or (percent_peptide is None and aa_cut is None):
-            #print("No model file specified, using V3_model_nopos")
+            # print("No model file specified, using V3_model_nopos")
             model_name = 'V3_model_nopos.pickle'
         else:
-            #print("No model file specified, using V3_model_full")
+            # print("No model file specified, using V3_model_full")
             model_name = 'V3_model_full.pickle'
 
         model_file = os.path.join(azimuth_saved_model_dir, model_name)
@@ -550,15 +558,15 @@ def predict(seq, aa_cut=-1, percent_peptide=-1, model=None, model_file=None, pam
     # Y, feature_sets, target_genes, learn_options, num_proc = setup(test=False, order=2, learn_options=learn_options, data_file=test_filename)
     # inputs, dim, dimsum, feature_names = pd.concatenate_feature_sets(feature_sets)
 
-    Xdf = pandas.DataFrame(columns=[u'30mer', u'Strand'], data=zip(seq, ['NA' for x in range(len(seq))]))
+    Xdf = pandas.DataFrame(columns=['30mer', 'Strand'], data=list(zip(seq, ['NA' for x in range(len(seq))])))
 
     if np.all(percent_peptide != -1) and (percent_peptide is not None and aa_cut is not None):
-        gene_position = pandas.DataFrame(columns=[u'Percent Peptide', u'Amino Acid Cut position'], data=zip(percent_peptide, aa_cut))
+        gene_position = pandas.DataFrame(columns=['Percent Peptide', 'Amino Acid Cut position'], data=list(zip(percent_peptide, aa_cut)))
     else:
-        gene_position = pandas.DataFrame(columns=[u'Percent Peptide', u'Amino Acid Cut position'], data=zip(np.ones(seq.shape[0])*-1, np.ones(seq.shape[0])*-1))
+        gene_position = pandas.DataFrame(columns=['Percent Peptide', 'Amino Acid Cut position'], data=list(zip(np.ones(seq.shape[0])*-1, np.ones(seq.shape[0])*-1)))
 
-    feature_sets = feat.featurize_data(Xdf, learn_options, pandas.DataFrame(), gene_position, pam_audit=pam_audit, length_audit=length_audit)
-    inputs, dim, dimsum, feature_names = azimuth.util.concatenate_feature_sets(feature_sets)
+    feature_sets = featurization.featurize_data(Xdf, learn_options, pandas.DataFrame(), gene_position, pam_audit=pam_audit, length_audit=length_audit)
+    inputs, dim, dimsum, feature_names = util.concatenate_feature_sets(feature_sets)
     
     #print "CRISPR"
     #pandas.DataFrame(inputs).to_csv("CRISPR.inputs.test.csv")
@@ -581,7 +589,7 @@ def override_learn_options(learn_options_override, learn_options):
     override all keys seen in learn_options_override to alter learn_options
     """
     if learn_options_override is not None:
-        for k in learn_options_override.keys():
+        for k in list(learn_options_override.keys()):
             learn_options[k] = learn_options_override[k]
     return learn_options
 
@@ -590,8 +598,8 @@ def fill_learn_options(learn_options_used_to_fill, learn_options_with_possible_m
     only fill in keys that are missing from learn_options from learn_options_fill
     """
     if learn_options_used_to_fill is not None:
-        for k in learn_options_used_to_fill.keys():
-            if not learn_options_with_possible_missing.has_key(k):
+        for k in list(learn_options_used_to_fill.keys()):
+            if k not in learn_options_with_possible_missing:
                 learn_options_with_possible_missing[k] = learn_options_used_to_fill[k]
     return learn_options_with_possible_missing
 
@@ -614,8 +622,8 @@ if __name__ == '__main__':
 
 
     learn_options = {"V": 3,
-                "train_genes": azimuth.load_data.get_V3_genes(),
-                "test_genes": azimuth.load_data.get_V3_genes(),
+                "train_genes": load_data.get_V3_genes(),
+                "test_genes": load_data.get_V3_genes(),
                 "target_name": 'score_drug_gene_rank',
                 "testing_non_binary_target_name": 'ranks',
                 'include_pi_nuc_feat': True,
