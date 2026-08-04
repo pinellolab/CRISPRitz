@@ -718,7 +718,7 @@ def genomeEnrichment():
             os.environ.get("CRISPRME_MAX_MEM_GB", "64"),
             os.environ.get("CRISPRME_ENRICH_WORKER_GB", "3"),
         ),
-        file=sys.stderr,
+        file=sys.stdout,
     )
     # Use a 'fork' context: crispritz.py runs its command dispatch at module
     # scope (no __main__ guard), so a 'spawn' start method would re-import and
