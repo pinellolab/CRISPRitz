@@ -1,6 +1,10 @@
 import pandas
-import matplotlib.pylab as plt
-import pylab as pl # so can just grab qqplotting code from fastlmm directly
+try:  # matplotlib is only used by plotting/analysis helpers below, never by scoring
+    import matplotlib.pylab as plt
+    import pylab as pl  # so can just grab qqplotting code from fastlmm directly
+except Exception:  # keep azimuth importable (and on-target scoring working) w/o matplotlib
+    plt = None
+    pl = None
 import scipy.stats
 import scipy as sp
 import numpy as np

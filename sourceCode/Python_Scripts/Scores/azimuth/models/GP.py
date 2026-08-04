@@ -1,5 +1,8 @@
 import numpy as np
-import matplotlib.pyplot as plt
+try:  # only used by training/plotting helpers, not by inference/scoring
+    import matplotlib.pyplot as plt
+except Exception:
+    plt = None
 
 
 def gp_on_fold(feature_sets, train, test, y, y_all, inputs, dim, dimsum, learn_options):
