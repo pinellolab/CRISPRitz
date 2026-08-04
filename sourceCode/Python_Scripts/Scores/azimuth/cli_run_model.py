@@ -1,5 +1,5 @@
 import os
-from model_comparison import *
+from .model_comparison import *
 import argparse
 
 # command-line version of model_comparison.py (see that file for more options?)
@@ -44,9 +44,9 @@ if __name__ == '__main__':
                                             adaboost_CV=options.adaboost_CV)
 
     if options.exp_name is None:
-        exp_name = results.keys()[0]
+        exp_name = list(results.keys())[0]
     else:
-        exp_name = results.keys()[0]
+        exp_name = list(results.keys())[0]
 
     os.chdir(cur_dir)
 

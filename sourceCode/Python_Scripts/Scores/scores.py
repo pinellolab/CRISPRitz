@@ -13,7 +13,24 @@
 import multiprocessing
 import itertools
 import string
-import azimuth.model_comparison
+# The azimuth on-target (Doench 2016) scoring package is vendored from
+# CRISPR-HAWK (github.com/pinellolab/CRISPR-HAWK, same lab), which ships a
+# modern port whose trained models (``saved_models/V3_model_*.pickle``)
+# unpickle cleanly on scikit-learn 1.1.3 / numpy 1.24.4 -- unlike the previous
+# sklearn ~0.21 models that referenced module paths removed in sklearn >=0.22
+# (e.g. ``sklearn.ensemble.gradient_boosting``) and broke on Python 3.11
+# (issues #17/#18). The import is still wrapped defensively so that, on an
+# unexpected environment mismatch, CFD (off-target) scoring -- the part
+# CRISPRme relies on -- keeps working and Doench scores degrade to 0 rather
+# than crashing. See azimuth/ATTRIBUTION.md for provenance and version pins.
+try:
+    import azimuth.model_comparison
+    _AZIMUTH_AVAILABLE = True
+    _AZIMUTH_IMPORT_ERROR = None
+except Exception as _azimuth_err:  # noqa: BLE001 - any import-time failure
+    azimuth = None
+    _AZIMUTH_AVAILABLE = False
+    _AZIMUTH_IMPORT_ERROR = _azimuth_err
 import subprocess
 import numpy as np
 from os.path import isfile, join
@@ -187,8 +204,26 @@ if '.fasta' in chromosome_files[0]:
 #   if'+' in enr[-2]:
 #     enr_str = '.enriched'
 
-with open(os.path.dirname(os.path.realpath(__file__)) + "/azimuth/saved_models/V3_model_nopos.pickle", 'rb') as f:
-    model = pickle.load(f)
+# Load the azimuth (Doench 2016) model. With the CRISPR-HAWK-derived package
+# and its modern saved_models this loads on scikit-learn 1.1.3 / numpy 1.24.4.
+# The load is still guarded: on an unexpected sklearn/numpy mismatch on-target
+# scoring is disabled but CFD off-target scoring stays fully functional.
+model = None
+if _AZIMUTH_AVAILABLE:
+    try:
+        with open(os.path.dirname(os.path.realpath(__file__)) + "/azimuth/saved_models/V3_model_nopos.pickle", 'rb') as f:
+            model = pickle.load(f)
+    except Exception as _model_err:  # noqa: BLE001
+        _AZIMUTH_AVAILABLE = False
+        _AZIMUTH_IMPORT_ERROR = _model_err
+if not _AZIMUTH_AVAILABLE:
+    sys.stderr.write(
+        "WARNING: azimuth on-target (Doench 2016) scoring is unavailable "
+        "(%s). CFD off-target scoring will still be computed; Doench scores "
+        "will be reported as 0. Expected working versions: scikit-learn"
+        "==1.1.3, numpy==1.24.4 (see azimuth/ATTRIBUTION.md).\n"
+        % (_AZIMUTH_IMPORT_ERROR,)
+    )
 max_doench = 0
 sum_cfd = 0
 
@@ -373,7 +408,8 @@ with open(score_filename, 'w+') as res, open(sys.argv[4], 'r') as guides:
         if g not in guides_dict:
             guides_dict[g] = 0
     # for k in guides_dict.keys():
-        if g not in targets_for_doench:
+        if g not in targets_for_doench or not _AZIMUTH_AVAILABLE:
+            # No targets to score, or azimuth on-target scoring is disabled.
             guides_dict_doench[g] = 0
         else:
             if len(targets_for_doench[g]) > SIZE_DOENCH:

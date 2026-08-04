@@ -18,6 +18,11 @@ With this aim in mind we created this package, containing the following software
 The two fastest way to use CRISPRitz is through the installation of Docker or Conda.
 Here we summarize the steps to install CRISPRitz with Docker and Conda.
 
+> ### Platform support
+> - **Linux (x86_64 and arm64):** fully supported natively — install via **Bioconda / Conda** (`conda install crispritz`).
+> - **macOS and Windows:** use the **Docker** image (see below). The image is multi-architecture and runs **natively on Apple Silicon Macs** (`linux/arm64`, no emulation).
+> - **Native macOS note:** `add-variants` (the C++ enricher) and on-target *azimuth* scoring build and run natively on Apple Silicon, but the index engine (`index-genome` / `search`, i.e. `buildTST`) relies on GCC's libstdc++ parallel extensions (`__gnu_parallel`), which Apple `clang` does not provide. For indexing/search on macOS, **use the Docker image** (it ships a Linux toolchain). This is also why the Bioconda package is **Linux-only** (`linux-64` + `linux-aarch64`).
+
 ## Installation (Phase 1)
 **Conda installation (Linux only):**
 - Open a terminal window
@@ -38,12 +43,12 @@ Here we summarize the steps to install CRISPRitz with Docker and Conda.
     (base) user@nameofPC:~$
     ```
     If you read the "(base)" like this, conda is loaded correctly and you can start using it.
-- Now you need to set the channels to allow conda to access different repositories and set the default version of python to version 3.8, so paste these commands into the terminal you just opened:
+- Now you need to set the channels to allow conda to access different repositories and set the default version of python to version 3.11, so paste these commands into the terminal you just opened:
     ```
-    conda config --add channels defaults
     conda config --add channels bioconda
     conda config --add channels conda-forge
-    conda install python=3.8
+    conda config --set channel_priority strict
+    conda install python=3.11
     ```
 - Now, you can install CRISPRitz by typing the command:
     ```

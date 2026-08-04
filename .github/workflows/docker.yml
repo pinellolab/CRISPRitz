@@ -1,16 +1,14 @@
 name: Docker multi-arch build
 
-# Tracks the health of the root Dockerfile for both linux/amd64 and
-# linux/arm64 (Apple Silicon / aarch64) by building — but NOT pushing — a
-# multi-arch image.
+# Builds — but does NOT push — the root Dockerfile for both linux/amd64 and
+# linux/arm64 (Apple Silicon / aarch64).
 #
-# NOTE: at the time this workflow was added the Dockerfile does NOT build (it
-# fails at `conda install python=3.8` with a solver conflict against the
-# current continuumio/miniconda3 base — a pre-existing staleness bug, not
-# arm64-specific). The job below is therefore `continue-on-error: true` and is
-# purely informational: it surfaces Dockerfile / base-image / bioconda drift
-# early without gating the PR. The hard aarch64 guarantee lives in the
-# source-level arm64-build job in ci.yml.
+# The Dockerfile was fixed to build on Python 3.11 (it previously failed on
+# BOTH arches at `conda install python=3.8`, an unsatisfiable solve against the
+# current continuumio/miniconda3 base). It now compiles the C++ binaries from
+# source and pins the scoring stack to scikit-learn 1.1.* + numpy<2 so the
+# vendored azimuth model loads. This job now gates the PR on both arches
+# building successfully.
 
 on:
   push:
@@ -21,16 +19,6 @@ jobs:
   buildx:
     name: buildx amd64 + arm64 (no push)
     runs-on: ubuntu-latest
-    # Informational early-warning only: it must not gate the source-level CI.
-    # As of this change the root Dockerfile does NOT build on any arch: the
-    # `RUN conda install python=3.8` step fails with a LibMambaUnsatisfiableError
-    # because the pinned python=3.8 is unsatisfiable against the current
-    # continuumio/miniconda3 base + channels. That is a pre-existing Dockerfile
-    # staleness bug (not arm64-specific and not introduced here); fixing it is a
-    # separate follow-up. Until then this job surfaces the state without turning
-    # the PR red -- the hard aarch64 guarantee is the source-level arm64-build
-    # job in ci.yml.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
