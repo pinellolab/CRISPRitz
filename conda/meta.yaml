@@ -5,7 +5,7 @@ package:
   version: {{ version }}
 
 source:
-  url: https://github.com/InfOmics/CRISPRitz/archive/v{{ version }}.tar.gz
+  url: https://github.com/pinellolab/CRISPRitz/archive/v{{ version }}.tar.gz
   sha256: 
 
 build:
@@ -71,6 +71,6 @@ test:
     - crispritz.py
 
 about:
-  home: https://github.com/InfOmics/CRISPRitz
+  home: https://github.com/pinellolab/CRISPRitz
   license: GPL3
   summary: CRISPRitz, tool package for CRISPR experiments assessment and analysis.
