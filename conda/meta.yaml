@@ -18,7 +18,8 @@ requirements:
     - make
     - boost
     - openmp
-    
+    - zlib
+
   host:
     - intervaltree
     - matplotlib
@@ -39,6 +40,7 @@ requirements:
     - tk
     - openmp
     - libdeflate
+    - zlib
     - python >=3.11
 
   run:
@@ -61,6 +63,7 @@ requirements:
     - tk
     - openmp
     - libdeflate
+    - zlib
     - python >=3.11
 
 test:
