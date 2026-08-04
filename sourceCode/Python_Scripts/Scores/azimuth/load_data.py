@@ -1,6 +1,9 @@
 import pandas
 from . import util
-import matplotlib.pyplot as plt
+try:  # only used by plotting helpers, not by scoring
+    import matplotlib.pyplot as plt
+except Exception:
+    plt = None
 import scipy as sp
 import scipy.stats
 import numpy as np
