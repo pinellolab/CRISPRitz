@@ -575,6 +575,13 @@ int main(int argc, char **argv) {
     std::string raw;
     while (vcf.getRawLine(raw)) {
         std::vector<std::string> line = splitStr(pyStrip(raw), '\t');
+        // issue #143: the per-position variant-info string is ';'-delimited
+        // (samples;ref,alt;rsID;AF). The VCF ID column (line[2]) can contain ';'
+        // for dbSNP multi-rsID records ("rs1;rs2"), colliding with that delimiter
+        // and shifting AF (and every field after) by one -> downstream float(rsID)
+        // crash. Normalize the ID field's ';' to ',' so rsID stays one field.
+        if (line.size() > 2)
+            std::replace(line[2].begin(), line[2].end(), ';', ',');
         if (first_line) {
             first_line = false;
             std::vector<std::string> splitted = splitStr(line[7], ';');

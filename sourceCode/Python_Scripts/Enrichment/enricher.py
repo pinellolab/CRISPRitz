@@ -353,6 +353,14 @@ for line in inAltFile:
         break
 for line in inAltFile:
     line = line.strip().split('\t')
+    # issue #143: the variant-info string embedded per position is ';'-delimited
+    # (samples;ref,alt;rsID;AF). The VCF ID column (line[2]) can itself contain
+    # ';' for dbSNP multi-rsID records (e.g. "rs1;rs2"), which collides with that
+    # delimiter and shifts AF (and every field after) by one -> downstream
+    # float(rsID) crashes. Normalize the ID field's ';' to ',' (CRISPRme's
+    # multi-value convention) once, so all rsID uses below stay a single field.
+    if len(line) > 2:
+        line[2] = line[2].replace(";", ",")
     if first_line:
         first_line = False
         splitted = line[7].split(";")
