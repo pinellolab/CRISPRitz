@@ -271,6 +271,17 @@ def searchTST():
     # run searchOnTST
     print("Search START")
     start_time = time.time()
+    # optional cap on the TOTAL number of edits (mismatches + DNA + RNA bulges),
+    # enforced inside the TST search (CRISPRme issue #107). Absent/negative => disabled.
+    max_edits = -1
+    if "--max-edits" in sys.argv[1:]:
+        try:
+            max_edits = int(sys.argv[(sys.argv).index("--max-edits") + 1])
+        except:
+            print(
+                "ATTENTION! Check the total-edits option: --max-edits <n> (n is an integer)"
+            )
+            sys.exit()
     subprocess.run(
         [
             corrected_origin_path + "searchTST",
@@ -284,6 +295,7 @@ def searchTST():
             str(r),
             str(th),
             max_bulges,
+            str(max_edits),
         ]
     )
     print("Search END")
@@ -718,7 +730,7 @@ def genomeEnrichment():
             os.environ.get("CRISPRME_MAX_MEM_GB", "64"),
             os.environ.get("CRISPRME_ENRICH_WORKER_GB", "3"),
         ),
-        file=sys.stderr,
+        file=sys.stdout,  # benign progress -> stdout, not stderr (stderr trips submit_job [ -s logerror ] gate)
     )
     # Use a 'fork' context: crispritz.py runs its command dispatch at module
     # scope (no __main__ guard), so a 'spawn' start method would re-import and
