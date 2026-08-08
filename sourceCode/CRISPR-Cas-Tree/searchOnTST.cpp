@@ -78,6 +78,7 @@ vector<string> guideRNA_s;				//input guide RNA as strings;
 vector<vector<bitset<4>>> guideRNA_bit; //input guide RNA in bitset
 int len_guide;
 int max_bulges = 0;
+int max_edits = -1; // total-edits cap (mismatches + DNA + RNA bulges), CRISPRme issue #107; -1 = disabled
 bool pam_at_start;
 
 //Create matrix for profiling //num_thr = number of layers of the matrix. Each thr update his own layer
@@ -895,6 +896,11 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool goToLoHi, int bulTypeRNA, int bulTypeDNA,
 				const int thr)
 {
+	// CRISPRme issue #107: prune whole subtrees whose path already spends more than
+	// the total-edits budget (mismatches + bulges). Edits only grow going down, and
+	// lo/hi siblings share the same (d,bD,bR), so pruning here is safe and complete.
+	if (max_edits >= 0 && (mm - d) + (bulDNA - bD) + (bulRNA - bR) > max_edits)
+		return;
 	if (p->lokid > 0 && goToLoHi)
 	{ // go to lokid
 		nearsearch(s, &albero_glb[thr][p->lokid], pos_in_guide, d, bD, bR, true, bulTypeRNA, bulTypeDNA, thr);
@@ -905,7 +911,8 @@ void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool
 		nearsearch(s, &albero_glb[thr][p->hikid], pos_in_guide, d, bD, bR, true, bulTypeRNA, bulTypeDNA, thr);
 	}
 
-	if (ti[thr] == (len_guide + bulDNA - bD) )
+	if (ti[thr] == (len_guide + bulDNA - bD) &&
+		(max_edits < 0 || (mm - d) + (bulDNA - bD) + (bulRNA - bR) <= max_edits))
 	{
 
 		save_function_start = omp_get_wtime();
@@ -970,7 +977,8 @@ void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool
 
 		d = (guideRNA_bit[guideI[thr]][pos_in_guide] & p->splitchar_bit) != 0 ? d : d - 1; // update distance where d is the number of mismatch
 
-		if (d > -1 && ti[thr] == (len_guide + bulDNA - bD)) // if all the mismatch were used (no more mismatches) and end of the guide
+		if (d > -1 && ti[thr] == (len_guide + bulDNA - bD) && // if all the mismatch were used (no more mismatches) and end of the guide
+			(max_edits < 0 || (mm - d) + (bulDNA - bD) + (bulRNA - bR) <= max_edits)) // #107 total-edits cap (last char mismatch counted above)
 		{ // save results
 
 			save_function_start = omp_get_wtime();
@@ -1019,6 +1027,10 @@ int main(int argc, char **argv)
 
 	string max_bulges_string = argv[10];
 	max_bulges = stoi(max_bulges_string);
+	// CRISPRme issue #107: optional 11th arg caps total edits (mismatches + bulges).
+	// Omitted or negative => disabled (backward compatible with existing callers).
+	if (argc > 11)
+		max_edits = atoi(argv[11]);
 	if (omp_get_max_threads() < num_thr)
 		num_thr = omp_get_max_threads();
 
