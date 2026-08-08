@@ -71,7 +71,7 @@ if '-ws' in sys.argv[:]:
     web_server = True
 if web_server:
     file_extension = 'png'
-if '-pop' is sys.argv[:]:
+if '-pop' in sys.argv[:]:
     population = True
 
 dictRef = {}

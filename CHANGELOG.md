@@ -43,6 +43,11 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   enrichment of merged multi-source population panels correct (e.g. CRISPRme's
   combined 1000G + HGDP panel).
 
+- `generate-report`: `radar_chart.py` compared a literal with `is`
+  (`if '-pop' is sys.argv[:]`), which raised a `SyntaxWarning` and — always being
+  False — left the `-pop` population-plot option dead. Use membership (`in`),
+  matching the adjacent `-ws` check (CRISPRitz issue #14).
+
 ### Changed
 - `add-variants` enrichment progress is written to stdout instead of stderr, so
   it no longer trips CRISPRme's `[ -s logerror ]` stage-failure gate.
