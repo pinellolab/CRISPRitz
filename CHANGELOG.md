@@ -15,18 +15,67 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 
 ## [Unreleased]
 
-### Fixed
-- `searchTST` heap buffer overflow when a degenerate PAM motif is combined with
-  bulges, which crashed the search (issue #105).
+## [2.8.1] - 2026-08-08
 
 ### Added
-- Continuous-integration workflow that builds CRISPRitz and runs the smoke/e2e
-  tests on Linux, catching build and search regressions before release.
+- `--max-edits` option for `searchTST`: cap the TOTAL number of edits
+  (mismatches + DNA bulges + RNA bulges) considered during the ternary-search-tree
+  search. The cap prunes the search tree in C++ as it descends, rather than
+  filtering results after the fact, so bounded searches complete dramatically
+  faster (e.g. an otherwise-intractable pamless whole-chromosome search finishes
+  in seconds). `-1` — the default, and the value used when the argument is
+  omitted — disables the cap, preserving prior behaviour. This backs CRISPRme's
+  total-edits control (CRISPRme issue #107).
+
+### Fixed
+- Variant-enrichment (`enricher`) allele-frequency / FILTER robustness: read
+  `INFO/AF` by exact key (so a pooled `AF` is selected over source-specific
+  `AF_*` / `*_AF` fields that may appear earlier in the record), guard the
+  allele-frequency count against the multiallelic records that `bcftools merge`
+  can emit, and accept both `PASS` and `.` in the FILTER column. This makes
+  enrichment of merged multi-source population panels correct (e.g. CRISPRme's
+  combined 1000G + HGDP panel).
 
 ### Changed
-- Removed stale committed `.pyc` bytecode from the source tree and ignore it
-  going forward, so the packaged sources no longer ship out-of-date compiled
-  artifacts.
+- `add-variants` enrichment progress is written to stdout instead of stderr, so
+  it no longer trips CRISPRme's `[ -s logerror ]` stage-failure gate.
+
+## [2.8.0] - 2026-08-04
+
+### Added
+- Python 3.11 support; stale committed bytecode removed and ignored going
+  forward (#17, #18).
+- On-target (azimuth) scoring restored on Python 3.11 via CRISPR-HAWK.
+- Golden-output search regression tests for Cas9 (NGG) and Cas12a (TTTV).
+- Continuous integration: build + minimal search test + AddressSanitizer
+  (guarding the #105 heap-overflow regression) + a native arm64 / Apple-Silicon
+  build.
+- Multi-architecture (amd64 + arm64) Docker image published to Docker Hub on
+  release (#32).
+
+### Changed
+- `enricher`: byte-identical C++ port of the variant-enrichment step, replacing
+  the previous Python implementation.
+- `add-variants`: memory-bounded cross-chromosome parallelism built on the
+  compiled enricher.
+- `azimuth`: matplotlib imports made lazy/optional (scoring no longer requires
+  matplotlib).
+- Conda recipe: added the `zlib` dependency (the enricher links `-lz` and
+  includes `zlib.h`).
+- `conda/meta.yaml`: `source` and `home` now point at pinellolab (were stale
+  InfOmics URLs) (#33).
+- README: documented platform support (Linux native; Docker for macOS + Windows).
+
+### Fixed
+- `add-variants`: normalize multi-rsID (`;`-separated) variant IDs — the root
+  cause of CRISPRme issue #143 (#35).
+- `add-variants`: worker diagnostic messages written to stdout, not stderr (#34).
+
+## [2.7.1] - 2026-08-01
+
+### Fixed
+- `searchTST` heap-buffer-overflow in the guide buffer when a degenerate PAM
+  motif is combined with bulges, which crashed the search (CRISPRme issue #105).
 
 ## [2.7.0] - 2025-09-17
 
@@ -80,7 +129,10 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 ### Added
 - Support for longer PAMs and mismatches within PAMs (beta).
 
-[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.7.0...HEAD
+[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.8.1...HEAD
+[2.8.1]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.1
+[2.8.0]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.0
+[2.7.1]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.7.1
 [2.7.0]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.7.0
 [2.6.6]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.6.6
 [2.6.5]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.6.5
