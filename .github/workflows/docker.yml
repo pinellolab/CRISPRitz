@@ -1,0 +1,114 @@
+name: Docker multi-arch build & publish
+
+# Builds the root Dockerfile for both linux/amd64 and linux/arm64 (Apple
+# Silicon / aarch64). The Dockerfile builds CRISPRitz FROM SOURCE on
+# Python 3.11 (it previously failed on BOTH arches at `conda install
+# python=3.8`, an unsatisfiable solve against the current base image). It
+# compiles the C++ binaries and pins the scoring stack to scikit-learn 1.1.3 +
+# numpy 1.24.4 so the vendored azimuth model loads.
+#
+#   - pull_request / branch push : BUILD both arches, do NOT push (gates the PR).
+#   - version tag (v* / *.*.*)   : BUILD both arches and PUSH to Docker Hub.
+#   - manual (workflow_dispatch) : PUSH only when run with publish=true; tags the
+#                                  image with the `image_tag` input + :latest.
+#                                  Use this to (re)publish an existing release
+#                                  without moving the git tag.
+#
+# Publishing pushes pinellolab/crispritz:latest + :<tag> using the repository
+# secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a write-scoped access token).
+
+on:
+  pull_request:
+  push:
+    tags:
+      - "v*"
+      - "*.*.*"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Push the image to Docker Hub"
+        type: boolean
+        default: false
+      image_tag:
+        description: "Image tag to publish (e.g. v2.8.0); also updates :latest"
+        type: string
+        default: ""
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Validation build: build both arches, do NOT push. Runs on PRs & branch push.
+  # ---------------------------------------------------------------------------
+  build:
+    name: buildx amd64 + arm64 (no push)
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build multi-arch image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: crispritz:ci-multiarch
+
+  # ---------------------------------------------------------------------------
+  # Publish build: build both arches and push to Docker Hub.
+  #   - automatically on version tags
+  #   - manually via workflow_dispatch with publish=true
+  # ---------------------------------------------------------------------------
+  publish:
+    name: Publish multi-arch image
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.publish)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve image tag
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            REF="${{ inputs.image_tag }}"
+          else
+            REF="${{ github.ref_name }}"
+          fi
+          if [ -z "$REF" ]; then
+            echo "No image tag provided (workflow_dispatch requires image_tag)." >&2
+            exit 1
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "Publishing pinellolab/crispritz:$REF + :latest"
+
+      - name: Checkout ${{ steps.meta.outputs.ref }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.ref }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            pinellolab/crispritz:latest
+            pinellolab/crispritz:${{ steps.meta.outputs.ref }}

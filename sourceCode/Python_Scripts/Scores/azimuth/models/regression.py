@@ -1,12 +1,18 @@
-import numpy as np
-import sklearn
+""" """
+
+from .. import metrics as ranking_metrics
+from .. import predict
+from .. import util
+
 from sklearn.linear_model import ARDRegression, LinearRegression
 from sklearn.metrics import roc_curve, auc
+
+import numpy as np
+
 import sklearn.linear_model
-import azimuth.util
-import azimuth.metrics as ranking_metrics
-import azimuth.predict
+import sklearn
 import numbers
+
 
 def ARDRegression_on_fold(feature_sets, train, test, y, y_all, X, dim, dimsum, learn_options):
     '''
@@ -125,9 +131,9 @@ def linreg_on_fold(feature_sets, train, test, y, y_all, X, dim, dimsum, learn_op
     if learn_options["weighted"] is not None and (learn_options["penalty"] != "L2" or learn_options["method"] != "linreg"):
         raise NotImplementedError("weighted prediction not implemented for any methods by L2 at the moment")
         
-    if not learn_options.has_key("fit_intercept"):
+    if "fit_intercept" not in learn_options:
         learn_options["fit_intercept"] = True
-    if not learn_options.has_key('normalize_features'):
+    if 'normalize_features' not in learn_options:
         learn_options['normalize_features'] = True
 
     cv, n_folds = set_up_inner_folds(learn_options, y_all.iloc[train])
@@ -158,7 +164,7 @@ def linreg_on_fold(feature_sets, train, test, y, y_all, X, dim, dimsum, learn_op
                     performance[i, j] += tmp_auc
 
                 elif learn_options['training_metric'] == 'spearmanr':
-                    spearman = azimuth.util.spearmanr_nonan(y_all[learn_options['ground_truth_label']][train][test_inner], tmp_pred.flatten())[0]
+                    spearman = util.spearmanr_nonan(y_all[learn_options['ground_truth_label']][train][test_inner], tmp_pred.flatten())[0]
                     performance[i, j] += spearman
 
                 elif learn_options['training_metric'] == 'score':
@@ -220,7 +226,7 @@ def linreg_on_fold(feature_sets, train, test, y, y_all, X, dim, dimsum, learn_op
 
 def feature_select(clf, learn_options, test_inner, train_inner, X, y):
     assert not learn_options["weighted"] is not None, "cannot currently do feature selection with weighted regression"
-    assert learn_options["loss"] is not "huber", "won't use huber loss function with feature selection"
+    assert learn_options["loss"] != "huber", "won't use huber loss function with feature selection"
     non_zero_coeff = (clf.coef_ != 0.0)
     if non_zero_coeff.sum() > 0:
         clf = LinearRegression()
@@ -273,7 +279,7 @@ def set_up_inner_folds(learn_options, y):
     gene_classes = label_encoder.transform(y['Target gene'].values)
     n_genes = len(np.unique(gene_classes))    
     if learn_options['ignore_gene_level_for_inner_loop'] or learn_options["cv"] == "stratified" or n_genes==1:
-        if 'n_folds' not in learn_options.keys():
+        if 'n_folds' not in list(learn_options.keys()):
             n_folds = len(np.unique(gene_classes))
         else:
             n_folds = learn_options['n_folds']        
@@ -282,6 +288,6 @@ def set_up_inner_folds(learn_options, y):
         gene_list = np.unique(y['Target gene'].values)
         cv = []
         for gene in gene_list:
-            cv.append(azimuth.predict.get_train_test(gene, y))
+            cv.append(predict.get_train_test(gene, y))
         n_folds = len(cv)
     return cv, n_folds

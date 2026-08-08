@@ -1,6 +1,10 @@
 import pandas
-import matplotlib.pylab as plt
-import pylab as pl # so can just grab qqplotting code from fastlmm directly
+try:  # matplotlib is only used by plotting/analysis helpers below, never by scoring
+    import matplotlib.pylab as plt
+    import pylab as pl  # so can just grab qqplotting code from fastlmm directly
+except Exception:  # keep azimuth importable (and on-target scoring working) w/o matplotlib
+    plt = None
+    pl = None
 import scipy.stats
 import scipy as sp
 import numpy as np
@@ -9,9 +13,9 @@ import sklearn.metrics
 import Bio.SeqUtils.MeltingTemp as Tm
 import Bio.Entrez as Entrez
 import Bio.SeqUtils as SeqUtil
-# import features.microhomology as microhomology
+from .features import microhomology as microhomology
 from Bio import SeqIO
-#import metrics as ranking_metrics #commented beacause no module metrics for conda
+from . import metrics as ranking_metrics
 import os
 import pickle
 import glob
@@ -21,10 +25,10 @@ import glob
 import Bio.Seq as Seq
 import time
 import scipy.stats as st
-# import util
+from . import util
 import sys
 import pandas as pd
-# import corrstats
+from . import corrstats
 
 def qqplot(pvals, fileout = None, alphalevel = 0.05,legend=None,xlim=None,ylim=None,fixaxes=True,addlambda=True,minpval=1e-20,title=None,h1=None,figsize=[5,5],grid=True, markersize=2):
     '''
@@ -65,7 +69,7 @@ def qqplot(pvals, fileout = None, alphalevel = 0.05,legend=None,xlim=None,ylim=N
          
     maxval = 0
 
-    for i in xrange(len(pvallist)):        
+    for i in range(len(pvallist)):        
         pval =pvallist[i].flatten()
         M = pval.shape[0]
         pnull = (0.5 + sp.arange(M))/M
@@ -94,7 +98,7 @@ def qqplot(pvals, fileout = None, alphalevel = 0.05,legend=None,xlim=None,ylim=N
             lambda_gc = estimate_lambda(pval)
             print("lambda=%1.4f" % lambda_gc)
             #pl.legend(["gc="+ '%1.3f' % lambda_gc],loc=2)   
-            # if there's only one method, just print(the lambda)
+            # if there's only one method, just print the lambda
             if len(pvallist) == 1:
                 legendlist=["$\lambda_{GC}=$%1.4f" % lambda_gc]   
             # otherwise add it at the end of the name
@@ -197,7 +201,7 @@ def _qqplot_bar(M=1000000, alphalevel = 0.05,distr = 'log10'):
     betaalphaLevel=sp.zeros(numPts);#down in the plot
     betaOneMinusalphaLevel=sp.zeros(numPts);#up in the plot
     betaInvHalf=sp.zeros(numPts);
-    for n in xrange(numPts):
+    for n in range(numPts):
         m=mRange[n]; #numplessThanThresh=m;
         betaInvHalf[n]=st.beta.ppf(0.5,m,M-m);
         betaalphaLevel[n]=st.beta.ppf(alphalevel,m,M-m);
@@ -247,9 +251,9 @@ def get_pval_from_predictions(m0_predictions, m1_predictions, ground_truth, twot
     '''
     If twotailed==False, then need to check that the one of corr0 and corr1 that is higher is the correct one
     '''
-    import corrstats
+    from . import corrstats
     n0 = len(m0_predictions)
-    n1 = len(m0_predictions)
+    n1 = len(m1_predictions)
     n2 = len(ground_truth)
     assert(n0==n1)
     assert(n0==n2)
@@ -328,11 +332,10 @@ def concatenate_feature_sets(feature_sets, keys=None):
     '''
     assert feature_sets != {}, "no feature sets present"
     if keys is None:
-        #keys = feature_sets.keys()
         keys = list(feature_sets.keys())
 
     F = feature_sets[keys[0]].shape[0]
-    for set in feature_sets.keys():
+    for set in list(feature_sets.keys()):
         F2 = feature_sets[set].shape[0]
         assert F == F2, "not same # individuals for features %s and %s" % (keys[0], set)
 
@@ -353,7 +356,7 @@ def concatenate_feature_sets(feature_sets, keys=None):
         for j in keys: print(j + str(feature_sets[j].shape))
         import ipdb; ipdb.set_trace()
 
-    #print("final size of inputs matrix is (%d, %d)" % inputs.shape)
+    #print "final size of inputs matrix is (%d, %d)" % inputs.shape
     return inputs, dim, dimsum, feature_names
 
 def extract_individual_level_data(one_result):
@@ -436,7 +439,7 @@ def get_gene_sequence(gene_name):
     # records = Entrez.read(search)
 
     # if len(records['IdList']) > 1:
-    #     print("warning, multiple hits found for entrez gene search %s" % gene_name)
+    #     print "warning, multiple hits found for entrez gene search %s" % gene_name
 
     # elink = Entrez.read(Entrez.elink(dbfrom="gene", db='nucleotide', id=records['IdList'][0]))
     # nucl_id = elink[0]['LinkSetDb'][3]
@@ -447,7 +450,7 @@ def get_gene_sequence(gene_name):
     #         nucl_id = elink[0]['LinkSetDb'][0]['Link'][0]['Id']
     #         cut = True
     #     else:
-    #         print("sorry not enough information to return sequence")
+    #         print "sorry not enough information to return sequence"
     #         return None
     # else:
     #     nucl_id = nucl_id['Link'][0]['Id']
@@ -475,7 +478,7 @@ def ranktrafo(data):
     Is = X.argsort(axis=0)
     RV = sp.zeros_like(X)
     rank = sp.zeros_like(X)
-    for i in xrange(X.shape[1]):
+    for i in range(X.shape[1]):
         x =  X[:,i]
         rank = sp.stats.rankdata(x)
         rank /= (X.shape[0]+1)
@@ -570,7 +573,7 @@ def get_data(data, y_names, organism="human", target_gene=None):
     #strip out featurization to later
     features = pandas.DataFrame(data['30mer'])
 
-    if organism is "human":
+    if organism == "human":
         target_gene = y_names[0].split(' ')[1]
 
     outputs['Target gene'] = target_gene
@@ -598,7 +601,6 @@ def plot_metrics(metrics, truth_and_predictions, target_genes, run_label, color=
         for i, gene in enumerate(target_genes):
             if len(best[1][gene])==0:
                 continue
-
             plt.figure('ROC per gene')
             plt.subplot(331+i)
             fpr, tpr, _ = sklearn.metrics.roc_curve(best[0][gene], best[1][gene])
@@ -619,17 +621,17 @@ def plot_metrics(metrics, truth_and_predictions, target_genes, run_label, color=
 
         plt.figure('AUC ROC per gene')
         ax = plt.subplot(111)
-        rect = ax.bar(range(len(AUCs)), AUCs, width=0.8)
+        rect = ax.bar(list(range(len(AUCs))), AUCs, width=0.8)
         autolabel(ax,rect)
 
         ax.set_ylim((0.5, 1.0))
         ax.set_ylabel('AUC ROC')
-        ax.set_xticks(np.array(range(len(AUCs))) + 0.8 / 2)
+        ax.set_xticks(np.array(list(range(len(AUCs)))) + 0.8 / 2)
         ax.set_xticklabels([t for t in AUCs_labels])
 
         fpr, tpr, _ = sklearn.metrics.roc_curve(all_truth, all_predictions)
         roc_auc = sklearn.metrics.auc(fpr, tpr)
-        #print(run_label, roc_auc)
+        #print run_label, roc_auc
         plt.figure('global ROC')
         plt.plot(fpr, tpr, label=run_label + " AUC=%.2f" % roc_auc, color=color, linewidth=2.)
         plt.legend(loc=0)
@@ -651,11 +653,11 @@ def plot_metrics(metrics, truth_and_predictions, target_genes, run_label, color=
     else:
         plt.figure('NDCG per gene')
         ax = plt.subplot(111)
-        rect = ax.bar(range(len(metrics)), metrics, width=0.8)
+        rect = ax.bar(list(range(len(metrics))), metrics, width=0.8)
         autolabel(ax,rect)
         ax.set_ylim((0.0, 1.2))
         ax.set_ylabel('NDCG')
-        ax.set_xticks(np.array(range(len(metrics))) + 0.8 / 2)
+        ax.set_xticks(np.array(list(range(len(metrics)))) + 0.8 / 2)
         ax.set_xticklabels([t for t in target_genes])
 
         truth, predictions = truth_and_predictions[0]
@@ -732,7 +734,7 @@ def extract_feature_from_model_sum(method, results, split, indexes):
     return tmp_imp
 
 def feature_importances(results, fontsize=16, figsize=(14, 8)):
-    for method in results.keys():
+    for method in list(results.keys()):
         feature_names = results[method][6]
 
         seen = set()
@@ -780,7 +782,7 @@ def feature_importances(results, fontsize=16, figsize=(14, 8)):
                         'NGGX_pd.Order2': nggx,}
 
         grouped_feat_ind = []
-        [grouped_feat_ind.extend(grouped_feat[a]) for a in grouped_feat.keys()]
+        [grouped_feat_ind.extend(grouped_feat[a]) for a in list(grouped_feat.keys())]
         remaining_features_ind = set.difference(set(range(len(feature_names))), set(grouped_feat_ind))
 
         for i in remaining_features_ind:
@@ -791,7 +793,7 @@ def feature_importances(results, fontsize=16, figsize=(14, 8)):
             if len(grouped_feat[k]) == 0:
                 continue
             else:
-                for split in results[method][3].keys():
+                for split in list(results[method][3].keys()):
                     split_feat_importance = extract_feature_from_model_sum(method, results, split, grouped_feat[k])
                     if k not in feature_importances_grouped:
                         feature_importances_grouped[k] = [split_feat_importance]
@@ -799,7 +801,7 @@ def feature_importances(results, fontsize=16, figsize=(14, 8)):
                         feature_importances_grouped[k].append(split_feat_importance)
 
         all_split_importances = None
-        for split in results[method][3].keys():
+        for split in list(results[method][3].keys()):
 
             split_feat_importance = extract_feature_from_model(method, results, split)
 
@@ -815,7 +817,7 @@ def feature_importances(results, fontsize=16, figsize=(14, 8)):
         df = pandas.DataFrame(data=imp_array, columns=['Feature name', 'Mean feature importance', 'Std. Dev.'])
         df = df.convert_objects(convert_numeric=True)
 
-        boxplot_labels = np.array([k for k in feature_importances_grouped.keys()])
+        boxplot_labels = np.array([k for k in list(feature_importances_grouped.keys())])
         boxplot_arrays = np.concatenate([np.array(feature_importances_grouped[k])[:, None] for k in boxplot_labels], axis=1)
 
         feature_dictionary = {
@@ -834,10 +836,10 @@ def feature_importances(results, fontsize=16, figsize=(14, 8)):
 
         for i in range(df.shape[0]):
             thisfeat = df['Feature name'].iloc[i]
-            if thisfeat in feature_dictionary.keys():
+            if thisfeat in list(feature_dictionary.keys()):
                 df['Feature name'].iloc[i] = feature_dictionary[thisfeat]
 
-        descriptive_labels = np.array([feature_dictionary[k] if k in feature_dictionary.keys() else k + " " for k in boxplot_labels])
+        descriptive_labels = np.array([feature_dictionary[k] if k in list(feature_dictionary.keys()) else k + " " for k in boxplot_labels])
 
         sorted_boxplot = np.argsort(np.median(boxplot_arrays, axis=0))[::-1]
         boxplot_means = np.mean(boxplot_arrays, axis=0)[sorted_boxplot]
@@ -868,7 +870,7 @@ def check_learn_options_set(learn_options_set):
 
     non_binary_target_name_agree = True
     non_binary_target_name = None
-    for l in learn_options_set.values():
+    for l in list(learn_options_set.values()):
         if non_binary_target_name is None:
             non_binary_target_name = l["testing_non_binary_target_name"]
         else:
@@ -879,19 +881,19 @@ def get_all_metrics(results, learn_options_set=None, test_metrics=['spearmanr'],
     """
     'metrics' here are the metrics used to evaluate
     """
-    all_results = dict([(k, {}) for k in results.keys()])
-    genes = results[results.keys()[0]][1][0][0].keys()
+    all_results = dict([(k, {}) for k in list(results.keys())])
+    genes = list(results[list(results.keys())[0]][1][0][0].keys())
 
     for metric in test_metrics:
-        for method in all_results.keys():
+        for method in list(all_results.keys()):
             all_results[method][metric] = []
 
     non_binary_target_name = check_learn_options_set(learn_options_set)
 
-    for method in results.keys():
+    for method in list(results.keys()):
         truth, predictions = results[method][1][0]
         test_indices = results[method][-1]
-        tmp_genes = results[method][1][0][0].keys()
+        tmp_genes = list(results[method][1][0][0].keys())
         if len(tmp_genes) != len(tmp_genes) or np.any(tmp_genes==genes): "genes have changed, need to modify code"
         all_truth_raw, all_truth_thrs, all_predictions = np.array([]), np.array([]), np.array([])
 
@@ -966,14 +968,14 @@ def get_all_metrics(results, learn_options_set=None, test_metrics=['spearmanr'],
         return all_results, genes
 
 def plot_all_metrics(metrics, gene_names, all_learn_options, save, plots=None, bottom=0.19):
-    num_methods = len(metrics.keys())
-    metrics_names = metrics[metrics.keys()[0]].keys()
+    num_methods = len(list(metrics.keys()))
+    metrics_names = list(metrics[list(metrics.keys())[0]].keys())
     num_genes = len(gene_names)
     width = 0.9/num_methods
     ind = np.arange(num_genes)
 
     if save==True:
-        first_key = all_learn_options.keys()[0]
+        first_key = list(all_learn_options.keys())[0]
         #basefile = r"..\results\V%s_trmetric%s_%s" % (all_learn_options[first_key]["V"], all_learn_options[first_key]["training_metric"], datestamp())
         basefile = r"..\results\%s" % (first_key)
 
@@ -995,20 +997,20 @@ def plot_all_metrics(metrics, gene_names, all_learn_options, save, plots=None, b
 
     for i, method in enumerate(metrics.keys()):
         boxplot_labels.append(method)
-        for metric in metrics[method].keys():
+        for metric in list(metrics[method].keys()):
 
             if 'global' in metric:
                 plt.figure(metric)
-                plt.bar([i], metrics[method][metric], 0.9, color=plt.cm.Paired(1.*i/len(metrics.keys())), label=method)
+                plt.bar([i], metrics[method][metric], 0.9, color=plt.cm.Paired(1.*i/len(list(metrics.keys()))), label=method)
             else:
                 if plots == None or 'gene level' in plots:
                     plt.figure(metric)
-                    plt.bar(ind+(i*width), metrics[method][metric], width, color=plt.cm.Paired(1.*i/len(metrics.keys())), label=method)
+                    plt.bar(ind+(i*width), metrics[method][metric], width, color=plt.cm.Paired(1.*i/len(list(metrics.keys()))), label=method)
 
                 median_metric = np.median(metrics[method][metric])
                 print(method, metric, median_metric)
                 assert not np.isnan(median_metric), "found nan for %s, %s" % (method, metric)
-                if metric not in boxplot_arrays.keys():
+                if metric not in list(boxplot_arrays.keys()):
                     boxplot_arrays[metric] = np.array(metrics[method][metric])[:, None]
                     boxplot_median[metric] = [np.median(np.array(metrics[method][metric]))]
                 else:
@@ -1024,7 +1026,7 @@ def plot_all_metrics(metrics, gene_names, all_learn_options, save, plots=None, b
             plt.ylabel(metric)
 
             if 'global' in metric:
-                plt.xticks(range(len(metrics.keys())), metrics.keys(), rotation=70)
+                plt.xticks(list(range(len(list(metrics.keys())))), list(metrics.keys()), rotation=70)
                 plt.grid(True, which='both')
                 plt.subplots_adjust(left = 0.05, right = 0.8)
             else:
@@ -1044,7 +1046,7 @@ def plot_all_metrics(metrics, gene_names, all_learn_options, save, plots=None, b
 
             plt.boxplot(boxplot_arrays[metric][:, sorted_boxplot])
             plt.ylabel(metric)
-            plt.xticks(range(1, num_methods+1), np.array(boxplot_labels)[sorted_boxplot], rotation=70)
+            plt.xticks(list(range(1, num_methods+1)), np.array(boxplot_labels)[sorted_boxplot], rotation=70)
             plt.subplots_adjust(top = 0.97, bottom = bottom)
 
             if metric == 'RMSE':
@@ -1076,7 +1078,7 @@ def load_results(directory, all_results, all_learn_options, model_filter=None, a
                     if m in results_file:
                         in_filt = True
                 if not in_filt:
-                    print("%s not in model_filter" % (results_file), model_filter)
+                    print("%s not in model_filter" % (results_file))#, model_filter)
                     continue
             elif model_filter not in results_file:
                 continue
@@ -1090,12 +1092,12 @@ def load_results(directory, all_results, all_learn_options, model_filter=None, a
                 # this is when I accidentally saved from the plotting routine and should not generally be needed
                 results, learn_options, gene_names = pickle.load(f)
 
-        for k in results.keys():
+        for k in list(results.keys()):
             if append_to_key is not None:
                 k_new = k + "_" + append_to_key
             else:
                 k_new = k
-            assert k_new not in all_results.keys(), "found %s already" % k
+            assert k_new not in list(all_results.keys()), "found %s already" % k
             print("adding key %s (from file %s)" % (k_new, os.path.split(results_file)[-1]))
             all_results[k_new] = results[k]
             all_learn_options[k_new] = learn_options[k]
@@ -1119,8 +1121,8 @@ def plot_cluster_results(metrics=['spearmanr', 'NDCG@5'], plots=['boxplots'], di
             all_results, all_learn_options = load_results(directory, all_results, all_learn_options, filter)
 
     else:
-        for k in results.keys():
-            assert k not in all_results.keys()
+        for k in list(results.keys()):
+            assert k not in list(all_results.keys())
             all_results[k] = results[k]
             all_learn_options[k] = learn_options[k]
 
@@ -1139,13 +1141,13 @@ def ensemble_cluster_results(directory=r'\\fusi1\crispr2\analysis\cluster\result
         with open(results_file, 'rb') as f:
             results, learn_options = pickle.load(f)
 
-        for k in results.keys():
-            assert k not in all_results.keys()
+        for k in list(results.keys()):
+            assert k not in list(all_results.keys())
             all_results[k] = results[k]
             all_learn_options[k] = learn_options[k]
 
-    genes = all_results[all_results.keys()[0]][1][0][0].keys()
-    models = all_results.keys()
+    genes = list(all_results[list(all_results.keys())[0]][1][0][0].keys())
+    models = list(all_results.keys())
 
     ens_predictions = {}
     ens_truths = {}
@@ -1192,11 +1194,11 @@ def ensemble_cluster_results(directory=r'\\fusi1\crispr2\analysis\cluster\result
                 cv_predictions = np.append(cv_predictions, cv_predictions_gene_j[:,None],
                                                     axis=1)
 
-        if ensemble_type is 'majority':
+        if ensemble_type == 'majority':
             y_pred = ensembles.pairwise_majority_voting(test_predictions)
-        if ensemble_type is 'median':
+        if ensemble_type == 'median':
             y_pred = ensembles.median(test_predictions)
-        if ensemble_type is 'stacking':
+        if ensemble_type == 'stacking':
             y_pred = ensembles.linear_stacking(cv_truth, cv_predictions, test_predictions)
 
         ens_predictions[gene] = y_pred
@@ -1207,8 +1209,8 @@ def ensemble_cluster_results(directory=r'\\fusi1\crispr2\analysis\cluster\result
     # spearmans = []
     # for gene in ens_predictions.keys():
     #     spearmans.append(sp.stats.spearmanr(ens_predictions[gene], ens_truths[gene]['raw'])[0])
-    #     print(gene, spearmans[-1])
-    # print("median: %.5f" % np.median(spearmans))
+    #     print gene, spearmans[-1]
+    # print "median: %.5f" % np.median(spearmans)
 
     return all_results, all_learn_options
 

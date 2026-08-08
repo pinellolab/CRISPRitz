@@ -209,6 +209,24 @@ def chromosomeSave():
     outFile.write(genomeHeader+genomeStr+'\n')
     outFile.close()
 
+def _af_value(line, pos_AF):
+    # Raw AF value string for this record, or "" if unavailable. Handles three
+    # cases uniformly: no AF-like field found anywhere in the file (pos_AF is
+    # None); this record's INFO field has fewer entries than the position
+    # cached from record 1 (variable-length INFO across records); and, as a
+    # defensive re-check on every call (not just the initial scan), the cached
+    # position pointing at a non-AF key in this particular record. "" is the
+    # deliberate placeholder (not "."): it's the only value besides "0" that
+    # pandas.to_numeric() parses as NaN instead of raising downstream.
+    if pos_AF is None:
+        return ""
+    splitted = line[7].split(";")
+    if pos_AF >= len(splitted):
+        return ""
+    key, sep, value = splitted[pos_AF].partition("=")
+    return value if key == "AF" else ""
+
+
 def add_to_dict_snps(line, pos_AF):
     list_samples = []
     list_chars = []
@@ -225,7 +243,7 @@ def add_to_dict_snps(line, pos_AF):
         rsID = line[2]
         list_chars.append(line[3])
         list_chars.append(line[4])
-        af = line[7].split(";")[pos_AF][3:] 
+        af = _af_value(line, pos_AF)
         if len(list_samples) > 0:
             chr_dict_snps[chr_pos_string] = ','.join(sorted(list_samples)) + ';' + ','.join(list_chars) + ";" + rsID + ";" + af
         else:
@@ -251,16 +269,18 @@ def add_to_dict_snps(line, pos_AF):
                     
             chr_pos_string = currentChr + ',' + line[1]
             rsID = line[2].split(',')
-            af = line[7].split(";")[pos_AF][3:].split(',')
+            af = _af_value(line, pos_AF).split(',')
 
             final_entry = []
             for idx, snp in enumerate(snps):
                 list_chars = [line[3]]
                 list_chars.append(snp)
+                af_idx = values_for_allele_info[idx] - 1
+                af_val = af[af_idx] if af_idx < len(af) else ""  # multiallelic site may have fewer AF values than ALT alleles
                 if len(dict_of_lists_samples[snp]) > 0:
-                    final_entry.append(','.join(sorted(dict_of_lists_samples[snp])) + ';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af[values_for_allele_info[idx]-1])
+                    final_entry.append(','.join(sorted(dict_of_lists_samples[snp])) + ';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af_val)
                 else:
-                    final_entry.append(';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af[values_for_allele_info[idx]-1])
+                    final_entry.append(';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af_val)
             chr_dict_snps[chr_pos_string] = '$'.join(final_entry)
 
 def dictSave():
@@ -297,7 +317,7 @@ def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
                         break
             if len(indels) > 0:
                 rsID = line[2].split(',')
-                af = line[7].split(";")[pos_AF][3:].split(',')
+                af = _af_value(line, pos_AF).split(',')
 
                 start_position = int(line[1])-26
                 end_position = int(line[1])+26+len(line[3])
@@ -315,8 +335,10 @@ def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
                         
                         refseq = genomeStr[start_position:start_position+len(sub_fasta)]
                         end_fake_pos = start_fake_pos + len(sub_fasta)#(end_position - start_position)
-                        
-                        log_indels.append([f"{currentChr}_{start_position}-{end_position}_{id_indel}", ",".join(dict_of_lists_samples[indel]), rsID[0], af[values_for_allele_info[idx]-1], indel_info, f"{start_fake_pos},{end_fake_pos}", refseq])
+
+                        af_idx = values_for_allele_info[idx] - 1
+                        af_val = af[af_idx] if af_idx < len(af) else ""  # multiallelic site may have fewer AF values than ALT alleles -- "" (not ".") so pd.to_numeric() reads it as NaN instead of crashing
+                        log_indels.append([f"{currentChr}_{start_position}-{end_position}_{id_indel}", ",".join(dict_of_lists_samples[indel]), rsID[0], af_val, indel_info, f"{start_fake_pos},{end_fake_pos}", refseq])
                     
                         id_indel += 1
                         start_fake_pos = end_fake_pos + 1 
@@ -347,20 +369,36 @@ if sys.argv[4] == 'yes':
     list_fasta_indels = []
 
 first_line = True
+pos_AF = None  # stays None if no exact "AF=" INFO key is found in the first record
 for line in inAltFile:
     if ('#CHROM') in line:
         VCFheader = line.strip().split('\t')   #Save this header for retrieving sample id
         break
 for line in inAltFile:
     line = line.strip().split('\t')
+    # issue #143: the variant-info string embedded per position is ';'-delimited
+    # (samples;ref,alt;rsID;AF). The VCF ID column (line[2]) can itself contain
+    # ';' for dbSNP multi-rsID records (e.g. "rs1;rs2"), which collides with that
+    # delimiter and shifts AF (and every field after) by one -> downstream
+    # float(rsID) crashes. Normalize the ID field's ';' to ',' (CRISPRme's
+    # multi-value convention) once, so all rsID uses below stay a single field.
+    if len(line) > 2:
+        line[2] = line[2].replace(";", ",")
     if first_line:
         first_line = False
         splitted = line[7].split(";")
         for pos, ele in enumerate(splitted):
-            if ele[0:2] == "AF":
+            # exact key match, not a prefix match: a prefix match would also
+            # accept e.g. gnomAD-style "AF_afr=", and either garble that value
+            # (the "AF="-only extraction below) or -- worse -- lock onto it and
+            # skip a later, real "AF=" field in the same record. Since the
+            # `break` only fires on a real match, this still keeps scanning
+            # past a non-matching population-specific field to find the true
+            # "AF=" wherever it appears in the record.
+            if ele.split("=", 1)[0] == "AF":
                 pos_AF = pos
                 break
-    if line[6] != 'PASS':
+    if line[6] not in ('PASS', '.'):  # '.' = no filter applied (e.g. HPRC vcfwave VCFs)
         continue
     if sys.argv[4] == 'yes': #if true do all the creation, if false do only genome enrichment with SNPs
         #print(sys.argv[4])

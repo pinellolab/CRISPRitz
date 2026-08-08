@@ -37,7 +37,6 @@ typedef struct tleaf
 	int guideIndex;
 	//INSERIRE BITSET CON bitset<#sample> CHE CONTIENE INFO SAMPLES
 	string guideDNA;
-	const char *guideDNA_char;
 	string pamDNA;
 	int next;
 } Tleaf;
@@ -538,7 +537,7 @@ int main(int argc, char **argv)
 					tmp_pam_str = target.substr(0, pamRNA.length());
 					reverse(tmp_pam_str.begin(), tmp_pam_str.end());
 
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges), target.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges).c_str(),
+					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges),
 														 tmp_pam_str,
 														 0}; //salvo l'indice del target
 				}
@@ -614,7 +613,7 @@ int main(int argc, char **argv)
 					tmp_pam_str = tmp.substr(0, pamRNA.length());
 					reverse(tmp_pam_str.begin(), tmp_pam_str.end());
 
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges), tmp.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges).c_str(),
+					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges),
 														 tmp_pam_str,
 														 0}; //salvo l'indice del target
 				}
@@ -643,7 +642,7 @@ int main(int argc, char **argv)
 
 					reverse(target.begin(), target.end()); //reverse per aggiungere nell'albero
 
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length()), target.substr(pamRNA.length()).c_str(),
+					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length()),
 														 target.substr(0, pamRNA.length()), 0}; //salvo l'indice del target
 																								// cout << "pam saved positive " << targetOnDNA[counter_index].pamDNA << endl;
 				}
@@ -713,7 +712,7 @@ int main(int argc, char **argv)
 							break;
 						}
 
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length()), tmp.substr(pamRNA.length()).c_str(),
+					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length()),
 														 tmp.substr(0, pamRNA.length()), 0};
 					// cout << "pam saved negative " << targetOnDNA[counter_index].pamDNA << endl;
 				}
