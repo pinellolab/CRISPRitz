@@ -28,6 +28,13 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   total-edits control (CRISPRme issue #107).
 
 ### Fixed
+- Brute-force (unindexed) `search` used the ENTIRE FASTA header line — including
+  spaces and description — as the chromosome name, so non-human assemblies (e.g.
+  `>NW_012020308.1 Macaca nemestrina …`) put a spaced description in the
+  Chromosome column and broke `bedtools getfasta` in the `-scores` step (empty
+  sequence -> azimuth assertion). Now the sequence name is the first
+  whitespace-delimited token, matching the samtools/bedtools/UCSC convention.
+  No-op for single-token headers like `>chr1` (CRISPRitz issue #13).
 - Variant-enrichment (`enricher`) allele-frequency / FILTER robustness: read
   `INFO/AF` by exact key (so a pooled `AF` is selected over source-specific
   `AF_*` / `*_AF` fields that may appear earlier in the record), guard the
