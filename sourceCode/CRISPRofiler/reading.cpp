@@ -91,7 +91,7 @@ void reading_chromosomes(char **argv)
       {
          if (line[0] == '>')
          {
-            chrnames = (line.substr(1));
+            chrnames = (line.substr(1)); { size_t _ws = chrnames.find_first_of(" \t\r"); if (_ws != string::npos) chrnames = chrnames.substr(0, _ws); } // FASTA convention: sequence name = first whitespace-delimited token (#13) { size_t _ws = chrnames.find_first_of(" \t\r"); if (_ws != string::npos) chrnames = chrnames.substr(0, _ws); } // FASTA convention: sequence name = first whitespace-delimited token (#13)
          }
          else
          {
@@ -138,7 +138,7 @@ void reading_chromosomes(char **argv)
             {
                if (line[0] == '>')
                {
-                  chrnames = (line.substr(1));
+                  chrnames = (line.substr(1)); { size_t _ws = chrnames.find_first_of(" \t\r"); if (_ws != string::npos) chrnames = chrnames.substr(0, _ws); } // FASTA convention: sequence name = first whitespace-delimited token (#13) { size_t _ws = chrnames.find_first_of(" \t\r"); if (_ws != string::npos) chrnames = chrnames.substr(0, _ws); } // FASTA convention: sequence name = first whitespace-delimited token (#13)
                }
                else
                {
