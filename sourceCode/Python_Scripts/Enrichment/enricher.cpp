@@ -224,6 +224,27 @@ static void SNPsProcess(std::vector<std::string> &line) {
 }
 
 // ---------------------------------------------------------------------------
+// afValue(line, pos_AF): raw AF value string for this record, or "" if
+// unavailable. Mirrors enricher.py's _af_value() -- see that function's
+// comment for the full rationale. pos_AF < 0 means "no exact AF= key found
+// in the first record" (the int sentinel for python's None); this also
+// guards pos_AF landing out of range for a *later* record with fewer INFO
+// fields than record 1, and re-verifies the key on every call rather than
+// trusting the cached position blindly.
+// ---------------------------------------------------------------------------
+
+static std::string afValue(const std::vector<std::string> &line, int pos_AF) {
+    if (pos_AF < 0) return "";
+    std::vector<std::string> splitted = splitStr(line[7], ';');
+    if ((size_t)pos_AF >= splitted.size()) return "";
+    const std::string &entry = splitted[pos_AF];
+    size_t eq = entry.find('=');
+    std::string key = (eq == std::string::npos) ? entry : entry.substr(0, eq);
+    if (key != "AF") return "";
+    return (eq == std::string::npos) ? "" : entry.substr(eq + 1);
+}
+
+// ---------------------------------------------------------------------------
 // add_to_dict_snps(line, pos_AF)
 // ---------------------------------------------------------------------------
 
@@ -240,7 +261,7 @@ static void add_to_dict_snps(const std::vector<std::string> &line, int pos_AF) {
         }
         std::string chr_pos_string = currentChr + "," + line[1];
         std::string rsID = line[2];
-        std::string af = splitStr(line[7], ';')[pos_AF].substr(3);
+        std::string af = afValue(line, pos_AF);
         std::string val;
         if (!list_samples.empty()) {
             std::vector<std::string> sorted_s = list_samples;
@@ -284,11 +305,14 @@ static void add_to_dict_snps(const std::vector<std::string> &line, int pos_AF) {
             }
             std::string chr_pos_string = currentChr + "," + line[1];
             std::string rsID0 = splitStr(line[2], ',')[0];
-            std::vector<std::string> af = splitStr(splitStr(line[7], ';')[pos_AF].substr(3), ',');
+            std::vector<std::string> af = splitStr(afValue(line, pos_AF), ',');
 
             std::vector<std::string> final_entry;
             for (size_t idx = 0; idx < snps.size(); ++idx) {
                 std::vector<std::string> &samps = dols[snps[idx]];
+                size_t afIdx = (size_t)(values_for_allele_info[idx] - 1);
+                // multiallelic site may have fewer AF values than ALT alleles
+                std::string afv = (afIdx < af.size()) ? af[afIdx] : "";
                 std::string entry;
                 if (!samps.empty()) {
                     std::vector<std::string> sorted_s = samps;
@@ -299,10 +323,10 @@ static void add_to_dict_snps(const std::vector<std::string> &line, int pos_AF) {
                         joined += sorted_s[k];
                     }
                     entry = joined + ";" + line[3] + "," + snps[idx] + ";" + rsID0 +
-                            ";" + af[values_for_allele_info[idx] - 1];
+                            ";" + afv;
                 } else {
                     entry = std::string(";") + line[3] + "," + snps[idx] + ";" + rsID0 +
-                            ";" + af[values_for_allele_info[idx] - 1];
+                            ";" + afv;
                 }
                 final_entry.push_back(entry);
             }
@@ -365,7 +389,7 @@ static void indel_to_fasta(const std::vector<std::string> &line, long &id_indel,
     }
 
     std::string rsID0 = splitStr(line[2], ',')[0];
-    std::vector<std::string> af = splitStr(splitStr(line[7], ';')[pos_AF].substr(3), ',');
+    std::vector<std::string> af = splitStr(afValue(line, pos_AF), ',');
 
     long posv = strtol(line[1].c_str(), NULL, 10);
     long start_position = posv - 26;
@@ -397,7 +421,11 @@ static void indel_to_fasta(const std::vector<std::string> &line, long &id_indel,
                      std::to_string(end_position) + "_" + std::to_string(id_indel);
             row[1] = samplesJoined;
             row[2] = rsID0;
-            row[3] = af[values_for_allele_info[idx] - 1];
+            {
+                // multiallelic site may have fewer AF values than ALT alleles
+                size_t afIdx = (size_t)(values_for_allele_info[idx] - 1);
+                row[3] = (afIdx < af.size()) ? af[afIdx] : "";
+            }
             row[4] = indel_info;
             row[5] = std::to_string(start_fake_pos) + "," + std::to_string(end_fake_pos);
             row[6] = refseq;
@@ -571,7 +599,7 @@ int main(int argc, char **argv) {
 
     // process data lines
     bool first_line = true;
-    int pos_AF = 0;
+    int pos_AF = -1;  // -1 if no exact "AF=" INFO key is found in the first record
     std::string raw;
     while (vcf.getRawLine(raw)) {
         std::vector<std::string> line = splitStr(pyStrip(raw), '\t');
@@ -586,14 +614,24 @@ int main(int argc, char **argv) {
             first_line = false;
             std::vector<std::string> splitted = splitStr(line[7], ';');
             for (size_t p = 0; p < splitted.size(); ++p) {
-                if (splitted[p].size() >= 2 && splitted[p][0] == 'A' &&
-                    splitted[p][1] == 'F') {
+                // exact key match, not a prefix match: a prefix match would
+                // also accept e.g. gnomAD-style "AF_afr=", and either garble
+                // that value or -- worse -- lock onto it and skip a later,
+                // real "AF=" field in the same record. The `break` only fires
+                // on a real match, so this still keeps scanning past a
+                // non-matching population-specific field to find the true
+                // "AF=" wherever it appears in the record.
+                size_t eq = splitted[p].find('=');
+                std::string key = (eq == std::string::npos)
+                                       ? splitted[p]
+                                       : splitted[p].substr(0, eq);
+                if (key == "AF") {
                     pos_AF = (int)p;
                     break;
                 }
             }
         }
-        if (line[6] != "PASS") continue;
+        if (line[6] != "PASS" && line[6] != ".") continue;  // '.' = no filter applied (e.g. HPRC vcfwave VCFs)
         if (doYes) {
             add_to_dict_snps(line, pos_AF);
             indel_to_fasta(line, id_indel, pos_AF, start_fake_pos);
