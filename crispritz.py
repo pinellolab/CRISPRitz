@@ -18,7 +18,7 @@ origin_path = os.path.dirname(os.path.realpath(__file__))
 # conda path
 conda_path = "opt/crispritz/"
 
-VERSION = "2.8.0"
+VERSION = "2.8.1"
 
 if "--debug" in sys.argv[1:]:
     # for quick local tests
