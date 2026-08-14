@@ -260,7 +260,7 @@ def searchTST():
     file_correct_ext = [
         f
         for f in listdir(dirTSTgenome)
-        if isfile(join(dirTSTgenome, f)) and not f.endswith(".bin")
+        if isfile(join(dirTSTgenome, f)) and not f.endswith(".bin") and not f.startswith(".")
     ]  # Get files not ending with .bin
     if len(file_correct_ext) != 0:  # Some files do not have .bin
         print(
