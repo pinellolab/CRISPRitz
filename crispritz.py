@@ -18,7 +18,7 @@ origin_path = os.path.dirname(os.path.realpath(__file__))
 # conda path
 conda_path = "opt/crispritz/"
 
-VERSION = "2.8.1"
+VERSION = "2.8.2"
 
 if "--debug" in sys.argv[1:]:
     # for quick local tests
@@ -645,16 +645,18 @@ def genomeEnrichment():
         doit = "yes"
     checkExistance(dirVCFFiles, "d")
     checkExistance(dirGenome, "d")
-    listChrs = os.listdir(dirVCFFiles)
-    # listChrs = glob.glob(dirVCFFiles+'/*.vcf.gz')
-
-    for file in listChrs:
-        if file.endswith(".tbi"):  # remove .tbi files
-            listChrs.remove(file)
-        # if 'tbi' in elem:  # remove .tbi files in vcf dir to avoid errors in exec
-        # listChrs.remove(elem)
-
-    # print(listChrs)
+    # List the per-chromosome VCF files, EXCLUDING tabix/bcftools index sidecars
+    # (.tbi/.csi). Build the filtered list in a single comprehension: the previous
+    # `for file in listChrs: if file.endswith(".tbi"): listChrs.remove(file)` mutated
+    # the list while iterating over it, so it SKIPPED elements and some .tbi files
+    # survived. Those survivors were later handed to the enricher (below), which does
+    # gzip.open() + readline() on them -- decompressing a binary .tbi index as text
+    # raised `UnicodeDecodeError: 'utf-8' codec can't decode byte 0x9d`. See CHANGELOG 2.8.2.
+    listChrs = [
+        f
+        for f in os.listdir(dirVCFFiles)
+        if not (f.endswith(".tbi") or f.endswith(".csi"))
+    ]
 
     chr_with_vcf = set()
     # VCF file must contain '.chrN.' with N = number or letter of chr

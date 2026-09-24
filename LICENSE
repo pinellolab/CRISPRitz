@@ -1,2 +1,97 @@
-  CRISPRitz has a dual license. It is made available for free to academic researchers under the Affero License (https://www.gnu.org/licenses/agpl-3.0.en.html).
- If you plan to use the CRISPRitz for-profit, you will need to purchase a license. Please contact rosalba.giugno@univr.it and lpinello@mgh.harvard.edu for more information.
+CRISPRitz — Licensing
+
+CRISPRitz is licensed under the MGB Open Access License 1.0 (MGBOA 1.0), the full
+text of which is reproduced below.
+
+Under MGBOA 1.0, use of CRISPRitz is permitted only for non-commercial,
+non-revenue-generating, academic purposes. Any commercial or for-profit use requires
+a commercial license — for inquiries and licensing details, please contact:
+    - Luca Pinello:    lpinello@mgh.harvard.edu
+    - Rosalba Giugno:  rosalba.giugno@univr.it
+
+Canonical MGBOA 1.0 text:
+https://github.com/MGB-Open-Science-Program-Office/open-science-license-library/blob/main/Open-Access-License-1.0/mgb-open-access-license-1.0.md
+
+===============================================================================
+
+# MGB OPEN ACCESS LICENSE 1.0
+
+These license terms are an agreement between You and Mass General Brigham Incorporated, a nonprofit corporation created and operating under the laws of the state of Massachusetts (or one of its affiliates) (the “Licensor”).
+
+By installing, downloading, accessing, Using, or distributing any of the Data or Materials, You agree to all of the terms and conditions of this Agreement and that the obligations set forth herein shall be binding and enforceable as a matter of contract, regardless of whether each component of the Data or Materials is subject to copyright, patent, or any other intellectual property protection.
+
+1. Definitions.
+
+“Agreement” shall mean this Open Access License comprising this document.
+
+“Data” shall mean the data, graphs, Models (hereinafter defined), and/or text, if any, whether in text or non-code form, that may accompany any code or are made available to You as part of the Materials.
+
+“Legal Entity” shall mean the union of the acting entity and all other entities that control, are controlled by, or are under common control with that entity. For the purposes of this definition, “control” means (i) the power, direct or indirect, to cause the direction or management of such entity, whether by contract or otherwise, or (ii) ownership of fifty percent (50%) or more of the outstanding voting shares of such entity, or (iii) beneficial ownership of such entity.
+
+“Licensor” shall mean the entity offering this Agreement which includes Mass General Brigham Incorporated and its affiliates offering this Agreement.
+
+“Materials” shall mean the work of authorship and literary works, whether in source or object form, text or non-code form, made available under this Agreement, which may be indicated by a copyright notice included in or attached.
+
+“Model(s)” shall mean the materials provided to you under this agreement that may be embodied in an artificial intelligence or machine learning model, including without limitation a collective work of authorship spanning model architecture, code in source or object Form, parameters, data descriptions, data, model weights, and all related artifacts.
+
+“Use” and “Using” shall mean and include anything You do with the Data or Materials, including anything You do with the Data or Materials that requires any license, transfer or assignment from You.
+
+“You” (or “Your”) shall mean an individual or Legal Entity exercising permissions granted by this License.
+
+2. Scope of Agreement.
+This Agreement applies to the literary works, Data, and Materials available under this specific Agreement. IF You COMPLY WITH THIS Agreement, You HAVE THE RIGHTS AND OBLIGATIONS OF THIS Agreement. BY ACCESSING OR Using THE Data OR Materials, You ACCEPT THIS Agreement.  If You are accessing, Using, or receiving the Data or Materials on behalf of Your company or Legal Entity, then You represent and warrant to Licensor that You have the authority to enter into this Agreement on behalf of such Legal Entity.
+
+3. License: Use and Distribution Rights (with modifications).
+Subject to the terms of this Agreement, Licensor licenses You to Use and distribute the Data and Materials solely for non-commercial, non-revenue generating, academic purposes, You may modify any Data and Materials, and You may distribute the unmodified and modified Data and Materials but only for noncommercial and non-revenue generating purposes. Notwithstanding the foregoing, Licensor's own rights to use, distribute, sublicense, and relicense Data, Materials, and any Contributions incorporated therein are governed by Section 4(a) and are not limited by this Section 3. If You distribute or attempt to distribute for any commercial or revenue generating purpose then doing so immediately revokes Your rights under this Agreement and renders You personally, and the Legal Entity You Use or act for, liable to Licensor for preliminary and permanent injunctive relief (without Licensor posting any bond), damages, Licensor’s attorney fees, and any other remedies or relief provided by a court of competent jurisdiction.
+
+4. Pre-requisite Sharing Back Obligation.
+If you share or distribute any Data or Materials with any modifications, including sharing or distributing anything other than an exact copy of all of the Data and Materials You receive (subject only to Section 6(d) below), then as a pre-requisite to such sharing or distribution You must deliver a copy of Your modifications to Licensor and Licensor's GitHub.com or other designated sharing location as specified in the Data or Materials; provided, however that in no event may Your modifications remove any notices, names, marks or authorship attribution in or on the literary work, Data or Materials.
+
+     (a)	License to Licensor. Any modifications delivered to Licensor under this Section 4 (each, a "Contribution") are hereby licensed to Licensor, effective upon delivery, under a perpetual, worldwide, non-exclusive, royalty-free, irrevocable license, with the right to sublicense through multiple tiers of sublicensees, to use, reproduce, modify, publicly display, publicly perform, and distribute the Contribution, in whole or in part, and to incorporate the Contribution into the Data or Materials and distribute and license the combined work on any terms Licensor sees fit, including terms that differ from this Agreement. Nothing in this Section 4(a0 grants Licensor any rights in Your Contribution beyond those necessary for Licensor to operate, maintain, and distribute the Data and Materials and derivative works thereof.
+
+      (b)	License to Other Recipients. Any Contribution delivered to Licensor under this Section 4 is also licensed, effective upon delivery, to any other recipient accessing such Contribution from the designated sharing location, but solely under the same non-commercial, non-revenue-generating, academic-use terms and conditions as this Agreement, and such recipients receive no right to sublicense.
+
+     (c)	No Effect on Contributor's Own Rights. Nothing in this Section 4 limits Your own right to use, modify, or distribute Your Contribution independently of Licensor, subject to the other terms of this Agreement.
+
+     (d)	Contributor Representations. By delivering a Contribution under this Section 4, You represent that (i) You have the legal right and authority to grant the licenses set forth in Section 4.1; (ii) to the best of Your knowledge, the Contribution does not include any patient data or personal data unless properly de-identified in accordance with applicable law, including HIPAA where applicable; and (iii) You have preserved all applicable attributions, copyright notices, and third-party license terms within the Contribution.
+
+5. Limitations.
+   Unless applicable law gives You more rights despite this Agreement, You may not:
+
+     (a)	work around any technical limitations in the Materials or any accompanying instructions that only allow You to Use it in certain ways;
+
+     (b)	reverse engineer, decompile or dissemble the Materials;
+
+     (c)	remove, minimize, block or modify any notices Licensor supplies in the Materials or on any output from the Materials;
+
+     (d)	Use the Materials in any way that is against the law or to create or propagate viruses, malware, or misinformation;
+
+     (e)	alter or remove any patent, trademark, authorship, copyright, or other notices in the Materials; or
+
+     (f)	transfer this Agreement, or any of Your obligations or rights under this Agreement, to any third party.
+
+6. No Implied Rights.
+
+     (a)	Rights not expressly granted are reserved to Licensor.
+
+     (b)	For the avoidance of doubt, Licensor may also offer the licensed Materials to others under separate terms or conditions, or stop distributing the Material at any time; however, doing so will not alter or terminate this Agreement to You.
+
+     (c)	Patent Non-Assertion.
+
+      (i) Covenant. Subject to the terms of this Section 6(c), each party (including Licensor, You, and any Contributor under Section 4) covenants not to bring or assist in bringing any claim, suit, or other legal proceeding alleging patent infringement against any other party arising from that other party's Use of the Data or Materials as permitted under this Agreement, to the extent such infringement would necessarily result from the other party's Use of the Data or Materials in the form made available to it under this Agreement. This covenant does not extend to any modification, combination, or use of the Data or Materials outside the scope of the rights granted by this Agreement.
+
+     (ii) Termination. The covenant in Section 6(c)(i) automatically and immediately terminates, without notice, as to any party (the "Terminating Party") that institutes, asserts, or knowingly and willingly assists another in instituting or asserting, any claim alleging that the Data, Materials, or any lawful Use thereof infringes a patent owned or controlled by the Terminating Party. Upon such termination, the covenant in Section 6(c)(i) shall be of no further force or effect as between the Terminating Party and any party against whom such claim was asserted, but shall remain in effect as to all other parties.
+
+     (iii) No License Granted. For the avoidance of doubt, this Section 6(c) is a covenant not to sue and does not constitute an express or implied license to any invention, patentable subject matter, or patent, of any kind or nature in any country or jurisdiction in the world. Nothing in this Section 6(c) shall be construed to grant, by implication, estoppel, or otherwise, any patent license broader than the covenant expressly set forth herein.
+
+     (iv) Scope. This Section 6(c) applies solely to patent claims that are necessarily infringed by the Data or Materials as delivered under this Agreement, and does not apply to any other product, service, method, or technology of any party, including any product, service, method, or technology used, developed, or offered by a party independently of, or in addition to, its Use of the Data or Materials.
+
+     (d)	The Materials may include Data, graphs, and / or Models, and if so, You are permitted to use and modify such Data, graphs, and Models according to the terms of this Agreement, provided that You may have obligations to comply with laws and policies concerning personal data or patient health information, and this Agreement does not excuse or limit any such obligations.
+
+8. Disclaimer of Warranties. The Data and Materials licensed to You under this Agreement is provided by Licensor on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. Licensor makes no warranty or representation (i) regarding the validity or scope of any of the Materials or licensed intellectual property, and (ii) that the exploitation of the Data and Materials or licensed intellectual property will not infringe any patents or other intellectual property rights of Licensor or of any third party. You are solely responsible for determining the appropriateness of Using or redistributing the Work and assume any risks associated with Your exercise of permissions under this License.
+
+9. No Trademark or Name License. This Agreement does not grant permission to Use the trade names, trademarks, service marks, or product names of Licensor, except as required for reasonable and customary Use in describing the origin of the Data and Materials and reproducing the content of any NOTICE file. Except as provided in the preceding sentence, You shall not Use any mark or name of Licensor, or anything confusingly similar thereto or to any Internet website or Universal Resource Locator of Licensor, nor any name of any trustee, director, officer, staff member, employee, student or agent of Licensor, or any adaptation thereof in any advertising, promotional or sales literature, publicity or in any document employed to obtain funds or financing without the prior express written approval, in each instance, of Licensor and of any individual whose name is to be Used or mentioned.
+
+10. Limitation of Liability. In no event shall Licensor or any of its trustees, directors, officers, medical or professional staff, employees, students, volunteers, agents, and/or attorneys be liable to you, or any contributor , or any of their affiliates, subcontractors, customers, sublicensees or distributors for indirect, special, incidental or consequential damages of any kind arising in any way out of this agreement, or rights granted hereunder, however caused including on any theory of liability, including without limitation economic damages or injury to property or lost profits, regardless of whether you or any contributor shall be advised, shall have other reason to know, or in fact shall know, of the possibility of any of the foregoing. Subject, in any event, to the limitations in the foregoing sentence, the liability of You and your Affiliates or any of their respective trustees, directors, officers, medical or professional staff, students, volunteers, employees, agents and attorneys, and their respective successors, heirs and assigns, with respect to any and all suits, actions, legal proceedings, claims, demands, damages, costs and expenses arising out of the performance or non-performance of any obligation under this Agreement whether based on contract, warranty, tort (including without limitation negligence), strict liability, statutory or otherwise, shall not exceed in the aggregate a sum equal to the total amounts paid to Licensor for this Agreement. The foregoing limitation applies notwithstanding the failure of any agreed or other remedy of its essential purpose.
+
+11. Interpretation. The section and other headings of this Agreement are for convenience of reference only and shall not be definitive of the interpretation of this Agreement. Whenever the context reasonably permits, the singular shall include the plural, the plural shall include the singular, and the whole shall include any part thereof. Any waiver under this Agreement must be in writing and any waiver of one event shall not be construed as a waiver of subsequent events. If any provision of this Agreement is invalid or unenforceable under applicable law, such provision shall be limited, narrowed, construed and altered as necessary to render it valid, but only to the extent necessary to achieve such validity.  If necessary, the invalid provision shall be eliminated from this Agreement. The remaining provisions shall remain in full force and effect. You may not assign or transfer this Agreement.
