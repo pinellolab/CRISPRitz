@@ -15,6 +15,27 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 
 ## [Unreleased]
 
+## [2.8.2] - 2026-09-24
+
+### Fixed
+- **`add-variants` no longer feeds tabix/bcftools index sidecars to the enricher.**
+  The VCF-directory listing filtered out `.tbi` files with
+  `for file in listChrs: if file.endswith(".tbi"): listChrs.remove(file)`, which
+  mutates the list while iterating over it and therefore **skips elements** — so some
+  `.tbi` files survived the filter and were passed to the enricher, which `gzip.open()`s
+  each input and reads it as text. Decompressing a binary `.tbi` index then raised
+  `UnicodeDecodeError: 'utf-8' codec can't decode byte 0x9d`. The listing is now built
+  with a single comprehension that excludes both `.tbi` and `.csi` index sidecars, so
+  only real VCFs reach the enricher. (Surfaced building a genotyped 1000G index whose
+  VCF folder was tabix-indexed; the stray index workers were harmless — they died before
+  writing — but produced confusing tracebacks and were a latent collision risk.)
+
+### Changed
+- **License changed from AGPL-3.0 (dual) to the MGB Open Access License 1.0 (MGBOA 1.0)**,
+  matching CRISPRme+ and CRISPRme. Non-commercial, non-revenue-generating academic use is
+  permitted; commercial use requires a commercial license (contact lpinello@mgh.harvard.edu /
+  rosalba.giugno@univr.it). See `LICENSE`.
+
 ## [2.8.1] - 2026-08-08
 
 ### Added
@@ -141,7 +162,8 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 ### Added
 - Support for longer PAMs and mismatches within PAMs (beta).
 
-[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.8.1...HEAD
+[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.8.2...HEAD
+[2.8.2]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.2
 [2.8.1]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.1
 [2.8.0]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.0
 [2.7.1]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.7.1
