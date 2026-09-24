@@ -15,7 +15,7 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 
 ## [Unreleased]
 
-## [2.8.2] - 2026-09-24
+## [2.8.3] - 2026-09-24
 
 ### Fixed
 - **`add-variants` no longer feeds tabix/bcftools index sidecars to the enricher.**
@@ -35,6 +35,13 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   matching CRISPRme+ and CRISPRme. Non-commercial, non-revenue-generating academic use is
   permitted; commercial use requires a commercial license (contact lpinello@mgh.harvard.edu /
   rosalba.giugno@univr.it). See `LICENSE`.
+
+## [2.8.2] - 2026-08-14
+
+### Fixed
+- `index` (`-index`) search now ignores hidden metadata sidecar files (dotfiles) in the
+  index directory (#42). Released to Bioconda as 2.8.2; the in-repo `VERSION`/recipe pins
+  were not bumped at the time (version drift) and are reconciled in 2.8.3.
 
 ## [2.8.1] - 2026-08-08
 
@@ -162,7 +169,8 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 ### Added
 - Support for longer PAMs and mismatches within PAMs (beta).
 
-[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.8.2...HEAD
+[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.8.3...HEAD
+[2.8.3]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.3
 [2.8.2]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.2
 [2.8.1]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.1
 [2.8.0]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.0
