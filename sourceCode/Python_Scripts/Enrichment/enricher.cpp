@@ -42,6 +42,32 @@ static std::vector<std::string> splitStr(const std::string &s, char delim) {
     return out;
 }
 
+// ALT allele indices carried by a VCF GT field.
+// Splits on '|' and '/', so phased, unphased, haploid ("1") and
+// partially-missing (".|1") genotypes are all handled. Reference (0) and
+// missing ('.') alleles are skipped, so the result holds only ALT indices.
+// Matching on these integers -- instead of searching the raw GT text for an
+// allele number -- is what keeps "0|12" from matching allele 1.
+static std::set<int> gtAltAlleles(const std::string &gt) {
+    std::set<int> out;
+    std::vector<std::string> parts = splitStr(gt, '|');
+    for (size_t i = 0; i < parts.size(); ++i) {
+        std::vector<std::string> sub = splitStr(parts[i], '/');
+        for (size_t j = 0; j < sub.size(); ++j) {
+            const std::string &a = sub[j];
+            if (a.empty()) continue;
+            bool numeric = true;
+            for (size_t c = 0; c < a.size(); ++c) {
+                if (a[c] < '0' || a[c] > '9') { numeric = false; break; }
+            }
+            if (!numeric) continue;  // '.' (missing) or anything unexpected
+            int v = atoi(a.c_str());
+            if (v > 0) out.insert(v);  // 0 is the reference allele
+        }
+    }
+    return out;
+}
+
 // Python str.strip(): removes leading/trailing ASCII whitespace.
 static std::string pyStrip(const std::string &s) {
     size_t b = 0, e = s.size();
@@ -295,11 +321,12 @@ static void add_to_dict_snps(const std::vector<std::string> &line, int pos_AF) {
             for (size_t p = 9; p < line.size(); ++p) {
                 const std::string &sample = line[p];
                 std::string gt = splitStr(sample, ':')[0];
+                std::set<int> alleles = gtAltAlleles(gt);
+                // No break: a sample carrying two different ALTs (e.g. "2|1")
+                // belongs to BOTH of them.
                 for (size_t idx = 0; idx < values_for_allele_info.size(); ++idx) {
-                    std::string vstr = std::to_string(values_for_allele_info[idx]);
-                    if (gt.find(vstr) != std::string::npos) {
+                    if (alleles.count(values_for_allele_info[idx])) {
                         dols[snps[idx]].push_back(VCFheader[p] + ":" + gt);
-                        break;
                     }
                 }
             }
@@ -379,11 +406,11 @@ static void indel_to_fasta(const std::vector<std::string> &line, long &id_indel,
     for (size_t k = 0; k < indels.size(); ++k) dols[indels[k]];
     for (size_t p = 9; p < line.size(); ++p) {
         std::string gt = splitStr(line[p], ':')[0];
+        std::set<int> alleles = gtAltAlleles(gt);
+        // No break: a sample carrying two different ALTs belongs to BOTH.
         for (size_t idx = 0; idx < values_for_allele_info.size(); ++idx) {
-            std::string vstr = std::to_string(values_for_allele_info[idx]);
-            if (gt.find(vstr) != std::string::npos) {
+            if (alleles.count(values_for_allele_info[idx])) {
                 dols[indels[idx]].push_back(VCFheader[p]);
-                break;
             }
         }
     }
