@@ -209,6 +209,24 @@ def chromosomeSave():
     outFile.write(genomeHeader+genomeStr+'\n')
     outFile.close()
 
+def _gt_alt_alleles(gt):
+    """ALT allele indices carried by a VCF GT field.
+
+    Splits on '|' and '/', so phased, unphased, haploid ('1') and
+    partially-missing ('.|1') genotypes are all handled. Reference (0) and
+    missing ('.') alleles are skipped, so the result holds only ALT indices.
+    Matching on these integers -- instead of searching the raw GT text for an
+    allele number -- is what keeps '0|12' from matching allele 1.
+    """
+    alleles = set()
+    for a in gt.replace('/', '|').split('|'):
+        if a.isdigit():
+            v = int(a)
+            if v > 0:  # 0 is the reference allele
+                alleles.add(v)
+    return alleles
+
+
 def _af_value(line, pos_AF):
     # Raw AF value string for this record, or "" if unavailable. Handles three
     # cases uniformly: no AF-like field found anywhere in the file (pos_AF is
@@ -262,10 +280,11 @@ def add_to_dict_snps(line, pos_AF):
             dict_of_lists_samples[snp] = []
         if len(snps) > 0:		
             for pos, sample in enumerate(line[9:]):
+                alleles = _gt_alt_alleles(sample.split(':')[0])
+                # no break: a sample carrying two different ALTs belongs to BOTH
                 for idx, value in enumerate(values_for_allele_info):
-                    if str(value) in sample.split(':')[0]:
+                    if value in alleles:
                         dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 9]+':'+sample.split(':')[0]) #add to correct entry of dict the sample with such snp
-                        break
                     
             chr_pos_string = currentChr + ',' + line[1]
             rsID = line[2].split(',')
@@ -311,10 +330,11 @@ def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
                 dict_of_lists_samples[indel] = []
 
             for pos, sample in enumerate(line[9:]):          #if sample has 1|1 0|1 or 1|0, #NOTE may change for different vcf
+                alleles = _gt_alt_alleles(sample.split(':')[0])
+                # no break: a sample carrying two different ALTs belongs to BOTH
                 for idx, value in enumerate(values_for_allele_info):
-                    if str(value) in sample.split(':')[0]:
+                    if value in alleles:
                         dict_of_lists_samples[indels[idx]].append(VCFheader[ pos + 9]) #add to correct entry of dict the sample with such snp
-                        break
             if len(indels) > 0:
                 rsID = line[2].split(',')
                 af = _af_value(line, pos_AF).split(',')
