@@ -15,6 +15,27 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 
 ## [Unreleased]
 
+## [2.8.4] - 2026-10-08
+
+### Fixed
+- **`add-variants` enricher assigned samples to the wrong ALT allele on
+  multiallelic records.** The enricher matched a sample to an ALT allele by
+  searching the raw genotype text for the allele number and stopping at the
+  first hit (`gt.find(str(allele))` + `break`), which failed two ways: (1) the
+  substring test let a record with ten or more ALTs bind a sample to an allele
+  it does not carry (GT `0|12` substring-matches allele `1`), and (2) the
+  `break` dropped the second allele of a sample carrying two different ALTs
+  (`2|1`), leaving that allele with no carrier. The genotype is now parsed into
+  integer alleles (splitting on `|` and `/`, so phased, unphased, haploid and
+  partially-missing calls are all handled, skipping `.` and the reference),
+  membership is tested on those integers, and the sample is recorded under every
+  ALT it carries. Applied to the multiallelic SNP path and the indel path in
+  both the C++ enricher and the Python fallback. The biallelic path is unchanged
+  (its `gt.find('1')` is correct because a biallelic GT holds only `0`, `1` or
+  `.`) and the enriched FASTA is byte-identical in every test, so the search
+  space does not move — only per-sample carrier assignment on multiallelic sites
+  is corrected. (#44)
+
 ## [2.8.3] - 2026-09-24
 
 ### Fixed
@@ -169,7 +190,8 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 ### Added
 - Support for longer PAMs and mismatches within PAMs (beta).
 
-[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.8.3...HEAD
+[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.8.4...HEAD
+[2.8.4]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.4
 [2.8.3]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.3
 [2.8.2]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.2
 [2.8.1]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.1
