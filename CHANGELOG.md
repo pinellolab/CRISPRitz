@@ -15,6 +15,38 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-10-08
+
+### Removed
+- **CRISPRitz is now a pure enumeration engine.** All scoring, annotation and
+  reporting have been removed; CRISPRitz keeps only `index-genome`, `search` and
+  `add-variants` (plus `version`/help). Removed subcommands: **`scores`** (the
+  vendored azimuth/Doench-2016 on-target model + CFD), **`annotate-results`**, and
+  **`generate-report`**; and the **`-scores`** option of `search`. Deleted the
+  vendored `Scores/` (incl. azimuth), `Annotator/`, `Plot/` and `ProcessData/`
+  trees. Downstream scoring/annotation/reporting now live in **CRISPRme+**, which
+  already implements them (CFD + CRISPR-Bulge scoring, interval-tree annotation,
+  and its own report/plots) and never used CRISPRitz's versions.
+
+### Changed
+- **Dependencies unpinned — the numerical stack now floats free.** The exact pins
+  `scikit-learn==1.1.3 / numpy==1.24.4 / pandas==2.0.3 / scipy==1.10.1` existed
+  **solely** for the azimuth model. With azimuth gone, `scikit-learn`, `scipy`,
+  `matplotlib`, `biopython`, `statsmodels` and `intervaltree` are dropped, and
+  `numpy`/`pandas` are unpinned (the `add-variants` Python-fallback enricher uses
+  pandas). This lets packages that require a modern numpy/pandas (e.g. **CRISPRme+**)
+  depend on `crispritz` from Bioconda without an unsolvable conflict.
+- **Recipe test** now exercises every engine subcommand (`index-genome`/`search`/
+  `add-variants` help) instead of only `crispritz.py` — so a broken import or a bad
+  dependency bump fails the build (the full index+search golden-output regression
+  remains in the GitHub Actions CI).
+
+### Migration
+- Users who relied on `crispritz scores` / `annotate-results` / `generate-report`
+  (or `search -scores`) should use **CRISPRme+**, which provides scoring (CFD +
+  CRISPR-Bulge), annotation and reporting. The search/index/enrich engine is
+  unchanged and byte-identical.
+
 ## [2.8.4] - 2026-10-08
 
 ### Fixed
@@ -190,7 +222,8 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 ### Added
 - Support for longer PAMs and mismatches within PAMs (beta).
 
-[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.8.4...HEAD
+[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.9.0
 [2.8.4]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.4
 [2.8.3]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.3
 [2.8.2]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.2

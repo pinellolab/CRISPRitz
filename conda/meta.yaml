@@ -1,4 +1,4 @@
-{% set version = "2.8.4" %}
+{% set version = "2.9.0" %}
 
 package:
   name: crispritz
@@ -20,47 +20,26 @@ requirements:
     - openmp
     - zlib
 
+  # CRISPRitz is now a PURE ENUMERATION ENGINE (index-genome / search / add-variants).
+  # All scoring (CFD + azimuth), annotation and reporting moved to CRISPRme+, so the
+  # heavy ML stack that forced the exact pins is GONE: no scikit-learn / scipy /
+  # matplotlib / biopython / statsmodels / intervaltree, and numpy/pandas are UNPINNED
+  # (the numerical stack now floats free). This is what lets downstream packages that
+  # need a modern numpy/pandas (e.g. CRISPRme+) depend on crispritz without a conflict.
+  # The add-variants Python-fallback enricher uses pandas; the C++ engine links against
+  # boost/openmp/zlib/libdeflate; add-variants shells out to bcftools.
   host:
-    - intervaltree
-    - matplotlib
-    - pandas ==2.0.3
-    - scipy ==1.10.1
-    - numpy ==1.24.4
-    # The azimuth (Doench 2016) on-target model is vendored from CRISPR-HAWK and
-    # only unpickles on this scikit-learn/numpy combo (see
-    # sourceCode/Python_Scripts/Scores/azimuth/ATTRIBUTION.md). Do NOT bump
-    # scikit-learn past 1.1.x without re-serializing the model: sklearn 1.2
-    # removed sklearn.ensemble._gb_losses, which the model references.
-    - scikit-learn ==1.1.3
-    - biopython
-    - more-itertools
-    - statsmodels
     - bcftools
     - boost
-    - tk
     - openmp
     - libdeflate
     - zlib
     - python >=3.11
 
   run:
-    - intervaltree
-    - matplotlib
-    - pandas ==2.0.3
-    - scipy ==1.10.1
-    - numpy ==1.24.4
-    # The azimuth (Doench 2016) on-target model is vendored from CRISPR-HAWK and
-    # only unpickles on this scikit-learn/numpy combo (see
-    # sourceCode/Python_Scripts/Scores/azimuth/ATTRIBUTION.md). Do NOT bump
-    # scikit-learn past 1.1.x without re-serializing the model: sklearn 1.2
-    # removed sklearn.ensemble._gb_losses, which the model references.
-    - scikit-learn ==1.1.3
-    - biopython
-    - more-itertools
-    - statsmodels
+    - pandas
     - bcftools
     - boost
-    - tk
     - openmp
     - libdeflate
     - zlib
@@ -68,7 +47,13 @@ requirements:
 
 test:
   commands:
+    # exercise the dispatch for EVERY engine subcommand (catches a broken import or a
+    # bad dep bump, which the old `--help`-only test would silently pass). The real
+    # index+search golden-output regression lives in the GitHub Actions CI.
     - crispritz.py
+    - crispritz.py index-genome help
+    - crispritz.py search help
+    - crispritz.py add-variants help
 
 about:
   home: https://github.com/pinellolab/CRISPRitz
