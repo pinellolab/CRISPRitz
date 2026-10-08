@@ -10,7 +10,6 @@ import shutil  # remove directory and its content
 import sys  # input argv
 from subprocess import Popen, PIPE
 import glob
-import pandas as pd
 import multiprocessing
 
 # path where this file is located
@@ -18,7 +17,7 @@ origin_path = os.path.dirname(os.path.realpath(__file__))
 # conda path
 conda_path = "opt/crispritz/"
 
-VERSION = "2.8.4"
+VERSION = "2.9.0"
 
 if "--debug" in sys.argv[1:]:
     # for quick local tests
@@ -245,17 +244,6 @@ def searchTST():
         print("Please select an output")
         sys.exit()
 
-    # Check '-scores' directory input
-    if "-scores" in sys.argv[1:]:
-        try:
-            idx_genome_fasta = (sys.argv).index("-scores") + 1
-            idx_genome_fasta = os.path.realpath(sys.argv[idx_genome_fasta])
-        except:
-            print(
-                "ERROR! Please select the directory containing the fasta files of the genome"
-            )
-            sys.exit()
-        checkExistance(idx_genome_fasta, "d")
     # Check input correctness
     file_correct_ext = [
         f
@@ -300,44 +288,14 @@ def searchTST():
     )
     print("Search END")
     print("Search runtime: %s seconds" % (time.time() - start_time))
-    if "-scores" in sys.argv[1:]:
-
-        try:
-            idx_genome_fasta = (sys.argv).index("-scores") + 1
-            idx_genome_fasta = os.path.realpath(sys.argv[idx_genome_fasta])
-        except:
-            print(
-                "ERROR! Please select the directory containing the fasta files of the genome"
-            )
-            sys.exit()
-
-        pam_guide = len(open(PAM).readline().split(" ")[0])
-        pam_at_beginning = int(open(PAM).readline().split(" ")[1])
-        if (
-            pam_guide != 23 or pam_at_beginning < 0
-        ):  # Also block scoring pam at beginning
-            print(
-                "WARNING: The CFD score and the Doench score can be calculated only for guides with 20bp and a 3bp PAM (SpCas9)"
-            )
-
-        target_filename = os.path.realpath(nameResult)
-        subprocess.run(
-            [
-                corrected_origin_path + "Python_Scripts/Scores/scores.py",
-                target_filename + ".targets.txt",
-                idx_genome_fasta + "/",
-                str(PAM),
-                str(fileGuide),
-            ]
-        )
 
 
 def searchBruteForce():
     if len(sys.argv) < 9 or "help" in sys.argv[1:]:
         print(
             "WARNING: Too few arguments to function search. Please provide:\n",
-            "\nEXAMPLE CALL MISMATCHES ONLY: crispritz.py search genomeDirectory/ pamFile.txt guidesFile.txt outputFile -mm 4 -th 4 -scores genomeDirectory(FASTA)/ -t\n",
-            "\nEXAMPLE CALL MISMATCHES + BULGES: crispritz.py search indexGenomeDirectory/ pamFile.txt guidesFile.txt outputFile -mm 4 -bDNA 1 -bRNA 2 -th 4 -scores genomeDirectory(FASTA)/ -t\n",
+            "\nEXAMPLE CALL MISMATCHES ONLY: crispritz.py search genomeDirectory/ pamFile.txt guidesFile.txt outputFile -mm 4 -th 4 -t\n",
+            "\nEXAMPLE CALL MISMATCHES + BULGES: crispritz.py search indexGenomeDirectory/ pamFile.txt guidesFile.txt outputFile -mm 4 -bDNA 1 -bRNA 2 -th 4 -t\n",
             "\n<genomeDirectory>: Directory containing a genome in .fa or .fasta format (.bin format if bulges present), need to be separated into single chromosome files",
             "\n<pamFile>: Text file containing the PAM sequence (including a number of Ns equal to the guide length) and a space separated number indicating the length of the PAM sequence",
             "\n<guidesFile>: Text file containing one or more guides (including a number of Ns equal to the length of the PAM sequence)",
@@ -346,7 +304,6 @@ def searchBruteForce():
             "\n-bRNA <bRNA_num>: (Optional) Size of RNA bulges",
             "\n-bDNA <bDNA_num>: (Optional) Size of DNA bulges",
             "\n-th < num_thread >: (Optional) Number of threads to use. Default uses all of the available threads (ONE for bulge search)",
-            "\n-scores <genomeDirectoryInFastaFormat>: (Optional) Directory containing the genome in .fa or .fasta format, necessary to extract sequences for Doench Score Function",
             "\n{-r,-p,-t}: Output type (-r off-targets list only, -p profile only, -t off-targets AND profile)\n",
         )
         sys.exit()
@@ -395,18 +352,6 @@ def searchBruteForce():
     # variant
     variant = 1  # always search with IUPAC variant
 
-    # Check '-scores' directory
-    if "-scores" in sys.argv[1:]:
-        try:
-            idx_genome_fasta = (sys.argv).index("-scores") + 1
-            idx_genome_fasta = os.path.realpath(sys.argv[idx_genome_fasta])
-        except:
-            print(
-                "ERROR! Please select the directory containing the fasta files of the genome"
-            )
-            sys.exit()
-        checkExistance(idx_genome_fasta, "d")
-
     # Check input correctness
     checkExistance(genomeDir, "d")
     checkExistance(filePAM, "f")
@@ -445,132 +390,6 @@ def searchBruteForce():
     )
     print("Search END")
     print("Search runtime: %s seconds" % (time.time() - start_time))
-
-    if "-scores" in sys.argv[1:]:
-        try:
-            idx_genome_fasta = (sys.argv).index("-scores") + 1
-            idx_genome_fasta = os.path.realpath(sys.argv[idx_genome_fasta])
-        except:
-            print(
-                "ERROR! Please select the directory containing the fasta files of the genome"
-            )
-            sys.exit()
-
-        pam_guide = len(open(filePAM).readline().split(" ")[0])
-        pam_at_beginning = int(open(filePAM).readline().split(" ")[1])
-        if (
-            pam_guide != 23 or pam_at_beginning < 0
-        ):  # Also block scoring pam at beginning
-            print(
-                "WARNING: The CFD score and the Doench score can be calculated only for guides with 20bp and a 3bp PAM (SpCas9)"
-            )
-
-        target_filename = os.path.realpath(result)
-        subprocess.run(
-            [
-                corrected_origin_path + "Python_Scripts/Scores/scores.py",
-                target_filename + ".targets.txt",
-                idx_genome_fasta + "/",
-                str(filePAM),
-                str(fileGuide),
-            ]
-        )
-
-
-def scores():
-    if len(sys.argv) < 6 or "help" in sys.argv[1:]:
-        print(
-            "WARNING: Too few arguments to function annotate-results. Please provide:\n",
-            "\nEXAMPLE CALL: crispritz.py scores resultsFile.txt pamFile.txt guideFiles.txt genomeDirectoryInFastaFormat\n",
-            "\n<resultsFile>: Targets file containing all genomic targets for the guides set",
-            "\n<pamFile>: Text file containing the PAM sequence (including a number of Ns equal to the guide length) and a space separated number indicating the length of the PAM sequence",
-            "\n<guidesFile>: Text file containing one or more guides (including a number of Ns equal to the length of the PAM sequence)",
-            "\n<genomeDirectoryInFastaFormat>: Directory containing the genome in .fa or .fasta format, necessary to extract sequences for Doench Score Function",
-        )
-        sys.exit()
-
-    resultFile = os.path.realpath(sys.argv[2])
-    filePAM = os.path.realpath(sys.argv[3])
-    fileGuide = os.path.realpath(sys.argv[4])
-    genomeDir = os.path.realpath(sys.argv[5]) + "/"
-
-    checkExistance(resultFile, "f")
-    checkExistance(filePAM, "f")
-    checkExistance(fileGuide, "f")
-    checkExistance(genomeDir, "d")
-
-    pam_guide = len(open(filePAM).readline().split(" ")[0])
-    pam_at_beginning = int(open(filePAM).readline().split(" ")[1])
-
-    if pam_guide != 23 or pam_at_beginning < 0:  # Also block scoring pam at beginning
-        print(
-            "WARNING: The CFD score and the Doench score can be calculated only for guides with 20bp and a 3bp PAM (SpCas9)"
-        )
-        # sys.exit()
-    subprocess.run(
-        [
-            corrected_origin_path + "Python_Scripts/Scores/scores.py",
-            resultFile,
-            genomeDir,
-            str(filePAM),
-            str(fileGuide),
-        ]
-    )
-
-
-def annotateResults():
-    if len(sys.argv) < 5 or "help" in sys.argv[1:]:  # was 6
-        print(
-            "WARNING: Too few arguments to function annotate-results. Please provide:\n",
-            "\nEXAMPLE CALL: crispritz.py annotate-results resultsFile.txt annotationsFile.bed outputFile\n",
-            "\n<resultsFile>: Targets file containing all genomic targets for the guides set",
-            # Bed file containing annotation
-            "\n<annotationsFile>: Text file containing the annotations in .bed format",
-            "\n<outputFile>: Name of output file",
-            "\n--change-ID <sampleIDfile> : (Optional) Change the samples, population and superpopulation IDs. DEFAULT: the default IDs are taken from the 1000 genome project (used for Human Genome hg19 and hg38)",
-        )
-        sys.exit()
-
-    # guidesFile = os.path.realpath(sys.argv[2])
-    resultsFile = os.path.realpath(sys.argv[2])
-    annotationsFile = os.path.realpath(sys.argv[3])
-    outputFile = os.path.realpath(sys.argv[4])
-
-    checkExistance(resultsFile, "f")
-    checkExistance(annotationsFile, "f")
-
-    sampleIDfile = (
-        corrected_origin_path
-        + "Python_Scripts/ProcessData/samples_1000genomeproject.txt"
-    )
-    if "--change-ID" in sys.argv[1:]:
-        sampleIDfile = (sys.argv).index("--change-ID") + 1
-        try:
-            sampleIDfile = os.path.realpath(sys.argv[sampleIDfile])
-        except:
-            print("Warning! Missing sampleID file")
-            sys.exit()
-    checkExistance(sampleIDfile, "f")
-    # NOTE sys.argv[-1] can be either sampleIDfile or 'Step [x/y] - Annotation', and it's just needed for having an output of the state of the
-    # analysis for the user
-    step = sys.argv[-1]
-    if "Step" not in step:
-        print("Annotation START")
-    start_time = time.time()
-    subprocess.run(
-        [
-            corrected_origin_path + "Python_Scripts/Annotator/annotator.py",
-            annotationsFile,
-            resultsFile,
-            outputFile,
-            sampleIDfile,
-            sys.argv[-1],
-        ]
-    )
-    if "Step" not in step:
-        print("Annotation END")
-        print("Annotation runtime: %s seconds" % (time.time() - start_time))
-
 
 def _enricher_command():
     """Resolve the enrichment executable, preferring the compiled binary.
@@ -789,94 +608,6 @@ def genomeEnrichment():
     print("Runtime: %s seconds" % (time.time() - start_time))
 
 
-def generateReport():
-    if len(sys.argv) < 9 or "help" in sys.argv[1:]:  # was 10
-        print(
-            "WARNING: Too few arguments to function generate-report. Please provide:\n",
-            "\nEXAMPLE CALL: crispritz.py GAGTCCGAGCAGAAGAAGAANNN -mm 4 -annotation annotationSummaryFile.txt -extprofile guideExtendedProfile.xls -gecko -sumref referenceAnnotationSummaryFile.txt\n",
-            "\n<guide>: (Optional) A guide present in the analyzed set",
-            "\n-mm <mm_num>: Number of mismatches to analyze",
-            "\n-annotation <annotationSummaryFile>: Count files for genomic annotations",
-            "\n-extprofile <guideExtendedProfile>: Extended profile file",
-            "\n-gecko: (Optional) Tag to activate gecko dataset comparison",
-            "\n-sumref <referenceAnnotationSummaryFile>: (Optional) Create a barplot comparing reference genome results with enriched genome results. If the <guide> option is used, the barplot will take into account only the targets found with that specific guide\n",
-        )
-        sys.exit()
-
-    # NOTE barplot is ok only when -annotator and profile, ext are from var, -sumref is from ref
-    if "-mm" in sys.argv[2]:
-        guide = "no"
-    else:
-        guide = sys.argv[2]
-
-    mm = 0
-    if "-mm" in sys.argv[1:]:
-        try:
-            mm = (sys.argv).index("-mm") + 1
-            mm = sys.argv[mm]
-            int(mm)
-        except:
-            print(
-                "ATTENTION! Check the mismatches option: -mm <mm_num> (mm_num is a number)"
-            )
-            sys.exit()
-
-    extProfileFile = "no"
-    if "-extprofile" in sys.argv[1:]:
-        extProfileFile = (sys.argv).index("-extprofile") + 1
-        extProfileFile = os.path.realpath(sys.argv[extProfileFile])
-        checkExistance(extProfileFile, "f")
-
-    countdir = "no"
-    if "-annotation" in sys.argv[1:]:
-        countdir = (sys.argv).index("-annotation") + 1
-        countdir = os.path.realpath(sys.argv[countdir])
-        checkExistance(countdir, "f")
-
-    summaryOne = "no"
-    if "-sumref" in sys.argv[1:]:
-        summaryOne = (sys.argv).index("-sumref") + 1
-        summaryOne = os.path.realpath(sys.argv[summaryOne])
-        checkExistance(summaryOne, "f")
-
-    summaryTwo = countdir
-
-    geckoProfile = "no"
-
-    if "-gecko" in sys.argv[1:]:
-        geckoProfile = (
-            corrected_origin_path
-            + "Python_Scripts/Plot/gecko.summary.total.Annotation.summary.txt"
-        )
-
-    if "-ws" in sys.argv[:]:
-        web_server = "-ws"
-    else:
-        web_server = ""
-    if "-sample" in sys.argv[:]:
-        sample_name = sys.argv.index("-sample")
-        sample_name = sys.argv[sample_name + 1]
-        sample_opt = "-sample"
-    else:
-        sample_name = ""
-        sample_opt = ""
-
-    subprocess.run(
-        [
-            corrected_origin_path + "Python_Scripts/Plot/radar_chart.py",
-            str(guide),
-            str(mm),
-            str(summaryTwo),
-            str(extProfileFile),
-            str(summaryOne),
-            str(geckoProfile),
-            web_server,
-            sample_opt,
-            sample_name,
-        ]
-    )
-
-
 def removeFile(to_remove):
     """
     Remove file given his path in input
@@ -904,9 +635,6 @@ def callHelp():
         "\ncrispritz.py add-variants FUNCTION TO ADD VARIANTS DATA TO A FASTA GENOME",
         "\ncrispritz.py index-genome FUNCTION TO CREATE GENOME INDEX TO PERFORM FAST SEARCHES WITH BULGES",
         "\ncrispritz.py search FUNCTION TO PERFORM SEARCHES ON A GENOME (INDEXED OR PLAIN FASTA)",
-        "\ncrispritz.py scores FUNCTION TO CALCULATE THE CFD SCORE FOR A LIST OF TARGETS",
-        "\ncrispritz.py annotate-results FUNCTION TO ADD GENOMIC INFORMATION TO TARGETS RESULTS",
-        "\ncrispritz.py generate-report FUNCTION TO GENERATE GRAPHICAL REPORT FOR A SPECIFIC GUIDE",
         "\n",
         "\nADD help TO ANY FUNCTION TO VISUALIZE A BRIEF HELP PAGE (example: crispritz.py index-genome help)\n",
     )
@@ -922,13 +650,7 @@ elif sys.argv[1] == "search" and ("-bDNA" in sys.argv[1:] or "-bRNA" in sys.argv
     searchTST()
 elif sys.argv[1] == "search":
     searchBruteForce()
-elif sys.argv[1] == "scores":
-    scores()
 elif sys.argv[1] == "add-variants":
     genomeEnrichment()
-elif sys.argv[1] == "annotate-results":
-    annotateResults()
-elif sys.argv[1] == "generate-report":
-    generateReport()
 else:
     print('ERROR! "' + sys.argv[1] + '" is not an allowed!')
