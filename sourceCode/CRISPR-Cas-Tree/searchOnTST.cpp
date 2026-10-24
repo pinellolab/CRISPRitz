@@ -1146,21 +1146,18 @@ int main(int argc, char **argv)
 
 	// ---- On-the-fly PAM filter: one-time init ----
 	// Enabled by the 12th positional arg (set above) OR the CRISPRITZ_PAM_PRUNE
-	// env var. pamRNA is the search PAM region (length == pamlimit). guideDNA_bit[j]
-	// in the index aligns to pamRNA[j] directly (loadTST decodes position j of the
-	// stored flank into guideDNA_bit[j] using the same A=0001/C=0010/G=0100/T=1000
-	// convention as pam_bit_conversion), so searchPamBit[j] compares against
-	// guideDNA_bit[j] with no reversal. This holds for both pam_at_start values
-	// because pamRNA and the stored flank are read in the same coordinate frame
-	// (the flank string is appended/prepended to the target verbatim at emit time).
+	// env var. The search PAM region is `pamRNA` (length L == |pamlimit|). The
+	// index stores K flank bases per leaf (K = the build-time pamlimit, encoded
+	// in the .bin filename prefix). We support K >= L: a search PAM shorter than
+	// the stored flank is N-padded to width K so ONE generous-flank PAM-less index
+	// (e.g. an 8-N index) serves ANY PAM of length <= K. The actual padding +
+	// searchPamBit construction happen in the length guard below, once K is known
+	// (K is read from the first .bin prefix). Here we only flip the mode on.
 	if (getenv("CRISPRITZ_PAM_PRUNE") != nullptr)
 		PAM_PRUNE = true;
 	if (PAM_PRUNE)
-	{
-		searchPamBit = pamPrune_bit_conversion(pamRNA);
-		cerr << "[PAM-FILTER] on-the-fly PAM filter ENABLED; search PAM region = "
-			 << pamRNA << " (" << searchPamBit.size() << " nt)" << endl;
-	}
+		cerr << "[PAM-FILTER] on-the-fly PAM filter ENABLED; raw search PAM region = "
+			 << pamRNA << " (" << pamRNA.size() << " nt)" << endl;
 	// ---- END PAM filter init ----
 
 	globalstart = omp_get_wtime(); // start global time
@@ -1232,16 +1229,38 @@ int main(int argc, char **argv)
 	}
 	closedir(d);
 
-	// ---- On-the-fly PAM filter: length guard ----
-	// loadTST reads exactly pamRNA.size() PAM nucleotides per leaf from each .bin.
-	// The index's stored PAM length is encoded in the .bin filename prefix (the
-	// build-time pamRNA, e.g. "NGG_chr1_0.bin" -> 3; "NNN_chr1_0.bin" -> 3). If the
-	// search PAM length differs from the index's stored PAM length, the binary
-	// stream would be mis-read (the PAM region, the "next" link and every
-	// subsequent leaf would shift), silently corrupting results. Fail fast with a
-	// clear message instead. This mirrors the normal CRISPRitz invariant that the
-	// index and the search must use the same PAM length; the on-the-fly filter
-	// only relaxes the PAM *letters* (NNN index -> NGG search), never the length.
+	// ---- On-the-fly PAM filter: length guard + N-padding to the stored flank ----
+	// loadTST reads EXACTLY pamRNA.size() PAM nucleotides per leaf from each .bin,
+	// so pamRNA.size() must equal the index's stored flank width K (the build-time
+	// pamlimit, encoded in the .bin filename prefix, e.g. "NGG_chr1_0.bin" -> 3,
+	// "NNNNNNNN_chr1_0.bin" -> 8). If it did not, the binary stream would be
+	// mis-read (the PAM region, the "next" link and every subsequent leaf would
+	// shift), silently corrupting results.
+	//
+	// The "configurable generous flank" idea: build ONE PAM-less index with a wide
+	// all-N flank of width K, then serve ANY search PAM of length L <= K by
+	// N-PADDING the search PAM up to width K. A real PAM is always adjacent to the
+	// protospacer, so the real letters occupy the PROXIMAL positions and the pad N's
+	// occupy the DISTAL (outer) positions the index stored but the shorter PAM does
+	// not constrain:
+	//   * 3' PAM (pam_at_start == false): pamRNA = pam.substr(pamlen - pamlimit,
+	//     pamlimit) is ordered [proximal ... distal] (index j increases AWAY from the
+	//     protospacer), so the real letters are at low j and we pad on the END:
+	//         pamRNA = pamRNA + string(K - L, 'N');
+	//   * 5' PAM (pam_at_start == true): pamRNA = pam.substr(0, pamlimit) is ordered
+	//     [distal ... proximal] (index j increases TOWARD the protospacer), so the
+	//     real letters are at high j and we pad on the FRONT:
+	//         pamRNA = string(K - L, 'N') + pamRNA;
+	// In both cases the padded pamRNA is laid out in the SAME coordinate frame as the
+	// stored flank guideDNA_bit[0..K-1] (loadTST decodes stored position j into
+	// guideDNA_bit[j] with the same A=0001/C=0010/G=0100/T=1000 convention used
+	// build-side), so searchPamBit[j] compares 1:1 against guideDNA_bit[j] with no
+	// reversal, and the pad N's (bitset 1111) never reject anything. This is proven
+	// equivalent to a dedicated K=L index by test/run_pam_filter_test.sh (an 8-flank
+	// NGG search == a dedicated 3-flank NGG index, same result SET).
+	//
+	// L > K remains a HARD ERROR: the index never stored those extra bases, so a
+	// longer search PAM cannot be satisfied.
 	if (PAM_PRUNE)
 	{
 		string index_pam_prefix;
@@ -1258,19 +1277,41 @@ int main(int argc, char **argv)
 				}
 			}
 		}
-		if (!index_pam_prefix.empty() && index_pam_prefix.size() != pamRNA.size())
+		if (!index_pam_prefix.empty())
 		{
-			cerr << "ERROR: --prune-pam/CRISPRITZ_PAM_PRUNE requires the search PAM "
-				 << "length to match the index PAM length. Index PAM region is '"
-				 << index_pam_prefix << "' (" << index_pam_prefix.size()
-				 << " nt) but search PAM region is '" << pamRNA << "' ("
-				 << pamRNA.size() << " nt). Build/choose an index whose PAM is the "
-				 << "same length (e.g. a 3-nt NNN index for a 3-nt NGG/NRG search)."
-				 << endl;
-			return 1;
+			size_t K = index_pam_prefix.size(); // stored flank width in the index
+			size_t L = pamRNA.size();            // requested search PAM length
+			if (L > K)
+			{
+				cerr << "ERROR: --prune-pam/CRISPRITZ_PAM_PRUNE search PAM is LONGER "
+					 << "than the index's stored flank. Index flank is '"
+					 << index_pam_prefix << "' (" << K << " nt) but search PAM region "
+					 << "is '" << pamRNA << "' (" << L << " nt). A longer PAM cannot "
+					 << "be served because the index never stored those extra flank "
+					 << "bases; rebuild the index with an all-N PAM of length >= "
+					 << L << " (recommended generous default: 8)." << endl;
+				return 1;
+			}
+			if (L < K)
+			{
+				// N-pad the search PAM up to the stored flank width K. Pad DISTAL:
+				// end for a 3' PAM, front for a 5' PAM (see rationale above).
+				string pad(K - L, 'N');
+				if (pam_at_start)
+					pamRNA = pad + pamRNA;   // 5': real letters proximal (high j)
+				else
+					pamRNA = pamRNA + pad;   // 3': real letters proximal (low j)
+				cerr << "[PAM-FILTER] N-padded search PAM to the index flank width K="
+					 << K << " (orientation: " << (pam_at_start ? "5'/front" : "3'/end")
+					 << "-pad): effective PAM region = " << pamRNA << endl;
+			}
 		}
+		// Build the IUPAC-expanded bitsets now that pamRNA is at the stored width K.
+		searchPamBit = pamPrune_bit_conversion(pamRNA);
+		cerr << "[PAM-FILTER] effective search PAM region = " << pamRNA << " ("
+			 << searchPamBit.size() << " nt)" << endl;
 	}
-	// ---- END PAM filter length guard ----
+	// ---- END PAM filter length guard + N-padding ----
 
 	sort(file_stats_vec.begin(), file_stats_vec.end(), compareBySize);
 

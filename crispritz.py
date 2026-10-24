@@ -270,11 +270,13 @@ def searchTST():
                 "ATTENTION! Check the total-edits option: --max-edits <n> (n is an integer)"
             )
             sys.exit()
-    # optional on-the-fly PAM filter: let a PAM-less index (e.g. NNN) serve a more
-    # restrictive search PAM (e.g. NGG/NRG) by dropping candidates whose concrete
-    # flanking PAM does not match the search PAM, before they are emitted. OFF by
-    # default; 1 = on. The search PAM length must equal the index PAM length (the
-    # binary enforces this and exits with a clear error otherwise).
+    # optional on-the-fly PAM filter: let ONE generous-flank PAM-less index (an
+    # all-N flank of width K, e.g. 8) serve ANY search PAM of length L <= K (e.g.
+    # NGG/NRG/NGA/NNGRRT/TTTV) by dropping candidates whose concrete flank does not
+    # match the search PAM, before they are emitted. A short search PAM is N-padded
+    # up to the stored width K on the distal side. OFF by default; 1 = on. L > K is
+    # a hard error (the index never stored those extra flank bases). See README
+    # section 3.3.3.
     prune_pam = 1 if "--prune-pam" in sys.argv[1:] else 0
     subprocess.run(
         [
@@ -312,7 +314,7 @@ def searchBruteForce():
             "\n-bDNA <bDNA_num>: (Optional) Size of DNA bulges",
             "\n-th < num_thread >: (Optional) Number of threads to use. Default uses all of the available threads (ONE for bulge search)",
             "\n--max-edits <n>: (Optional, indexed search) Cap the TOTAL number of edits (mismatches + DNA bulges + RNA bulges) per off-target. Omitted/negative disables the cap.",
-            "\n--prune-pam: (Optional, indexed search) On-the-fly PAM filter. Lets a PAM-less index (e.g. NNN) serve a more restrictive search PAM (e.g. NGG/NRG/NRR/NGA/NAG/NNNN): candidates whose concrete flanking PAM does not match the search PAM are skipped before they are emitted, giving results identical to a dedicated per-PAM index. The search PAM length must equal the index PAM length. OFF by default.",
+            "\n--prune-pam: (Optional, indexed search) On-the-fly PAM filter. Lets ONE generous-flank PAM-less index (built with an all-N PAM of flank width K, e.g. 8) serve ANY search PAM of length L <= K (e.g. NGG/NRG/NRR/NGA/NNGRRT/TTTV): candidates whose concrete flanking PAM does not match the search PAM are skipped before they are emitted, giving the same off-target loci as a dedicated per-PAM index. A shorter PAM is N-padded up to the stored width K (end for a 3' PAM, front for a 5' PAM). L > K is a hard error. OFF by default (byte-identical to upstream). See README section 3.3.3.",
             "\n{-r,-p,-t}: Output type (-r off-targets list only, -p profile only, -t off-targets AND profile)\n",
         )
         sys.exit()

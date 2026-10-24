@@ -15,6 +15,39 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 
 ## [Unreleased]
 
+### Added
+- **`search --prune-pam`: one generous-flank PAM-less index serves ANY PAM up to
+  the stored flank width (N-padding).** Build a single PAM-less index with a wide
+  all-N flank of width `K` (the declared PAM length; recommended generous default
+  `K = 8`), then serve *any* PAM of length `L ≤ K` on the fly — no dedicated
+  per-PAM index. At TST leaf emit (`saveIndices` + `saveIndices2`), each
+  candidate's stored concrete flank is bit-AND-compared against the IUPAC-expanded
+  search PAM and skipped **before it is written or scored** if incompatible. A
+  search PAM shorter than `K` is **N-padded to width `K` on the distal side** — the
+  *end* for a 3′ PAM, the *front* for a 5′ PAM — because a real PAM is always
+  adjacent to the protospacer (proximal positions carry the real letters; the pad
+  N's cover the outer stored positions the short PAM does not constrain). This
+  yields the **same off-target loci** as a dedicated per-PAM index (proven for 3′
+  NGG and 5′ TTTV in `test/run_pam_filter_test.sh`: an 8-flank NGG search == a
+  dedicated 3-flank NGG index as a set). `L > K` is a **hard error** (the index
+  never stored those bases). Enable via `crispritz.py search … --prune-pam`, the
+  12th positional arg to `searchTST`, or the `CRISPRITZ_PAM_PRUNE` env var.
+  **Default (flag absent) is a strict no-op — byte-identical to upstream.**
+  Workflow + build recipe in README §3.3.3.
+- **Index-size cost of a wider flank is linear, not multiplicative.** The flank is
+  4-bit-packed (2 bases/byte) per leaf, so widening the flank adds a *constant*
+  per-leaf cost. Measured on a 5 Mb hg38 chr22 reference slice (~10 M leaves,
+  mismatch-only index): `K = 3` → 216.0 MB, `K = 8` → 236.0 MB, i.e. **+2 bytes/
+  leaf, +9.3%**. Extrapolated to a full hg38 reference index (~6.2 × 10⁹ leaves):
+  ≈134 GB (`K = 3`) → ≈146 GB (`K = 8`), **+≈12 GB (+9.3%)**; a variant/enriched
+  index has more leaves but the same +2 bytes/leaf, so the percentage is unchanged.
+  A generous `K = 8` flank is a ~10% premium that removes the need to store one
+  index per PAM.
+- `test/run_pam_filter_test.sh`: 32-assertion regression covering default-off
+  byte-identity, the dedicated-index equivalence (3′ and 5′), the generous-flank
+  N-padding (NGG/NRG/NRR/NNNN(4)/6-nt PAM off a K = 8 index with exact PAM
+  partitioning), the 8-flank==3-flank NGG equivalence, and the `L > K` hard error.
+
 ## [2.9.0] - 2026-10-08
 
 ### Removed

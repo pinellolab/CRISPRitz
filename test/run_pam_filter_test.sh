@@ -133,6 +133,33 @@ same_set() { # <a> <b>
   diff <(tail -n +2 "$1" | sort) <(tail -n +2 "$2" | sort) >/dev/null
 }
 
+# A wider-flank index legitimately emits a WIDER DNA/crRNA PAM region than a
+# dedicated L-flank index (e.g. an 8-flank NGG search reports "...GGGACGGC" where
+# a 3-flank NGG index reports "...GGG"). The off-target LOCUS is identical. To
+# compare an index with stored flank width K against a dedicated L-flank index,
+# trim the trailing (K-L) flank characters from the crRNA (col 2) and DNA (col 3)
+# columns of the K-flank file, then compare the SET. The flank region never
+# contains bulge dashes, so a plain trailing-char trim is exact.
+#   same_locus_set_3prime <wide_file> <dedicated_file> <K> <L>
+same_locus_set_3prime() {
+  local wide="$1" ded="$2" K="$3" L="$4" trim=$(( $3 - $4 ))
+  diff <(tail -n +2 "${wide}" | awk -F'\t' -v OFS='\t' -v t="${trim}" \
+           '{$2=substr($2,1,length($2)-t); $3=substr($3,1,length($3)-t); print}' | sort) \
+       <(tail -n +2 "${ded}"  | sort) >/dev/null
+}
+# 5' variant: the wider flank is at the FRONT, so (a) trim the leading (K-L) chars
+# from crRNA (col 2) and DNA (col 3), and (b) a 5' match's reported START coordinate
+# includes the flank, so a K-flank match starts (K-L) bp LEFT of the equivalent
+# L-flank match -- add (K-L) back to the Position (col 5) and Cluster Position
+# (col 6) to recover the dedicated-index coordinate. (3' PAMs don't shift because
+# the match start is the protospacer end-independent left edge of the protospacer.)
+same_locus_set_5prime() {
+  local wide="$1" ded="$2" K="$3" L="$4" trim=$(( $3 - $4 ))
+  diff <(tail -n +2 "${wide}" | awk -F'\t' -v OFS='\t' -v t="${trim}" \
+           '{$2=substr($2,t+1); $3=substr($3,t+1); $5=$5+t; $6=$6+t; print}' | sort) \
+       <(tail -n +2 "${ded}"  | sort) >/dev/null
+}
+
 # The PAM region a search uses, by orientation:
 #  - 3' PAM (default): the LAST 3 (or 4) chars of the DNA column.
 #  - 5' PAM (Cas12a) : the FIRST 4 chars of the DNA column.
@@ -318,19 +345,125 @@ echo "OK: bulge path subset + PAM-correct ($(rows "${WORKDIR}/bulge_NGG.targets.
 
 #############################################################################
 echo ""
-echo "########## 6. LENGTH GUARD (search PAM len != index PAM len) ##########"
-# 3-nt NNN index searched with a 4-nt PAM + filter ON must fail fast, non-zero.
+echo "########## 6. LENGTH GUARD (search PAM len > index flank width -> hard error) ##########"
+# 3-nt NNN index searched with a 4-nt PAM + filter ON must fail fast, non-zero:
+# the index never stored a 4th flank base, so a 4-nt PAM cannot be served (L > K).
 set +e
 "${SEARCHTST_BIN}" "${NNN_IDX}/" "${GUIDE_CAS9}" 3 0 0 "${PAMDIR}/NNNN.txt" \
   "${WORKDIR}/guard" t 1 "${MAX_BULGES}" -1 1 > "${WORKDIR}/guard.log" 2>&1
 RC=$?
 set -e
-if [[ "${RC}" -ne 0 ]] && grep -qi "length to match the index PAM length" "${WORKDIR}/guard.log"; then
-  echo "OK: length-mismatch exits non-zero (rc=${RC}) with a clear error"; PASS=$((PASS+1))
+if [[ "${RC}" -ne 0 ]] && grep -qi "LONGER than the index" "${WORKDIR}/guard.log"; then
+  echo "OK: L>K (search PAM longer than index flank) exits non-zero (rc=${RC}) with a clear error"; PASS=$((PASS+1))
 else
-  echo "ASSERT FAIL: expected non-zero exit + clear error on PAM length mismatch (rc=${RC})"
+  echo "ASSERT FAIL: expected non-zero exit + clear error on L>K PAM length (rc=${RC})"
   cat "${WORKDIR}/guard.log"; exit 1
 fi
+
+#############################################################################
+# ===== CONFIGURABLE GENEROUS FLANK: one wide PAM-less index serves ANY =====
+# ===== PAM up to the stored flank width K, shorter PAMs N-padded.      =====
+#############################################################################
+# Build ONE generous K=8 3' PAM-less index (20 guide-N + 8 flank-N, length "8")
+# and serve 3-, 4- and 6-nt PAMs off it via N-padding. The win: no per-PAM index.
+printf 'NNNNNNNNNNNNNNNNNNNNNNNNNNNN 8\n'  > "${PAMDIR}/N8.txt"    # PAM-less K=8 build/base
+printf 'NNNNNNNNNNNNNNNNNNNNNGGNNNNN 8\n'  > "${PAMDIR}/NGG8.txt"  # NGG as an explicit 8-wide PAM (control)
+
+echo ""
+echo "########## 7. GENEROUS FLANK build (K=8 PAM-less 3' index) ##########"
+N8_IDX="${WORKDIR}/idx_N8"; build_index "${PAMDIR}/N8.txt" "${N8_IDX}"
+# confirm the stored flank width really is 8 (the .bin prefix)
+PREFIX8="$(find "${N8_IDX}" -maxdepth 1 -name '*.bin' -printf '%f\n' | head -1 | cut -d_ -f1)"
+if [[ "${#PREFIX8}" -eq 8 ]]; then
+  echo "OK: K=8 index built; stored flank prefix='${PREFIX8}' (8 nt)"; PASS=$((PASS+1))
+else echo "ASSERT FAIL: expected an 8-nt flank prefix, got '${PREFIX8}' (${#PREFIX8} nt)"; exit 1; fi
+
+echo ""
+echo "########## 8. N-PADDING: short PAMs (<=8) served off the K=8 index ##########"
+# baseline: the full unfiltered K=8 PAM-less search (emit everything), mm only.
+run_search "${N8_IDX}" "${GUIDE_CAS9}" "${PAMDIR}/N8.txt" 3 0 0 0 "${WORKDIR}/base8"
+BASE8="$(rows "${WORKDIR}/base8.targets.txt")"
+echo "baseline K=8 PAM-less (mm only): ${BASE8} rows"
+# proximal flank of a 3' DNA column: the 8-wide flank is the LAST 8 chars; a
+# length-L 3' PAM constrains its PROXIMAL L positions, i.e. the first L of that
+# 8-char window = chars [len-8+1 .. len-8+L] (1-based). (NOT the last L -- those
+# are distal and were N-padded.)
+prox8_pam() { # <targets_file> <L>
+  local f="$1" L="$2"
+  tail -n +2 "${f}" | awk -F'\t' -v L="${L}" '{s=$3; gsub(/-/,"",s); print toupper(substr(s,length(s)-8+1,L))}'
+}
+# Each of these short 3' PAMs (length < 8) must N-pad up to 8 and still partition
+# the baseline exactly by their PROXIMAL-L relevant flank letters.
+for spec in "NGG:3" "NRG:3" "NRR:3" "NNNN:4" "NGGNRN:6"; do
+  P="${spec%%:*}"; L="${spec##*:}"
+  # write an L-length 3' PAM file: 20 guide-N + the L PAM letters, number L. The
+  # binary N-pads up to the index flank width (8) on the distal/end side itself.
+  printf 'NNNNNNNNNNNNNNNNNNNN%s %d\n' "${P}" "${L}" > "${PAMDIR}/gf_${P}.txt"
+  run_search "${N8_IDX}" "${GUIDE_CAS9}" "${PAMDIR}/gf_${P}.txt" 3 0 0 1 "${WORKDIR}/gf_${P}"
+  # subset of the K=8 baseline?
+  if comm -23 <(tail -n +2 "${WORKDIR}/gf_${P}.targets.txt" | sort) \
+               <(tail -n +2 "${WORKDIR}/base8.targets.txt" | sort) | grep -q .; then
+    echo "ASSERT FAIL: ${P} (N-padded) rows are not a subset of the K=8 baseline"; exit 1
+  fi
+  # exact partition by the PROXIMAL L flank positions
+  prox8_pam "${WORKDIR}/gf_${P}.targets.txt" "${L}" > "${WORKDIR}/gfkept_${P}.pams"
+  comm -23 <(tail -n +2 "${WORKDIR}/base8.targets.txt" | sort) \
+           <(tail -n +2 "${WORKDIR}/gf_${P}.targets.txt" | sort) > "${WORKDIR}/gfdrop_${P}.rows"
+  awk -F'\t' -v L="${L}" '{s=$2; gsub(/-/,"",s); print toupper(substr(s,length(s)-8+1,L))}' "${WORKDIR}/gfdrop_${P}.rows" > "${WORKDIR}/gfdrop_${P}.pams"
+  run_assert assert_all_pam_match  "${WORKDIR}/gfkept_${P}.pams" "${P}"
+  run_assert assert_none_pam_match "${WORKDIR}/gfdrop_${P}.pams" "${P}"
+  echo "OK: ${P} (len ${L}) N-padded to K=8 -> subset + exact PAM partition ($(rows "${WORKDIR}/gf_${P}.targets.txt") kept / ${BASE8} baseline)"
+done
+
+echo ""
+echo "########## 9. EQUIVALENCE: NGG on the K=8 flank == NGG on a dedicated K=3 index ##########"
+# The definitive proof the N-padding orientation is correct: searching NGG off the
+# GENEROUS 8-flank PAM-less index yields the SAME target SET as the dedicated
+# 3-flank NGG index (the committed cas9 golden). mm + bulges, to exercise both
+# emit paths (saveIndices + saveIndices2).
+run_search "${N8_IDX}" "${GUIDE_CAS9}" "${PAMDIR}/gf_NGG.txt" 3 1 0 1 "${WORKDIR}/gf_ngg_vs"
+# The 8-flank index emits an 8-char flank; trim the distal 5 (= K-L = 8-3) chars
+# off the crRNA/DNA columns, then the off-target LOCI must be the SAME SET as the
+# dedicated 3-flank NGG index (the committed cas9 golden).
+if same_locus_set_3prime "${WORKDIR}/gf_ngg_vs.targets.txt" "${GOLDEN_DIR}/cas9.targets.txt" 8 3; then
+  echo "OK: 8-flank NGG (N-padded) == dedicated 3-flank NGG golden, SAME LOCI ($(rows "${WORKDIR}/gf_ngg_vs.targets.txt") rows; distal 5 flank bases trimmed). N-padding orientation (3'/end) CONFIRMED."; PASS=$((PASS+1))
+else
+  echo "ASSERT FAIL: 8-flank NGG != dedicated 3-flank NGG golden loci (N-pad orientation bug); set difference:"
+  diff <(tail -n +2 "${WORKDIR}/gf_ngg_vs.targets.txt" | awk -F'\t' -v OFS='\t' '{$2=substr($2,1,length($2)-5); $3=substr($3,1,length($3)-5); print}' | sort) \
+       <(tail -n +2 "${GOLDEN_DIR}/cas9.targets.txt" | sort)
+  exit 1
+fi
+
+echo ""
+echo "########## 10. GENEROUS FLANK 5' PAM: K=8 Cas12a index, TTTV N-padded ##########"
+# 5' generous flank: 8-N PAM + 24-N guide region (negative length encodes 5').
+printf 'NNNNNNNNNNNNNNNNNNNNNNNNNNNN -8\n' > "${PAMDIR}/N8_5.txt"
+N8_5_IDX="${WORKDIR}/idx_N8_5"; build_index "${PAMDIR}/N8_5.txt" "${N8_5_IDX}"
+# TTTV as a 4-nt 5' PAM (declared length 4), N-padded (on the FRONT) to the
+# 8-flank index by the binary. The PAM FILE still declares the real 4-nt PAM:
+# total length = 20-N protospacer + TTTV = 24, number -4 (so pamlen-pamlimit=20).
+printf 'TTTVNNNNNNNNNNNNNNNNNNNN -4\n' > "${PAMDIR}/gf_TTTV.txt"
+run_search "${N8_5_IDX}" "${GUIDE_CAS12A}" "${PAMDIR}/gf_TTTV.txt" 3 1 0 1 "${WORKDIR}/gf_tttv"
+# 5' flank is at the FRONT; trim the distal 4 (= K-L = 8-4) leading chars, then
+# the loci must match the dedicated 4-flank TTTV golden.
+if same_locus_set_5prime "${WORKDIR}/gf_tttv.targets.txt" "${GOLDEN_DIR}/cas12a.targets.txt" 8 4; then
+  echo "OK: 8-flank TTTV (5', front-N-padded) == dedicated 4-flank TTTV golden, SAME LOCI ($(rows "${WORKDIR}/gf_tttv.targets.txt") rows; distal 4 flank bases trimmed). 5' pam_at_start N-pad orientation CONFIRMED."; PASS=$((PASS+1))
+else
+  echo "ASSERT FAIL: 8-flank TTTV != dedicated TTTV golden loci (5' N-pad orientation bug); set difference:"
+  diff <(tail -n +2 "${WORKDIR}/gf_tttv.targets.txt" | awk -F'\t' -v OFS='\t' '{$2=substr($2,5); $3=substr($3,5); $5=$5+4; $6=$6+4; print}' | sort) \
+       <(tail -n +2 "${GOLDEN_DIR}/cas12a.targets.txt" | sort)
+  exit 1
+fi
+
+echo ""
+echo "########## 11. DEFAULT-OFF on the K=8 index is byte-identical (no regression) ##########"
+# Filter OFF on the generous index == the 11-arg upstream invocation, byte-for-byte.
+run_search "${N8_IDX}" "${GUIDE_CAS9}" "${PAMDIR}/N8.txt" 3 1 0 0 "${WORKDIR}/gf_off"
+"${SEARCHTST_BIN}" "${N8_IDX}/" "${GUIDE_CAS9}" 3 1 0 "${PAMDIR}/N8.txt" \
+  "${WORKDIR}/gf_upstream" t 1 "${MAX_BULGES}" -1 >/dev/null
+if diff -q "${WORKDIR}/gf_off.targets.txt" "${WORKDIR}/gf_upstream.targets.txt" >/dev/null; then
+  echo "OK: K=8 index, filter OFF byte-identical to the 11-arg upstream call ($(rows "${WORKDIR}/gf_off.targets.txt") rows)"; PASS=$((PASS+1))
+else echo "ASSERT FAIL: K=8 default-off differs from upstream"; exit 1; fi
 
 echo ""
 echo "=== PASS: on-the-fly PAM filter test (${PASS} assertions) ==="
