@@ -81,6 +81,68 @@ int max_bulges = 0;
 int max_edits = -1; // total-edits cap (mismatches + DNA + RNA bulges), CRISPRme issue #107; -1 = disabled
 bool pam_at_start;
 
+// ---- On-the-fly PAM filter (opt-in) --------------------------------------
+// When enabled, a PAM-less index (e.g. NNN) can serve a more restrictive
+// search PAM (e.g. NGG/NRG/NRR/NGA/NAG/NNNN) WITHOUT a dedicated per-PAM index:
+// at leaf emission, each candidate's stored concrete flanking PAM is compared
+// against the IUPAC-expanded search PAM, and entries whose flank is incompatible
+// with the search PAM are SKIPPED BEFORE they are written/scored. This is a
+// leaf-time skip-before-write, NOT a tree-descent prune: the PAM-less tree is
+// still traversed in full; the win is that excluded-PAM candidates are never
+// emitted, scored or post-processed. The result is identical to searching a
+// dedicated index built for that restrictive PAM (see test/run_pam_filter_test.sh).
+//
+// Opt-in via: the 12th positional arg to searchTST (1 = on; crispritz.py
+// `search --prune-pam`), OR the environment variable CRISPRITZ_PAM_PRUNE being
+// set. Default (flag/env absent) is a strict no-op: the filter branch is never
+// entered, so behaviour is byte-identical to upstream (see golden/minimal CI).
+bool PAM_PRUNE = false;
+vector<bitset<4>> searchPamBit; // IUPAC-expanded bitsets of the search PAM region (pamRNA)
+
+// Local copy of the IUPAC->bitset conversion used BUILD-side in pamGenerator.cpp
+// (same convention: A=0001 C=0010 G=0100 T=1000 N=1111 ...). Kept local so the
+// searchTST link line is unchanged (pamGenerator.cpp is not linked into searchTST).
+static vector<bitset<4>> pamPrune_bit_conversion(const string &PAM)
+{
+	vector<bitset<4>> pam_bit;
+	for (size_t i = 0; i < PAM.length(); ++i)
+	{
+		char c = PAM[i];
+		if (c == 'A')      pam_bit.push_back(bitset<4>(string("0001")));
+		else if (c == 'C') pam_bit.push_back(bitset<4>(string("0010")));
+		else if (c == 'G') pam_bit.push_back(bitset<4>(string("0100")));
+		else if (c == 'T') pam_bit.push_back(bitset<4>(string("1000")));
+		else if (c == 'N') pam_bit.push_back(bitset<4>(string("1111")));
+		else if (c == 'R') pam_bit.push_back(bitset<4>(string("0101")));
+		else if (c == 'Y') pam_bit.push_back(bitset<4>(string("1010")));
+		else if (c == 'S') pam_bit.push_back(bitset<4>(string("0110")));
+		else if (c == 'W') pam_bit.push_back(bitset<4>(string("1001")));
+		else if (c == 'K') pam_bit.push_back(bitset<4>(string("1100")));
+		else if (c == 'M') pam_bit.push_back(bitset<4>(string("0011")));
+		else if (c == 'B') pam_bit.push_back(bitset<4>(string("1110")));
+		else if (c == 'D') pam_bit.push_back(bitset<4>(string("1101")));
+		else if (c == 'H') pam_bit.push_back(bitset<4>(string("1011")));
+		else if (c == 'V') pam_bit.push_back(bitset<4>(string("0111")));
+		else               pam_bit.push_back(bitset<4>(string("1111"))); // treat unknown as N
+	}
+	return pam_bit;
+}
+
+// Returns true if the stored leaf PAM (guideDNA_bit, indexed the SAME way as
+// pamRNA/searchPamBit) is INCOMPATIBLE with the search PAM at any position, i.e.
+// the entry should be pruned. Uses the BUILD-side convention: a position is a
+// mismatch iff (stored & search).none().
+static inline bool pamPrune_reject(const bitset<4> *leafPam)
+{
+	for (size_t j = 0; j < searchPamBit.size(); ++j)
+	{
+		if ((leafPam[j] & searchPamBit[j]).none())
+			return true; // incompatible at this PAM position -> prune
+	}
+	return false;
+}
+// ---- END PROTOTYPE globals ----
+
 //Create matrix for profiling //num_thr = number of layers of the matrix. Each thr update his own layer
 vector<vector<vector<int>>> profiling;
 
@@ -558,6 +620,17 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 		int index = (p->eqkid + 1) * -1;
 		do
 		{
+			// On-the-fly PAM filter (mismatch path): skip this leaf entry BEFORE
+			// emitting if its stored concrete flank PAM is incompatible with the
+			// search PAM. Leaf-time skip-before-write (not a during-descent prune):
+			// the index is PAM-less so the descent still visits every node; we only
+			// avoid writing the excluded-PAM entries. Advancing `index` to the next
+			// entry then `continue` mirrors the normal end-of-loop advance below.
+			if (PAM_PRUNE && pamPrune_reject(targetOnDNA[thr][index].guideDNA_bit))
+			{
+				index = (targetOnDNA[thr][index].next + 1) * -1;
+				continue;
+			}
 
 			string t(targetOfGuide[thr]);     // take all the string
 			// cout << "t subito assignment " << t << endl;
@@ -744,6 +817,14 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 
 		do
 		{
+			// On-the-fly PAM filter (bulge path): skip this leaf entry BEFORE
+			// emitting if its stored concrete flank PAM is incompatible with the
+			// search PAM. Same semantics as saveIndices; advance to the next entry.
+			if (PAM_PRUNE && pamPrune_reject(targetOnDNA[thr][index].guideDNA_bit))
+			{
+				index = (targetOnDNA[thr][index].next + 1) * -1;
+				continue;
+			}
 
 			string t(targetOfGuide[thr]);
 
@@ -1031,6 +1112,12 @@ int main(int argc, char **argv)
 	// Omitted or negative => disabled (backward compatible with existing callers).
 	if (argc > 11)
 		max_edits = atoi(argv[11]);
+	// Optional 12th arg: on-the-fly PAM filter (1 = on). Omitted/0 => off. The
+	// environment variable CRISPRITZ_PAM_PRUNE (any value) also enables it, so
+	// either interface works; the positional arg is what crispritz.py passes for
+	// `search --prune-pam`. Kept last so existing 11-arg callers are unaffected.
+	if (argc > 12 && atoi(argv[12]) != 0)
+		PAM_PRUNE = true;
 	if (omp_get_max_threads() < num_thr)
 		num_thr = omp_get_max_threads();
 
@@ -1056,6 +1143,26 @@ int main(int argc, char **argv)
 	{
 		pamRNA = pam.substr(0, pamlimit); // if pam_at_start is set, then PAM = TTTNNNNNNNNNNNNNNNNNNNNN -4, i select the first 4 chars
 	}
+
+	// ---- On-the-fly PAM filter: one-time init ----
+	// Enabled by the 12th positional arg (set above) OR the CRISPRITZ_PAM_PRUNE
+	// env var. pamRNA is the search PAM region (length == pamlimit). guideDNA_bit[j]
+	// in the index aligns to pamRNA[j] directly (loadTST decodes position j of the
+	// stored flank into guideDNA_bit[j] using the same A=0001/C=0010/G=0100/T=1000
+	// convention as pam_bit_conversion), so searchPamBit[j] compares against
+	// guideDNA_bit[j] with no reversal. This holds for both pam_at_start values
+	// because pamRNA and the stored flank are read in the same coordinate frame
+	// (the flank string is appended/prepended to the target verbatim at emit time).
+	if (getenv("CRISPRITZ_PAM_PRUNE") != nullptr)
+		PAM_PRUNE = true;
+	if (PAM_PRUNE)
+	{
+		searchPamBit = pamPrune_bit_conversion(pamRNA);
+		cerr << "[PAM-FILTER] on-the-fly PAM filter ENABLED; search PAM region = "
+			 << pamRNA << " (" << searchPamBit.size() << " nt)" << endl;
+	}
+	// ---- END PAM filter init ----
+
 	globalstart = omp_get_wtime(); // start global time
 	int numGuide = 0;
 	string iguide;
@@ -1124,6 +1231,46 @@ int main(int argc, char **argv)
 		}
 	}
 	closedir(d);
+
+	// ---- On-the-fly PAM filter: length guard ----
+	// loadTST reads exactly pamRNA.size() PAM nucleotides per leaf from each .bin.
+	// The index's stored PAM length is encoded in the .bin filename prefix (the
+	// build-time pamRNA, e.g. "NGG_chr1_0.bin" -> 3; "NNN_chr1_0.bin" -> 3). If the
+	// search PAM length differs from the index's stored PAM length, the binary
+	// stream would be mis-read (the PAM region, the "next" link and every
+	// subsequent leaf would shift), silently corrupting results. Fail fast with a
+	// clear message instead. This mirrors the normal CRISPRitz invariant that the
+	// index and the search must use the same PAM length; the on-the-fly filter
+	// only relaxes the PAM *letters* (NNN index -> NGG search), never the length.
+	if (PAM_PRUNE)
+	{
+		string index_pam_prefix;
+		for (size_t f = 0; f < file_stats_vec.size(); ++f)
+		{
+			const string &fn = file_stats_vec[f].file_name;
+			if (fn.size() > 4 && fn.compare(fn.size() - 4, 4, ".bin") == 0)
+			{
+				size_t us = fn.find('_');
+				if (us != string::npos)
+				{
+					index_pam_prefix = fn.substr(0, us);
+					break;
+				}
+			}
+		}
+		if (!index_pam_prefix.empty() && index_pam_prefix.size() != pamRNA.size())
+		{
+			cerr << "ERROR: --prune-pam/CRISPRITZ_PAM_PRUNE requires the search PAM "
+				 << "length to match the index PAM length. Index PAM region is '"
+				 << index_pam_prefix << "' (" << index_pam_prefix.size()
+				 << " nt) but search PAM region is '" << pamRNA << "' ("
+				 << pamRNA.size() << " nt). Build/choose an index whose PAM is the "
+				 << "same length (e.g. a 3-nt NNN index for a 3-nt NGG/NRG search)."
+				 << endl;
+			return 1;
+		}
+	}
+	// ---- END PAM filter length guard ----
 
 	sort(file_stats_vec.begin(), file_stats_vec.end(), compareBySize);
 

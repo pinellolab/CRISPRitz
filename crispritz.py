@@ -270,6 +270,12 @@ def searchTST():
                 "ATTENTION! Check the total-edits option: --max-edits <n> (n is an integer)"
             )
             sys.exit()
+    # optional on-the-fly PAM filter: let a PAM-less index (e.g. NNN) serve a more
+    # restrictive search PAM (e.g. NGG/NRG) by dropping candidates whose concrete
+    # flanking PAM does not match the search PAM, before they are emitted. OFF by
+    # default; 1 = on. The search PAM length must equal the index PAM length (the
+    # binary enforces this and exits with a clear error otherwise).
+    prune_pam = 1 if "--prune-pam" in sys.argv[1:] else 0
     subprocess.run(
         [
             corrected_origin_path + "searchTST",
@@ -284,6 +290,7 @@ def searchTST():
             str(th),
             max_bulges,
             str(max_edits),
+            str(prune_pam),
         ]
     )
     print("Search END")
@@ -304,6 +311,8 @@ def searchBruteForce():
             "\n-bRNA <bRNA_num>: (Optional) Size of RNA bulges",
             "\n-bDNA <bDNA_num>: (Optional) Size of DNA bulges",
             "\n-th < num_thread >: (Optional) Number of threads to use. Default uses all of the available threads (ONE for bulge search)",
+            "\n--max-edits <n>: (Optional, indexed search) Cap the TOTAL number of edits (mismatches + DNA bulges + RNA bulges) per off-target. Omitted/negative disables the cap.",
+            "\n--prune-pam: (Optional, indexed search) On-the-fly PAM filter. Lets a PAM-less index (e.g. NNN) serve a more restrictive search PAM (e.g. NGG/NRG/NRR/NGA/NAG/NNNN): candidates whose concrete flanking PAM does not match the search PAM are skipped before they are emitted, giving results identical to a dedicated per-PAM index. The search PAM length must equal the index PAM length. OFF by default.",
             "\n{-r,-p,-t}: Output type (-r off-targets list only, -p profile only, -t off-targets AND profile)\n",
         )
         sys.exit()
