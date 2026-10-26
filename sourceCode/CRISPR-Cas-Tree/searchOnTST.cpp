@@ -97,6 +97,8 @@ bool pam_at_start;
 // set. Default (flag/env absent) is a strict no-op: the filter branch is never
 // entered, so behaviour is byte-identical to upstream (see golden/minimal CI).
 bool PAM_PRUNE = false;
+int prune_pad = 0; // (K-L) distal N-pad width of a padded --prune-pam search;
+                   // added to minus-strand coords (3' PAM) so output == a dedicated L-PAM index
 vector<bitset<4>> searchPamBit; // IUPAC-expanded bitsets of the search PAM region (pamRNA)
 
 // Local copy of the IUPAC->bitset conversion used BUILD-side in pamGenerator.cpp
@@ -688,8 +690,8 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 				}
 				if (targetOnDNA[thr][index].guideIndex < 0)
 				{ // negative strand
-					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1);
-					cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1);
+					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1 + (pam_at_start ? 0 : prune_pad));
+					cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1 + (pam_at_start ? 0 : prune_pad));
 					if (pam_at_start)
 					{
 						directions[thr].emplace_back('+');
@@ -877,8 +879,8 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 
 				if (targetOnDNA[thr][index].guideIndex < 0)
 				{ // negative strand
-					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1);
-					cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1);
+					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1 + (pam_at_start ? 0 : prune_pad));
+					cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1 + (pam_at_start ? 0 : prune_pad));
 					if (pam_at_start)
 					{
 						directions[thr].emplace_back('+');
@@ -1297,6 +1299,7 @@ int main(int argc, char **argv)
 				// N-pad the search PAM up to the stored flank width K. Pad DISTAL:
 				// end for a 3' PAM, front for a 5' PAM (see rationale above).
 				string pad(K - L, 'N');
+				prune_pad = (int)(K - L); // minus-strand (3') coord reconciliation to a dedicated L index
 				if (pam_at_start)
 					pamRNA = pad + pamRNA;   // 5': real letters proximal (high j)
 				else
