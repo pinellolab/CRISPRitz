@@ -106,6 +106,7 @@ printf 'NNNNNNNNNNNNNNNNNNNNNRR 3\n' > "${PAMDIR}/NRR.txt"
 printf 'NNNNNNNNNNNNNNNNNNNNNGA 3\n' > "${PAMDIR}/NGA.txt"
 printf 'NNNNNNNNNNNNNNNNNNNNNAG 3\n' > "${PAMDIR}/NAG.txt"
 printf 'NNNNNNNNNNNNNNNNNNNNNNNN 4\n' > "${PAMDIR}/NNNN.txt" # 4-nt 3' PAM (length-guard)
+printf 'NNNNNNNNNNNNNNNNNNNNNNNNN 5\n' > "${PAMDIR}/NNNNN.txt" # K=5 PAM-less 3' base (padded-equivalence guard)
 # 5' PAMs (pam_at_start = true, encoded by the NEGATIVE PAM length): 4-nt PAM.
 printf 'NNNNNNNNNNNNNNNNNNNNNNNN -4\n' > "${PAMDIR}/NNNN5.txt" # PAM-less 5' index base
 printf 'TTTVNNNNNNNNNNNNNNNNNNNN -4\n' > "${PAMDIR}/TTTV.txt"
@@ -273,6 +274,28 @@ fi
 
 #############################################################################
 echo ""
+#############################################################################
+echo ""
+echo "########## 2b. PADDED 3' EQUIVALENCE (L<K): NNNNN(K=5)+NGG == dedicated NGG ##########"
+# Generous-flank regression guard: a WIDER PAM-less index (K=5) searched with a
+# SHORTER PAM (NGG, L=3) N-pads NGG->NGGNN. The reported minus-strand coordinate
+# AND the crRNA/DNA PAM-region width must still match a dedicated L=3 NGG index
+# EXACTLY (distal flank trimmed on output; minus-strand coord gets the (K-L)
+# reconciliation). Compared as a SET over ALL columns incl coords+sequences, so
+# any (K-L) coordinate or sequence-width regression fails here. The existing K==L
+# equivalences above never exercise padding.
+NNNNN_IDX="${WORKDIR}/idx_NNNNN"; build_index "${PAMDIR}/NNNNN.txt" "${NNNNN_IDX}"
+run_search "${NNNNN_IDX}" "${GUIDE_CAS9}" "${PAMDIR}/NGG.txt" 3 1 0 1 "${WORKDIR}/eq_ngg_pad"
+if same_set "${GOLDEN_DIR}/cas9.targets.txt" "${WORKDIR}/eq_ngg_pad.targets.txt"; then
+  echo "OK: NNNNN(K=5) + NGG + --prune-pam == dedicated NGG golden as a SET incl coords+sequences ($(rows "${WORKDIR}/eq_ngg_pad.targets.txt") rows). Padded L<K path CONFIRMED."; PASS=$((PASS+1))
+else
+  echo "ASSERT FAIL: padded NNNNN(K=5)+NGG != dedicated NGG golden (generous-flank coord/seq regression):"
+  diff <(tail -n +2 "${GOLDEN_DIR}/cas9.targets.txt" | sort) <(tail -n +2 "${WORKDIR}/eq_ngg_pad.targets.txt" | sort) | head -20
+  exit 1
+fi
+
+#############################################################################
+echo ""
 echo "########## 3. EQUIVALENCE 5' PAM (Cas12a TTTV): NNNN+filter == dedicated TTTV (golden) ##########"
 run_search "${NNNN5_IDX}" "${GUIDE_CAS12A}" "${PAMDIR}/TTTV.txt" 3 1 0 1 "${WORKDIR}/eq_tttv"
 run_search "${TTTV_IDX}" "${GUIDE_CAS12A}" "${FIX_DIR}/pam_cas12a.txt" 3 1 0 0 "${WORKDIR}/ded_tttv"
@@ -379,58 +402,43 @@ if [[ "${#PREFIX8}" -eq 8 ]]; then
 else echo "ASSERT FAIL: expected an 8-nt flank prefix, got '${PREFIX8}' (${#PREFIX8} nt)"; exit 1; fi
 
 echo ""
-echo "########## 8. N-PADDING: short PAMs (<=8) served off the K=8 index ##########"
-# baseline: the full unfiltered K=8 PAM-less search (emit everything), mm only.
-run_search "${N8_IDX}" "${GUIDE_CAS9}" "${PAMDIR}/N8.txt" 3 0 0 0 "${WORKDIR}/base8"
-BASE8="$(rows "${WORKDIR}/base8.targets.txt")"
-echo "baseline K=8 PAM-less (mm only): ${BASE8} rows"
-# proximal flank of a 3' DNA column: the 8-wide flank is the LAST 8 chars; a
-# length-L 3' PAM constrains its PROXIMAL L positions, i.e. the first L of that
-# 8-char window = chars [len-8+1 .. len-8+L] (1-based). (NOT the last L -- those
-# are distal and were N-padded.)
-prox8_pam() { # <targets_file> <L>
-  local f="$1" L="$2"
-  tail -n +2 "${f}" | awk -F'\t' -v L="${L}" '{s=$3; gsub(/-/,"",s); print toupper(substr(s,length(s)-8+1,L))}'
-}
-# Each of these short 3' PAMs (length < 8) must N-pad up to 8 and still partition
-# the baseline exactly by their PROXIMAL-L relevant flank letters.
+echo "########## 8. N-PADDING: short PAMs (<=8) off the K=8 index == dedicated ##########"
+# Each short 3' PAM (L<8) N-pads up to the K=8 flank and must yield output
+# BYTE-IDENTICAL to a dedicated L-flank index for that PAM: same spacer+PAM, same
+# reconciled coordinates (incl minus strand, (K-L) offset), same output PAM width
+# (distal pad trimmed). Compared as a SET over ALL columns (row order differs by
+# tree shape), so any generous-flank coordinate or sequence-width regression fails
+# here. mm + bulges exercise both emit paths (saveIndices + saveIndices2).
 for spec in "NGG:3" "NRG:3" "NRR:3" "NNNN:4" "NGGNRN:6"; do
   P="${spec%%:*}"; L="${spec##*:}"
-  # write an L-length 3' PAM file: 20 guide-N + the L PAM letters, number L. The
-  # binary N-pads up to the index flank width (8) on the distal/end side itself.
+  # L-length 3' PAM file: 20 guide-N + the L PAM letters, number L.
   printf 'NNNNNNNNNNNNNNNNNNNN%s %d\n' "${P}" "${L}" > "${PAMDIR}/gf_${P}.txt"
-  run_search "${N8_IDX}" "${GUIDE_CAS9}" "${PAMDIR}/gf_${P}.txt" 3 0 0 1 "${WORKDIR}/gf_${P}"
-  # subset of the K=8 baseline?
-  if comm -23 <(tail -n +2 "${WORKDIR}/gf_${P}.targets.txt" | sort) \
-               <(tail -n +2 "${WORKDIR}/base8.targets.txt" | sort) | grep -q .; then
-    echo "ASSERT FAIL: ${P} (N-padded) rows are not a subset of the K=8 baseline"; exit 1
+  # dedicated L-flank index for this exact PAM (K==L, no padding = reference output)
+  DED_P_IDX="${WORKDIR}/idx_ded_${P}"; build_index "${PAMDIR}/gf_${P}.txt" "${DED_P_IDX}"
+  run_search "${DED_P_IDX}" "${GUIDE_CAS9}" "${PAMDIR}/gf_${P}.txt" 3 1 0 0 "${WORKDIR}/ded_${P}"
+  # same PAM served off the generous K=8 index via N-padding + --prune-pam
+  run_search "${N8_IDX}"    "${GUIDE_CAS9}" "${PAMDIR}/gf_${P}.txt" 3 1 0 1 "${WORKDIR}/gf_${P}"
+  if same_set "${WORKDIR}/ded_${P}.targets.txt" "${WORKDIR}/gf_${P}.targets.txt"; then
+    echo "OK: ${P} (len ${L}) N-padded to K=8 == dedicated ${P} index, byte-identical SET ($(rows "${WORKDIR}/gf_${P}.targets.txt") rows)"; PASS=$((PASS+1))
+  else
+    echo "ASSERT FAIL: ${P} N-padded(K=8) != dedicated ${P} (generous-flank coord/seq regression):"
+    diff <(tail -n +2 "${WORKDIR}/ded_${P}.targets.txt" | sort) <(tail -n +2 "${WORKDIR}/gf_${P}.targets.txt" | sort) | head -20
+    exit 1
   fi
-  # exact partition by the PROXIMAL L flank positions
-  prox8_pam "${WORKDIR}/gf_${P}.targets.txt" "${L}" > "${WORKDIR}/gfkept_${P}.pams"
-  comm -23 <(tail -n +2 "${WORKDIR}/base8.targets.txt" | sort) \
-           <(tail -n +2 "${WORKDIR}/gf_${P}.targets.txt" | sort) > "${WORKDIR}/gfdrop_${P}.rows"
-  awk -F'\t' -v L="${L}" '{s=$2; gsub(/-/,"",s); print toupper(substr(s,length(s)-8+1,L))}' "${WORKDIR}/gfdrop_${P}.rows" > "${WORKDIR}/gfdrop_${P}.pams"
-  run_assert assert_all_pam_match  "${WORKDIR}/gfkept_${P}.pams" "${P}"
-  run_assert assert_none_pam_match "${WORKDIR}/gfdrop_${P}.pams" "${P}"
-  echo "OK: ${P} (len ${L}) N-padded to K=8 -> subset + exact PAM partition ($(rows "${WORKDIR}/gf_${P}.targets.txt") kept / ${BASE8} baseline)"
 done
 
 echo ""
-echo "########## 9. EQUIVALENCE: NGG on the K=8 flank == NGG on a dedicated K=3 index ##########"
-# The definitive proof the N-padding orientation is correct: searching NGG off the
-# GENEROUS 8-flank PAM-less index yields the SAME target SET as the dedicated
-# 3-flank NGG index (the committed cas9 golden). mm + bulges, to exercise both
-# emit paths (saveIndices + saveIndices2).
+echo "########## 9. EQUIVALENCE: NGG on the K=8 flank == dedicated NGG (byte-identical) ##########"
+# The definitive proof: NGG served off the GENEROUS 8-flank PAM-less index yields
+# output BYTE-IDENTICAL to the dedicated 3-flank NGG index (committed cas9 golden) --
+# same spacer+PAM, reconciled coordinates (incl minus strand), trimmed PAM width --
+# as a SET (row order differs by tree shape). mm + bulges exercise both emit paths.
 run_search "${N8_IDX}" "${GUIDE_CAS9}" "${PAMDIR}/gf_NGG.txt" 3 1 0 1 "${WORKDIR}/gf_ngg_vs"
-# The 8-flank index emits an 8-char flank; trim the distal 5 (= K-L = 8-3) chars
-# off the crRNA/DNA columns, then the off-target LOCI must be the SAME SET as the
-# dedicated 3-flank NGG index (the committed cas9 golden).
-if same_locus_set_3prime "${WORKDIR}/gf_ngg_vs.targets.txt" "${GOLDEN_DIR}/cas9.targets.txt" 8 3; then
-  echo "OK: 8-flank NGG (N-padded) == dedicated 3-flank NGG golden, SAME LOCI ($(rows "${WORKDIR}/gf_ngg_vs.targets.txt") rows; distal 5 flank bases trimmed). N-padding orientation (3'/end) CONFIRMED."; PASS=$((PASS+1))
+if same_set "${GOLDEN_DIR}/cas9.targets.txt" "${WORKDIR}/gf_ngg_vs.targets.txt"; then
+  echo "OK: 8-flank NGG (N-padded) == dedicated 3-flank NGG golden, BYTE-IDENTICAL SET ($(rows "${WORKDIR}/gf_ngg_vs.targets.txt") rows, incl coords+sequences). Padded 3' path CONFIRMED."; PASS=$((PASS+1))
 else
-  echo "ASSERT FAIL: 8-flank NGG != dedicated 3-flank NGG golden loci (N-pad orientation bug); set difference:"
-  diff <(tail -n +2 "${WORKDIR}/gf_ngg_vs.targets.txt" | awk -F'\t' -v OFS='\t' '{$2=substr($2,1,length($2)-5); $3=substr($3,1,length($3)-5); print}' | sort) \
-       <(tail -n +2 "${GOLDEN_DIR}/cas9.targets.txt" | sort)
+  echo "ASSERT FAIL: 8-flank NGG != dedicated 3-flank NGG golden (generous-flank coord/seq regression):"
+  diff <(tail -n +2 "${GOLDEN_DIR}/cas9.targets.txt" | sort) <(tail -n +2 "${WORKDIR}/gf_ngg_vs.targets.txt" | sort) | head -20
   exit 1
 fi
 

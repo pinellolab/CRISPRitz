@@ -21,6 +21,18 @@ jobs:
         env:
           PAM: NGG
 
+  pam-filter:
+    name: PAM filter / --prune-pam equivalence (incl padded L<K)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+      - name: Run PAM-filter test suite
+        run: bash test/run_pam_filter_test.sh
+
   golden:
     name: golden search regression (Cas9 NGG + Cas12a TTTV)
     runs-on: ubuntu-latest
