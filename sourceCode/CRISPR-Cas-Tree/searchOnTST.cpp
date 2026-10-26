@@ -605,7 +605,7 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 		else
 		{
 			reverse(g.begin(), g.end());
-			for (int i = 0; i < pamRNA.size(); i++)
+			for (int i = 0; i < (int)pamRNA.size() - prune_pad; i++)
 				g += "N";
 		}
 
@@ -648,7 +648,7 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 			else
 			{
 				reverse(t.begin(), t.end());
-				t += targetOnDNA[thr][index].guideDNA;
+				t.append(targetOnDNA[thr][index].guideDNA, (size_t)((int)pamRNA.size() - prune_pad));
 			}
 
 			// cout << "t pam assignment " << t << endl;
@@ -800,7 +800,7 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 		else
 		{
 			reverse(g.begin(), g.end());
-			for (int i = 0; i < pamRNA.size(); i++)
+			for (int i = 0; i < (int)pamRNA.size() - prune_pad; i++)
 				g += "N";
 		}
 
@@ -840,7 +840,7 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 			else
 			{
 				reverse(t.begin(), t.end());
-				t += targetOnDNA[thr][index].guideDNA;
+				t.append(targetOnDNA[thr][index].guideDNA, (size_t)((int)pamRNA.size() - prune_pad));
 			}
 
 			vector<bitset<4>> t_bit(len_guide + bulDNA);
