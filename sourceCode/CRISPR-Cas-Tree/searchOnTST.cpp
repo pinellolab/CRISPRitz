@@ -410,6 +410,15 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 	fileTree.open(path, ios::in | ios::binary);
 
 	fileTree.read((char *)&numLeaves, sizeof(int)); // read number of leaves
+	// Defense-in-depth: refuse to load a non-tree file (it should already be filtered to
+	// *.bin at the directory scan). A garbage numLeaves would otherwise drive a huge
+	// resize/alloc, and a later numNodes=0 would OOB-write in deSerialize.
+	if (!fileTree || numLeaves <= 0)
+	{
+		cerr << "ERROR: '" << path << "' is not a valid CRISPRitz index (.bin) file "
+			 << "(numLeaves=" << numLeaves << ")." << endl;
+		exit(1);
+	}
 	targetOnDNA[thr].resize(numLeaves);
 
 	fileTree.read((char *)&offset_guide_len, sizeof(int));
@@ -545,6 +554,12 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 	}
 
 	fileTree.read((char *)&numNodes, sizeof(int)); // read number of nodes
+	if (!fileTree || numNodes <= 0)
+	{
+		cerr << "ERROR: '" << path << "' has an invalid TST node count (numNodes="
+			 << numNodes << "); refusing to deserialize." << endl;
+		exit(1);
+	}
 	vector<bitset<4>> pairNuc_bit(2);
 	char pairNuc[2];
 	uint8_t flag = 1;
@@ -1158,7 +1173,7 @@ int main(int argc, char **argv)
 	if (getenv("CRISPRITZ_PAM_PRUNE") != nullptr)
 		PAM_PRUNE = true;
 	if (PAM_PRUNE)
-		cerr << "[PAM-FILTER] on-the-fly PAM filter ENABLED; raw search PAM region = "
+		cout << "[PAM-FILTER] on-the-fly PAM filter ENABLED; raw search PAM region = "
 			 << pamRNA << " (" << pamRNA.size() << " nt)" << endl;
 	// ---- END PAM filter init ----
 
@@ -1222,7 +1237,16 @@ int main(int argc, char **argv)
 			string tmp1(genome_dir);
 			string tmp2(dir->d_name);
 			tmp1 += "/" + tmp2;
-			stat(tmp1.c_str(), &file_stats);
+			// Only load REGULAR files whose name ends in ".bin" as TST trees. The index
+			// directory can also contain provenance sidecars (.pam_build, index_meta.json,
+			// .display_label) or subdirectories; handing a non-tree file to loadTST reads
+			// garbage (e.g. numNodes=0) and crashes with an out-of-bounds write in
+			// deSerialize. Use the same anchored ".bin" suffix test as the PAM-prefix scan
+			// below, plus S_ISREG; the >4 guard rejects a bare ".bin" and never admits
+			// names like "foo.bin.tmp".
+			if (stat(tmp1.c_str(), &file_stats) != 0 || !S_ISREG(file_stats.st_mode) ||
+				!(tmp2.size() > 4 && tmp2.compare(tmp2.size() - 4, 4, ".bin") == 0))
+				continue;
 
 			file_stats_vec.push_back(file_stats_struct());
 			file_stats_vec[file_stats_vec.size() - 1].file_name = dir->d_name;
@@ -1230,6 +1254,14 @@ int main(int argc, char **argv)
 		}
 	}
 	closedir(d);
+
+	// A mistyped index path (or an index dir with no .bin trees) must fail loudly
+	// rather than silently reporting zero off-targets.
+	if (file_stats_vec.empty())
+	{
+		cerr << "ERROR: no .bin index files found in '" << genome_dir << "'." << endl;
+		exit(1);
+	}
 
 	// ---- On-the-fly PAM filter: length guard + N-padding to the stored flank ----
 	// loadTST reads EXACTLY pamRNA.size() PAM nucleotides per leaf from each .bin,
@@ -1304,14 +1336,14 @@ int main(int argc, char **argv)
 					pamRNA = pad + pamRNA;   // 5': real letters proximal (high j)
 				else
 					pamRNA = pamRNA + pad;   // 3': real letters proximal (low j)
-				cerr << "[PAM-FILTER] N-padded search PAM to the index flank width K="
+				cout << "[PAM-FILTER] N-padded search PAM to the index flank width K="
 					 << K << " (orientation: " << (pam_at_start ? "5'/front" : "3'/end")
 					 << "-pad): effective PAM region = " << pamRNA << endl;
 			}
 		}
 		// Build the IUPAC-expanded bitsets now that pamRNA is at the stored width K.
 		searchPamBit = pamPrune_bit_conversion(pamRNA);
-		cerr << "[PAM-FILTER] effective search PAM region = " << pamRNA << " ("
+		cout << "[PAM-FILTER] effective search PAM region = " << pamRNA << " ("
 			 << searchPamBit.size() << " nt)" << endl;
 	}
 	// ---- END PAM filter length guard + N-padding ----
