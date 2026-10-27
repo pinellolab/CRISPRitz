@@ -473,5 +473,39 @@ if diff -q "${WORKDIR}/gf_off.targets.txt" "${WORKDIR}/gf_upstream.targets.txt" 
   echo "OK: K=8 index, filter OFF byte-identical to the 11-arg upstream call ($(rows "${WORKDIR}/gf_off.targets.txt") rows)"; PASS=$((PASS+1))
 else echo "ASSERT FAIL: K=8 default-off differs from upstream"; exit 1; fi
 
+#############################################################################
+echo ""
+echo "########## 12. NON-.bin SIDECARS in the index dir are skipped (crash regression) ##########"
+# Regression for the OOB crash: searchTST used to load EVERY directory entry as a TST
+# tree. PAM-less indexes ship a .pam_build provenance dotfile; loading it as a tree gave
+# numLeaves=garbage / numNodes=0 -> out-of-bounds write in deSerialize -> SIGSEGV (and
+# the per-thread timing of which thread hit it made the truncated output look
+# nondeterministic). The directory scan must now skip any non-regular-.bin entry.
+SIDE_IDX="${WORKDIR}/idx_sidecar"
+cp -a "${NNN_IDX}" "${SIDE_IDX}"                          # a VALID NNN index...
+: > "${SIDE_IDX}/.pam_build"                               # ...plus the provenance dotfile that crashed
+printf 'build_pam NNN\n' > "${SIDE_IDX}/index_meta.json"  # a non-dotfile sidecar
+mkdir -p "${SIDE_IDX}/decoy.bin"                          # a SUBDIRECTORY literally named *.bin
+set +e
+"${SEARCHTST_BIN}" "${SIDE_IDX}/" "${GUIDE_CAS9}" 3 1 0 "${PAMDIR}/NGG.txt" \
+  "${WORKDIR}/sidecar" t 8 "${MAX_BULGES}" -1 1 > "${WORKDIR}/sidecar.out" 2> "${WORKDIR}/sidecar.err"
+RC=$?
+set -e
+if [[ "${RC}" -ne 0 ]]; then
+  echo "ASSERT FAIL: searchTST crashed/failed (rc=${RC}) on an index dir with .pam_build + a *.bin subdir"
+  cat "${WORKDIR}/sidecar.err"; exit 1
+fi
+if [[ -s "${WORKDIR}/sidecar.err" ]]; then
+  echo "ASSERT FAIL: non-empty stderr on a successful prune-pam search (would false-fail CRISPRme _search_end_or_fail):"
+  cat "${WORKDIR}/sidecar.err"; exit 1
+fi
+if same_set "${WORKDIR}/sidecar.targets.txt" "${WORKDIR}/eq_ngg.targets.txt"; then
+  echo "OK: non-.bin sidecars (.pam_build / index_meta.json / *.bin subdir) skipped; rc=0, empty stderr, result == clean NNN+NGG ($(rows "${WORKDIR}/sidecar.targets.txt") rows)"; PASS=$((PASS+1))
+else
+  echo "ASSERT FAIL: sidecar-dir result differs from the clean NNN+NGG result (set difference):"
+  diff <(tail -n +2 "${WORKDIR}/eq_ngg.targets.txt" | sort) <(tail -n +2 "${WORKDIR}/sidecar.targets.txt" | sort) | head -20
+  exit 1
+fi
+
 echo ""
 echo "=== PASS: on-the-fly PAM filter test (${PASS} assertions) ==="
