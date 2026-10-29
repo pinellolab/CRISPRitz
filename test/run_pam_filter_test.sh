@@ -451,15 +451,56 @@ N8_5_IDX="${WORKDIR}/idx_N8_5"; build_index "${PAMDIR}/N8_5.txt" "${N8_5_IDX}"
 # 8-flank index by the binary. The PAM FILE still declares the real 4-nt PAM:
 # total length = 20-N protospacer + TTTV = 24, number -4 (so pamlen-pamlimit=20).
 printf 'TTTVNNNNNNNNNNNNNNNNNNNN -4\n' > "${PAMDIR}/gf_TTTV.txt"
-run_search "${N8_5_IDX}" "${GUIDE_CAS12A}" "${PAMDIR}/gf_TTTV.txt" 3 1 0 1 "${WORKDIR}/gf_tttv"
-# 5' flank is at the FRONT; trim the distal 4 (= K-L = 8-4) leading chars, then
-# the loci must match the dedicated 4-flank TTTV golden.
-if same_locus_set_5prime "${WORKDIR}/gf_tttv.targets.txt" "${GOLDEN_DIR}/cas12a.targets.txt" 8 4; then
-  echo "OK: 8-flank TTTV (5', front-N-padded) == dedicated 4-flank TTTV golden, SAME LOCI ($(rows "${WORKDIR}/gf_tttv.targets.txt") rows; distal 4 flank bases trimmed). 5' pam_at_start N-pad orientation CONFIRMED."; PASS=$((PASS+1))
+# A shorter PAM off a WIDER flank must be REFUSED for a 5' PAM. The loci do match a
+# dedicated index -- that is what this assertion used to check, and it passed -- but
+# the emit path trims prune_pad from the END of the reported crRNA/DNA, while a 5' pad
+# sits at the FRONT. So every emitted row carries pad N's inside its PAM region. A
+# locus-only check cannot see that; a downstream PAM filter can, and drops every row.
+# Refuse until the 5' emit/coordinate reconciliation is implemented.
+set +e
+run_search "${N8_5_IDX}" "${GUIDE_CAS12A}" "${PAMDIR}/gf_TTTV.txt" 3 1 0 1 "${WORKDIR}/gf_tttv" 2>"${WORKDIR}/gf_tttv.err"
+GF_RC=$?
+set -e
+if [ "${GF_RC}" -ne 0 ] && grep -q "cannot yet serve a SHORTER PAM" "${WORKDIR}/gf_tttv.err"; then
+  echo "OK: 5' PAM shorter than the stored flank (TTTV=4 off a K=8 index) is REFUSED with an explanatory error, not emitted with pad N's in the PAM region (rc=${GF_RC})"; PASS=$((PASS+1))
 else
-  echo "ASSERT FAIL: 8-flank TTTV != dedicated TTTV golden loci (5' N-pad orientation bug); set difference:"
-  diff <(tail -n +2 "${WORKDIR}/gf_tttv.targets.txt" | awk -F'\t' -v OFS='\t' '{$2=substr($2,5); $3=substr($3,5); $5=$5+4; $6=$6+4; print}' | sort) \
-       <(tail -n +2 "${GOLDEN_DIR}/cas12a.targets.txt" | sort)
+  echo "ASSERT FAIL: a 5' PAM shorter than the stored flank must be refused (rc=${GF_RC}); stderr was:"
+  cat "${WORKDIR}/gf_tttv.err"
+  exit 1
+fi
+
+echo ""
+echo "########## 10b. 5' PAM at EQUAL width still works (the supported 5' case) ##########"
+# K == L needs no pad, so the 5' path is unaffected by the refusal above.
+printf 'NNNNNNNNNNNNNNNNNNNNNNNN -4\n' > "${PAMDIR}/N4_5.txt"
+N4_5_IDX="${WORKDIR}/idx_N4_5"; build_index "${PAMDIR}/N4_5.txt" "${N4_5_IDX}"
+run_search "${N4_5_IDX}" "${GUIDE_CAS12A}" "${PAMDIR}/gf_TTTV.txt" 3 1 0 1 "${WORKDIR}/eq_tttv"
+if [ "$(rows "${WORKDIR}/eq_tttv.targets.txt")" = "$(rows "${GOLDEN_DIR}/cas12a.targets.txt")" ]; then
+  echo "OK: 5' TTTV off an equal-width (K=L=4) PAM-less index == dedicated TTTV golden row count ($(rows "${WORKDIR}/eq_tttv.targets.txt") rows)"; PASS=$((PASS+1))
+else
+  echo "ASSERT FAIL: 5' equal-width PAM-less index differs from the dedicated golden: $(rows "${WORKDIR}/eq_tttv.targets.txt") vs $(rows "${GOLDEN_DIR}/cas12a.targets.txt") rows"
+  exit 1
+fi
+
+echo ""
+echo "########## 10c. WIDTH MISMATCH with the filter OFF is refused, not mis-parsed ##########"
+# loadTST consumes exactly ceil(pamRNA.size()/2) stored PAM bytes per leaf. Only the
+# --prune-pam path reconciles that width against the index's stored flank, so a K=8
+# index searched with a 3-nt PAM and the filter OFF used to desync the leaf stream at
+# the first leaf -- every later PAM, "next" link and finally numNodes read from a
+# shifted offset, ending in a SIGSEGV. A segfault writes nothing to stderr and leaves
+# a 0-byte targets file, which the caller then reports as a clean empty result, so
+# this has to be refused up front.
+printf 'NNNNNNNNNNNNNNNNNNNNNGG 3\n' > "${PAMDIR}/mm_NGG.txt"
+set +e
+run_search "${N8_IDX}" "${GUIDE_CAS9}" "${PAMDIR}/mm_NGG.txt" 3 1 0 0 "${WORKDIR}/w_mismatch" 2>"${WORKDIR}/w_mismatch.err"
+WM_RC=$?
+set -e
+if [ "${WM_RC}" -ne 0 ] && grep -q "stores a 8-nt PAM/flank region" "${WORKDIR}/w_mismatch.err"; then
+  echo "OK: K=8 index + 3-nt PAM with the filter OFF is refused up front (rc=${WM_RC}), naming the width and pointing at --prune-pam"; PASS=$((PASS+1))
+else
+  echo "ASSERT FAIL: a width mismatch with the filter OFF must be refused (rc=${WM_RC}); stderr was:"
+  cat "${WORKDIR}/w_mismatch.err"
   exit 1
 fi
 

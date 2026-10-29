@@ -1305,22 +1305,44 @@ int main(int argc, char **argv)
 	//
 	// L > K remains a HARD ERROR: the index never stored those extra bases, so a
 	// longer search PAM cannot be satisfied.
-	if (PAM_PRUNE)
+	// The stored flank width is encoded in the .bin filename prefix. Read it
+	// UNCONDITIONALLY: loadTST consumes exactly ceil(pamRNA.size()/2) PAM bytes per
+	// leaf, so if that width disagrees with what the index stored, the leaf stream
+	// desyncs at the first leaf -- every later PAM, "next" link and finally numNodes
+	// is read from a shifted offset. That used to be checked only inside the
+	// PAM_PRUNE branch, so a width-K PAM-less index searched with a length-L PAM and
+	// the filter OFF walked off the stream instead of being rejected.
+	string index_pam_prefix;
+	for (size_t f = 0; f < file_stats_vec.size(); ++f)
 	{
-		string index_pam_prefix;
-		for (size_t f = 0; f < file_stats_vec.size(); ++f)
+		const string &fn = file_stats_vec[f].file_name;
+		if (fn.size() > 4 && fn.compare(fn.size() - 4, 4, ".bin") == 0)
 		{
-			const string &fn = file_stats_vec[f].file_name;
-			if (fn.size() > 4 && fn.compare(fn.size() - 4, 4, ".bin") == 0)
+			size_t us = fn.find('_');
+			if (us != string::npos)
 			{
-				size_t us = fn.find('_');
-				if (us != string::npos)
-				{
-					index_pam_prefix = fn.substr(0, us);
-					break;
-				}
+				index_pam_prefix = fn.substr(0, us);
+				break;
 			}
 		}
+	}
+	if (!PAM_PRUNE && !index_pam_prefix.empty()
+		&& index_pam_prefix.size() != pamRNA.size())
+	{
+		cerr << "ERROR: this index stores a " << index_pam_prefix.size()
+			 << "-nt PAM/flank region ('" << index_pam_prefix << "') but the search "
+			 << "PAM region '" << pamRNA << "' is " << pamRNA.size() << " nt. Reading "
+			 << "it at the wrong width would mis-parse every leaf of the index, so the "
+			 << "search is refused." << endl;
+		if (index_pam_prefix.find_first_not_of('N') == string::npos)
+			cerr << "       This is a PAM-less index: pass --prune-pam to serve a "
+				 << "shorter PAM from it, or use an index built for this PAM." << endl;
+		else
+			cerr << "       Use an index built for this PAM." << endl;
+		return 1;
+	}
+	if (PAM_PRUNE)
+	{
 		if (!index_pam_prefix.empty())
 		{
 			size_t K = index_pam_prefix.size(); // stored flank width in the index
@@ -1340,12 +1362,29 @@ int main(int argc, char **argv)
 			{
 				// N-pad the search PAM up to the stored flank width K. Pad DISTAL:
 				// end for a 3' PAM, front for a 5' PAM (see rationale above).
+				if (pam_at_start)
+				{
+					// The emit path trims prune_pad from the END of the reported
+					// crRNA/DNA (see the `pamRNA.size() - prune_pad` sites). For a 5'
+					// PAM the pad goes on the FRONT, so that trim removes real bases
+					// and leaves the pad in the reported PAM region -- loci still
+					// match a dedicated index, which is all the equivalence test
+					// checks, but every emitted row carries N's where the PAM should
+					// be and a downstream PAM filter then drops all of them. Refuse
+					// until the 5' emit/coordinate reconciliation is implemented.
+					cerr << "ERROR: --prune-pam cannot yet serve a SHORTER PAM from a "
+						 << "wider flank for a 5' PAM. Index flank is '"
+						 << index_pam_prefix << "' (" << K << " nt), search PAM '"
+						 << pamRNA << "' (" << L << " nt), PAM at start. The emitted "
+						 << "sequence is trimmed at the end only, so a front pad would "
+						 << "be reported inside the PAM region. Use an index whose "
+						 << "flank width equals the PAM length (" << L << ") for a 5' "
+						 << "PAM." << endl;
+					return 1;
+				}
 				string pad(K - L, 'N');
 				prune_pad = (int)(K - L); // minus-strand (3') coord reconciliation to a dedicated L index
-				if (pam_at_start)
-					pamRNA = pad + pamRNA;   // 5': real letters proximal (high j)
-				else
-					pamRNA = pamRNA + pad;   // 3': real letters proximal (low j)
+				pamRNA = pamRNA + pad;   // 3': real letters proximal (low j)
 				cout << "[PAM-FILTER] N-padded search PAM to the index flank width K="
 					 << K << " (orientation: " << (pam_at_start ? "5'/front" : "3'/end")
 					 << "-pad): effective PAM region = " << pamRNA << endl;

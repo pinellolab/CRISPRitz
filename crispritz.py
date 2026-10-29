@@ -19,6 +19,35 @@ conda_path = "opt/crispritz/"
 
 VERSION = "2.9.1"
 
+
+def _run_checked(argv, what):
+    """Run a compiled helper and FAIL if it did not exit cleanly.
+
+    subprocess.run() does not raise on a non-zero exit, and nothing here inspected
+    the return code, so a crashed binary looked like a completed step. For searchTST
+    that is a silent wrong answer rather than a loud one: a segfault writes nothing
+    to stderr and leaves a 0-byte targets file, and CRISPRme -- which decides a stage
+    failed by looking for output on stderr -- then reports "the search completed
+    successfully; the result set is empty" and exits 0. An empty off-target report is
+    indistinguishable from a real negative result, so it has to be impossible to
+    produce one this way.
+    """
+    rc = subprocess.run(argv).returncode
+    if rc != 0:
+        import signal as _signal
+
+        detail = f"exit code {rc}"
+        if rc < 0:
+            try:
+                detail = f"signal {_signal.Signals(-rc).name}"
+            except ValueError:
+                detail = f"signal {-rc}"
+        sys.stderr.write(
+            f"ERROR: {what} failed ({detail}). Its output is incomplete or absent, "
+            f"so it must not be treated as an empty result.\n"
+        )
+        sys.exit(1)
+
 if "--debug" in sys.argv[1:]:
     # for quick local tests
     corrected_origin_path = origin_path + "/sourceCode/"
@@ -116,15 +145,16 @@ def indexGenome():
         if f.strip().split(".")[-1] != "fa":
             continue
         print("Indexing:", f)
-        subprocess.run(
+        _run_checked(
             [
                 corrected_origin_path + "buildTST",
                 str(dirGenome) + "/" + str(f),
                 str(dirPAM),
                 str(th),
                 max_bulges,
-            ]
-        )
+            ],
+        "buildTST (index build)",
+    )
     print("Finish indexing")
     print("Indexing runtime: %s seconds" % (time.time() - start_time))
 
@@ -278,7 +308,7 @@ def searchTST():
     # a hard error (the index never stored those extra flank bases). See README
     # section 3.3.3.
     prune_pam = 1 if "--prune-pam" in sys.argv[1:] else 0
-    subprocess.run(
+    _run_checked(
         [
             corrected_origin_path + "searchTST",
             str(dirTSTgenome),
@@ -293,7 +323,8 @@ def searchTST():
             max_bulges,
             str(max_edits),
             str(prune_pam),
-        ]
+        ],
+        "searchTST (index search)",
     )
     print("Search END")
     print("Search runtime: %s seconds" % (time.time() - start_time))
@@ -386,7 +417,7 @@ def searchBruteForce():
     # run searchBruteForce
     print("Search START")
     start_time = time.time()
-    subprocess.run(
+    _run_checked(
         [
             corrected_origin_path + "searchBruteForce",
             str(genomeDir),
@@ -397,7 +428,8 @@ def searchBruteForce():
             str(th),
             str(r),
             str(variant),
-        ]
+        ],
+        "searchBruteForce (brute-force search)",
     )
     print("Search END")
     print("Search runtime: %s seconds" % (time.time() - start_time))
