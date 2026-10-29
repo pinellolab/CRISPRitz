@@ -15,6 +15,8 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 
 ## [Unreleased]
 
+## [2.9.1] - 2026-10-29
+
 ### Added
 - **`search --prune-pam`: one generous-flank PAM-less index serves ANY PAM up to
   the stored flank width (N-padding).** Build a single PAM-less index with a wide
@@ -47,6 +49,51 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   byte-identity, the dedicated-index equivalence (3′ and 5′), the generous-flank
   N-padding (NGG/NRG/NRR/NNNN(4)/6-nt PAM off a K = 8 index with exact PAM
   partitioning), the 8-flank==3-flank NGG equivalence, and the `L > K` hard error.
+
+### Fixed
+- **A non-`.bin` file in the index directory crashed the search.** The directory scan
+  skipped only `.` and `..`, so a sidecar such as `.pam_build` or `index_meta.json` was
+  stat'd, pushed into the file list, and handed to `loadTST` as if it were a tree. The
+  first four bytes became a leaf count, driving a huge allocation, and a later
+  `numNodes = 0` wrote out of bounds in `deSerialize`. The scan now accepts only regular
+  files whose name ends in `.bin`, and `loadTST` refuses a stream whose leaf count is not
+  positive rather than trusting it. Covered by assertion 12 of
+  `test/run_pam_filter_test.sh`.
+- **A genomic `N` in the stored PAM/flank region dropped the target.** An `N` converts to
+  a code that intersects nothing, so it failed a PAM match at every position even where
+  the PAM stated no requirement — and a PAM-less index stores a wider flank than a
+  dedicated index for a shorter PAM, so it was more exposed. Three gates acted on this,
+  which is why fixing any one alone changed nothing: the build-time PAM scan tested every
+  position, the build discarded any window containing an `N` over `pamlen + max_bulges`,
+  and the prune test covered the N-pad that widens a search PAM to the stored width. The
+  first is now relaxed only for a fully unconstrained PAM, the second is narrowed to the
+  guide region (which cannot hold an `N`, the tree having no encoding for one), and the
+  third tests only the positions the real PAM covers. Carrying `N` through also needed two
+  encoding defects fixed: the writer shifted its nibble conditionally on the *value*, so a
+  nucleotide encoding to `0x0` lost its slot and displaced every following nibble, and the
+  loader's `case 0x0` was an unreachable no-op now free to carry `N`. Impact is
+  concentrated on the synthetic indel genome, which is `N`-separated roughly every 56
+  bases: a width-31 window admitted 34,690,315 start positions on one contig against a
+  width-26 window's 41,454,105, so 16.3% were invisible to a wider index. Real assembly
+  `N` sits in megabase gaps where nothing matches, so reference and SNP searches were
+  unaffected — a dedicated index built by the patched builder is bit-identical to one
+  built before, and the patched engine returns identical sorted rows on pre-fix indexes.
+  Covered by `test/run_flank_n_test.sh`, which plants targets on both strands.
+- **A multiallelic site compounded its indel alleles into one contig.** `indel_to_fasta`
+  assigned each allele's substitution back into the shared reference window, so allele 2
+  was applied on top of allele 1: its contig carried both insertions — a haplotype no
+  sample need carry — and the logged `refseq` and FAKEPOS drifted with its length. On a
+  synthetic `G -> GA, GAA` the second contig inserted three bases for a two-base allele.
+  Not reachable through split (biallelic) input, where the loop runs once per record, but
+  `add-variants` also accepts VCFs merged into multiallelic sites. Each allele is now
+  derived from the reference window; for a single-allele record the result is
+  byte-identical, so no existing index moves. Also `start_position = POS - 26` had no
+  floor: the window is anchored with the REF base at index 25, which a negative start
+  cannot satisfy, and the two ports did not even agree — Python sliced from the far end of
+  the chromosome and returned an empty window while C++ threw from `substr`. Both now skip
+  the site with a warning on stdout. `verify_enricher.sh` gained a site with two carried
+  indel alleles (its previous "multiallelic indel" case was one SNP allele plus one
+  insertion, so the per-allele loop ran once and could not catch this) and now runs in CI.
 
 ## [2.9.0] - 2026-10-08
 
@@ -255,7 +302,8 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 ### Added
 - Support for longer PAMs and mismatches within PAMs (beta).
 
-[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.9.1...HEAD
+[2.9.1]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.9.1
 [2.9.0]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.9.0
 [2.8.4]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.4
 [2.8.3]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.3
