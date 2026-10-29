@@ -3,7 +3,8 @@
 #
 # Builds a small synthetic chromosome FASTA + gzipped VCF containing a mix of
 # variant types (biallelic SNP, multiallelic SNP, non-PASS -> skipped,
-# insertion, deletion, multiallelic indel), then runs BOTH enricher.py and the
+# insertion, deletion, multiallelic indel, and a site with TWO carried indel
+# alleles), then runs BOTH enricher.py and the
 # compiled `enricher` on identical inputs in separate dirs (mode "yes") and
 # diffs all four outputs.
 #
@@ -118,6 +119,16 @@ snpalt=("T" if b(p)!="T" else "A")
 insalt=b(p)+"GG"
 lines.append(row(p, "rs600,rs601", b(p), snpalt+","+insalt,
                  "AC=1,1;AF=0.12,0.22", ["0|1","0|2","1|2","0|0","2|0"]))
+
+# 7) TWO CARRIED INDEL ALLELES at one site (pos 330): REF T -> T+A and T+AA, the
+#    shape of the real chr22:42762462 T -> TA / TAA / TAAA site. Case 6 above is a
+#    SNP alt plus ONE insertion, so its `indels` list has a single entry and the
+#    per-allele loop runs once -- it cannot catch an allele being built on top of
+#    the previous one. This case makes that loop run twice, with S5 carrying both
+#    alleles so the carrier scan is exercised too.
+p=330
+lines.append(row(p, "rs700,rs701", b(p), b(p)+"A," + b(p)+"AA",
+                 "AC=2,1;AF=0.3,0.1", ["0|1","0|2","1|1","0|0","2|1"]))
 
 open(out,"w").write("\n".join(lines)+"\n")
 PY

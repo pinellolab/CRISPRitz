@@ -33,6 +33,31 @@ jobs:
       - name: Run PAM-filter test suite
         run: bash test/run_pam_filter_test.sh
 
+  enricher-ports:
+    name: enricher.py and enricher.cpp agree (incl. multiallelic indels)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ zlib1g-dev
+
+      # enricher.cpp is meant to be a faithful port of enricher.py, and the
+      # packaged install silently falls back to the Python one when the binary is
+      # absent, so the two must not drift. verify_enricher.sh synthesizes a VCF
+      # covering biallelic and multiallelic SNPs, a non-PASS record, an insertion,
+      # a deletion, and a site carrying TWO indel alleles -- the case where a
+      # per-allele window built on the previous allele's output compounds them --
+      # then diffs all four outputs byte-for-byte.
+      - name: Build the C++ enricher
+        run: g++ -std=c++11 -O2 sourceCode/Python_Scripts/Enrichment/enricher.cpp -o /tmp/enricher_opt -lz
+
+      - name: enricher.py vs enricher.cpp, byte-for-byte
+        working-directory: sourceCode/Python_Scripts/Enrichment
+        run: bash verify_enricher.sh /tmp/enricher_opt
+
   flank-n:
     name: hard genomic N in the stored PAM/flank region
     runs-on: ubuntu-latest

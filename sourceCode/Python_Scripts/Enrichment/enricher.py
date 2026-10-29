@@ -341,6 +341,14 @@ def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
 
                 start_position = int(line[1])-26
                 end_position = int(line[1])+26+len(line[3])
+                if start_position < 0:
+                    # The window is anchored so the REF base lands at index 25, which a
+                    # negative start cannot satisfy: Python would slice from the far end
+                    # of the chromosome and hand back an EMPTY window, so the contig and
+                    # the coordinates logged for it would disagree. (enricher.cpp throws
+                    # instead, so the two ports only agree if both skip.)
+                    print(f"WARNING: skipping indel at {currentChr}:{line[1]} -- fewer than 26 bases from the chromosome start")
+                    return id_indel, start_fake_pos
                 sub_fasta = genomeStr[start_position:end_position]
                 for idx, indel in enumerate(indels):
                     if len(dict_of_lists_samples[indel]) > 0:
@@ -348,13 +356,23 @@ def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
                         
                         #sub_fasta[25] = line[3] 
                         #sub_fasta = ''.join(sub_fasta)
-                        sub_fasta = sub_fasta[0:25] + re.sub(line[3], indel, sub_fasta[25:], 1, flags=re.IGNORECASE) 
-                        
+                        # Build THIS allele's window from the reference window every
+                        # time. Assigning back into sub_fasta fed the previous allele's
+                        # mutated sequence into this substitution, so a site carrying two
+                        # ALTs emitted a contig holding BOTH of them -- a haplotype no
+                        # sample need carry -- and its length, refseq and FAKEPOS drifted
+                        # with it. Split (biallelic) input hides this, because the loop
+                        # runs once per record; input merged into multiallelic sites (see
+                        # gnomAD-converter --multiallelic) does not. Dropping the `break`
+                        # in the carrier scan made it worse, by letting more alleles reach
+                        # this gate.
+                        allele_fasta = sub_fasta[0:25] + re.sub(line[3], indel, sub_fasta[25:], 1, flags=re.IGNORECASE)
+
                         #fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
-                        list_fasta_indels.append(sub_fasta+'\n'+"N\n")
+                        list_fasta_indels.append(allele_fasta+'\n'+"N\n")
                         
-                        refseq = genomeStr[start_position:start_position+len(sub_fasta)]
-                        end_fake_pos = start_fake_pos + len(sub_fasta)#(end_position - start_position)
+                        refseq = genomeStr[start_position:start_position+len(allele_fasta)]
+                        end_fake_pos = start_fake_pos + len(allele_fasta)#(end_position - start_position)
 
                         af_idx = values_for_allele_info[idx] - 1
                         af_val = af[af_idx] if af_idx < len(af) else ""  # multiallelic site may have fewer AF values than ALT alleles -- "" (not ".") so pd.to_numeric() reads it as NaN instead of crashing

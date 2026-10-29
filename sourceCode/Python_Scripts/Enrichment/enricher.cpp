@@ -421,6 +421,17 @@ static void indel_to_fasta(const std::vector<std::string> &line, long &id_indel,
     long posv = strtol(line[1].c_str(), NULL, 10);
     long start_position = posv - 26;
     long end_position = posv + 26 + (long)line[3].size();
+    if (start_position < 0) {
+        // Matches enricher.py: the window is anchored with the REF base at index 25,
+        // which a negative start cannot satisfy. substr() would convert the negative
+        // offset to size_t and throw, where Python silently yields an empty window --
+        // so the two ports only agree if both skip the site.
+        // printf, not cerr: a write to stderr is fatal to the CRISPRme stage that
+        // calls this. Matches the file's existing <cstdio> idiom.
+        printf("WARNING: skipping indel at %s:%s -- fewer than 26 bases from the chromosome start\n",
+               currentChr.c_str(), line[1].c_str());
+        return;
+    }
     std::string sub_fasta = genomeStr.substr(start_position, end_position - start_position);
 
     for (size_t idx = 0; idx < indels.size(); ++idx) {
@@ -428,15 +439,17 @@ static void indel_to_fasta(const std::vector<std::string> &line, long &id_indel,
         if (!samps.empty()) {
             std::string indel_info =
                 currentChr + "_" + line[1] + "_" + line[3] + "_" + indels[idx];
-            // sub_fasta = sub_fasta[0:25] + re.sub(ref, indel, sub_fasta[25:], 1, IGNORECASE)
+            // allele_fasta = sub_fasta[0:25] + re.sub(ref, indel, sub_fasta[25:], 1, IGNORECASE)
+            // Derived from the REFERENCE window each time -- see enricher.py for why
+            // assigning back into sub_fasta compounds alleles at a multiallelic site.
             std::string head = sub_fasta.substr(0, 25);
             std::string tail = sub_fasta.substr(25);
-            sub_fasta = head + reSubFirstCI(line[3], indels[idx], tail);
+            std::string allele_fasta = head + reSubFirstCI(line[3], indels[idx], tail);
 
-            list_fasta_indels.push_back(sub_fasta + "\n" + "N\n");
+            list_fasta_indels.push_back(allele_fasta + "\n" + "N\n");
 
-            std::string refseq = genomeStr.substr(start_position, sub_fasta.size());
-            long end_fake_pos = start_fake_pos + (long)sub_fasta.size();
+            std::string refseq = genomeStr.substr(start_position, allele_fasta.size());
+            long end_fake_pos = start_fake_pos + (long)allele_fasta.size();
 
             std::string samplesJoined;
             for (size_t k = 0; k < samps.size(); ++k) {
