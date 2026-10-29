@@ -136,7 +136,15 @@ static vector<bitset<4>> pamPrune_bit_conversion(const string &PAM)
 // mismatch iff (stored & search).none().
 static inline bool pamPrune_reject(const bitset<4> *leafPam)
 {
-	for (size_t j = 0; j < searchPamBit.size(); ++j)
+	// Only the positions the search PAM actually covers are tested. The N-pad that
+	// widens the search PAM to the stored flank width states no requirement, while a
+	// stored 'N' is the 0000 nibble and intersects nothing -- so testing a padded
+	// position would reject targets that a dedicated index of the real PAM width
+	// keeps. Within the real width a stored 'N' still prunes, which is what a
+	// dedicated index does when it matches its PAM on the genome.
+	size_t first = pam_at_start ? (size_t)prune_pad : 0;
+	size_t last = searchPamBit.size() - (pam_at_start ? 0 : (size_t)prune_pad);
+	for (size_t j = first; j < last; ++j)
 	{
 		if ((leafPam[j] & searchPamBit[j]).none())
 			return true; // incompatible at this PAM position -> prune
@@ -458,7 +466,8 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 			switch (mask)
 			{
 			case 0x0:
-				//cout << "Zero" ;
+				targetOnDNA[thr][i].guideDNA[j] = 'N';
+				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("0000"); //intersects nothing
 				break;
 			case 0x10:
 				targetOnDNA[thr][i].guideDNA[j] = 'A';
@@ -1289,7 +1298,8 @@ int main(int argc, char **argv)
 	// stored flank guideDNA_bit[0..K-1] (loadTST decodes stored position j into
 	// guideDNA_bit[j] with the same A=0001/C=0010/G=0100/T=1000 convention used
 	// build-side), so searchPamBit[j] compares 1:1 against guideDNA_bit[j] with no
-	// reversal, and the pad N's (bitset 1111) never reject anything. This is proven
+	// reversal, and the pad positions are not tested at all (pamPrune_reject skips
+	// them, since a stored 'N' intersects nothing). This is proven
 	// equivalent to a dedicated K=L index by test/run_pam_filter_test.sh (an 8-flank
 	// NGG search == a dedicated 3-flank NGG index, same result SET).
 	//

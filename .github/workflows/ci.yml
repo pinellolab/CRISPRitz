@@ -33,6 +33,28 @@ jobs:
       - name: Run PAM-filter test suite
         run: bash test/run_pam_filter_test.sh
 
+  flank-n:
+    name: hard genomic N in the stored PAM/flank region
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+
+      # A genomic 'N' converts to 0000, which intersects nothing, so an 'N' in the
+      # wide flank a PAM-less index stores used to exclude the target even though a
+      # dedicated index for a SHORTER PAM over the same guide region keeps it. This
+      # job plants targets on BOTH strands with the 'N' at an exact flank offset and
+      # asserts: the dedicated index finds exactly the planted set (so equivalence
+      # cannot pass by both sides being equally wrong), a guide-region 'N' is in
+      # neither index, PAM-less + prune == dedicated over a mismatch/bulge matrix,
+      # and the stored 'N' survives the writer and the loader.
+      - name: Run flank-N regression test
+        run: bash test/run_flank_n_test.sh
+
   golden:
     name: golden search regression (Cas9 NGG + Cas12a TTTV)
     runs-on: ubuntu-latest

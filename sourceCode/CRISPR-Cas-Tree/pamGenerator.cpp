@@ -320,6 +320,15 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 	vector<bitset<4>> pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
 	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
 
+	//a PAM made only of 'N' states no sequence requirement at any position, so PAM
+	//content must not exclude a site: a genomic 'N' converts to 0000, which
+	//intersects nothing, and would otherwise drop sites that a shorter PAM over the
+	//same guide region keeps. PAMs with at least one real constraint are unaffected.
+	bool pam_unconstrained = true;
+	for (int j = 0; j < pam_bit.size(); j++)
+		if (!pam_bit[j].all())
+			pam_unconstrained = false;
+
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
 		for (int nt = 0; nt < genome_sequence.length() - pam_limit; nt++)
@@ -330,7 +339,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			int negative_mismatches = max_mismatches;
 			bitset<4> bit_check = 0;
 
-			for (int pam_nt = 0; pam_nt < pam_limit; pam_nt++)
+			for (int pam_nt = 0; !pam_unconstrained && pam_nt < pam_limit; pam_nt++)
 			{
 				bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
 				if (bit_check.none())
@@ -373,7 +382,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			int negative_mismatches = max_mismatches;
 			bitset<4> bit_check = 0;
 
-			for (int pam_nt = 0; pam_nt < pam_limit; pam_nt++)
+			for (int pam_nt = 0; !pam_unconstrained && pam_nt < pam_limit; pam_nt++)
 			{
 				bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
 				if (bit_check.none())
