@@ -143,23 +143,33 @@ iupac_code_scomposition = {
         }
 
 
+# base SET -> IUPAC letter, order-independent: the A/C/G/T bases present as a 4-bit
+# mask. Built from iupac_code, which has no single-base key, so one base maps to
+# nothing and leaves the genome unchanged.
+_BASE_BIT = {'A': 1, 'C': 2, 'G': 4, 'T': 8}
+_IUPAC_BY_MASK = {sum(_BASE_BIT[c] for c in spellings[0]): letter
+                  for letter, spellings in iupac_code.items()}
+
+
 def SNPsProcess(line):
     if len(line[3]) > 1: #se len ref > 1 significa che non è snp
         return
     line[1] = str(int(line[1])-1)  # taaac per corregere conta posizione da zero/uno
     altAlleles = line[4].strip().split(',') #list di tutti gli alleli alternative
     referenceNucleotide = genomeStr[int(line[1])] #nucleotide reference preso dalla stringa del fasta
-    iupac_value = set() #set che contiene nt reference + alt snps
-    iupac_value.add(referenceNucleotide)
-    for alt in altAlleles: #ciclo sugli alt nt
-        if len(alt) > 1: #se lun di alt nt è > 1 skippo perchè non è snp
-            continue
-        else:
-            iupac_value.add(alt) #add del nt alt al set di iupac
-    iupac_value = ''.join(iupac_value) #converto il set in una string
-    for key, value in iupac_code.items(): #cerco iupac value nel dict per avere il corrispettivo IUPAC nt
-        if iupac_value in value:
-            genomeList[int(line[1])] = str(key) #inserisco il IUPAC nt nel genoma enriched
+    # The reference base and every single-character ALT, as A/C/G/T bits. A member
+    # that is not A/C/G/T -- the '*' of a spanning deletion, an 'N', a lowercase
+    # base, an IUPAC reference base -- adds nothing, so the real SNP alleles beside
+    # it are still coded. Building the code from the whole set instead left the base
+    # unchanged whenever such a member was present, dropping a real SNP at every
+    # multiallelic '*' site. This is enricher.cpp's rule (baseBit/iupacFromMask).
+    mask = _BASE_BIT.get(referenceNucleotide, 0)
+    for alt in altAlleles:
+        if len(alt) == 1:
+            mask |= _BASE_BIT.get(alt, 0)
+    letter = _IUPAC_BY_MASK.get(mask)
+    if letter is not None:
+        genomeList[int(line[1])] = letter #inserisco il IUPAC nt nel genoma enriched
 
 
 # def SNPsProcess(line):
@@ -203,8 +213,10 @@ def SNPsProcess(line):
 def chromosomeSave():
     genomeStr = "".join(genomeList)
     os.chdir("./SNPs_genome/")
-    if not (os.path.isdir(dir_enr_name)):
-        os.mkdir(dir_enr_name)
+    # add-variants runs one enricher per chromosome in parallel, all into this one
+    # directory: two that reach here together both saw it missing and the second
+    # mkdir raised, losing that chromosome's outputs. enricher.cpp treats EEXIST as OK.
+    os.makedirs(dir_enr_name, exist_ok=True)
     outFile = open(dir_enr_name + '/' + genomeHeader[1:(len(genomeHeader)-1)]+'.enriched'+'.fa', 'w')
     outFile.write(genomeHeader+genomeStr+'\n')
     outFile.close()
@@ -341,6 +353,14 @@ def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
 
                 start_position = int(line[1])-26
                 end_position = int(line[1])+26+len(line[3])
+                if start_position < 0:
+                    # The window is anchored so the REF base lands at index 25, which a
+                    # negative start cannot satisfy: Python would slice from the far end
+                    # of the chromosome and hand back an EMPTY window, so the contig and
+                    # the coordinates logged for it would disagree. (enricher.cpp throws
+                    # instead, so the two ports only agree if both skip.)
+                    print(f"WARNING: skipping indel at {currentChr}:{line[1]} -- fewer than 26 bases from the chromosome start")
+                    return id_indel, start_fake_pos
                 sub_fasta = genomeStr[start_position:end_position]
                 for idx, indel in enumerate(indels):
                     if len(dict_of_lists_samples[indel]) > 0:
@@ -348,13 +368,23 @@ def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
                         
                         #sub_fasta[25] = line[3] 
                         #sub_fasta = ''.join(sub_fasta)
-                        sub_fasta = sub_fasta[0:25] + re.sub(line[3], indel, sub_fasta[25:], 1, flags=re.IGNORECASE) 
-                        
+                        # Build THIS allele's window from the reference window every
+                        # time. Assigning back into sub_fasta fed the previous allele's
+                        # mutated sequence into this substitution, so a site carrying two
+                        # ALTs emitted a contig holding BOTH of them -- a haplotype no
+                        # sample need carry -- and its length, refseq and FAKEPOS drifted
+                        # with it. Split (biallelic) input hides this, because the loop
+                        # runs once per record; input merged into multiallelic sites (see
+                        # gnomAD-converter --multiallelic) does not. Dropping the `break`
+                        # in the carrier scan made it worse, by letting more alleles reach
+                        # this gate.
+                        allele_fasta = sub_fasta[0:25] + re.sub(line[3], indel, sub_fasta[25:], 1, flags=re.IGNORECASE)
+
                         #fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
-                        list_fasta_indels.append(sub_fasta+'\n'+"N\n")
+                        list_fasta_indels.append(allele_fasta+'\n'+"N\n")
                         
-                        refseq = genomeStr[start_position:start_position+len(sub_fasta)]
-                        end_fake_pos = start_fake_pos + len(sub_fasta)#(end_position - start_position)
+                        refseq = genomeStr[start_position:start_position+len(allele_fasta)]
+                        end_fake_pos = start_fake_pos + len(allele_fasta)#(end_position - start_position)
 
                         af_idx = values_for_allele_info[idx] - 1
                         af_val = af[af_idx] if af_idx < len(af) else ""  # multiallelic site may have fewer AF values than ALT alleles -- "" (not ".") so pd.to_numeric() reads it as NaN instead of crashing

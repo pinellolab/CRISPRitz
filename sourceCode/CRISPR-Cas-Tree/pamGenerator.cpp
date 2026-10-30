@@ -316,9 +316,28 @@ string reversenuc(string pam)
 vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges, int max_mismatches)
 {
 	vector<int> indices; //to save indices for TST extraction
+	//a sequence shorter than one target window (pam_len + max_bulges) holds no
+	//target on either strand, so return before the scans. Their bounds below,
+	//genome_sequence.length() - pam_limit / - pam_len / - (pam_len + max_bulges),
+	//are unsigned and wrap on such a sequence -- an empty or header-only FASTA, as
+	//the enricher writes for a chromosome with no carried indel. For a constrained
+	//PAM the scan then read past the sequence and crashed; for an all-N PAM, whose
+	//scan reads nothing, it ran ~2^31 iterations pushing indices until the process
+	//was killed for memory. No target fits, so nothing reachable is lost.
+	if (genome_sequence.length() < (size_t)(pam_len + max_bulges))
+		return indices;
 	vector<bitset<4>> pam_bit = pam_bit_conversion(pam_sequence);
 	vector<bitset<4>> pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
 	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
+
+	//a PAM made only of 'N' states no sequence requirement at any position, so PAM
+	//content must not exclude a site: a genomic 'N' converts to 0000, which
+	//intersects nothing, and would otherwise drop sites that a shorter PAM over the
+	//same guide region keeps. PAMs with at least one real constraint are unaffected.
+	bool pam_unconstrained = true;
+	for (int j = 0; j < pam_bit.size(); j++)
+		if (!pam_bit[j].all())
+			pam_unconstrained = false;
 
 	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
 	{
@@ -330,7 +349,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			int negative_mismatches = max_mismatches;
 			bitset<4> bit_check = 0;
 
-			for (int pam_nt = 0; pam_nt < pam_limit; pam_nt++)
+			for (int pam_nt = 0; !pam_unconstrained && pam_nt < pam_limit; pam_nt++)
 			{
 				bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
 				if (bit_check.none())
@@ -373,7 +392,7 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			int negative_mismatches = max_mismatches;
 			bitset<4> bit_check = 0;
 
-			for (int pam_nt = 0; pam_nt < pam_limit; pam_nt++)
+			for (int pam_nt = 0; !pam_unconstrained && pam_nt < pam_limit; pam_nt++)
 			{
 				bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
 				if (bit_check.none())

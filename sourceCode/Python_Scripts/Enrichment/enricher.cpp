@@ -144,10 +144,26 @@ static inline int baseBit(char c) {
 // Maps a mask of ACGT bits to the IUPAC letter reproduced by enricher.py.
 static char iupacFromMask(int mask) {
     switch (mask) {
-        case 1:  return 'A';
-        case 2:  return 'C';
-        case 4:  return 'G';
-        case 8:  return 'T';
+        // A SINGLE base is NOT a key in python's iupac_code: its values are the
+        // 2-, 3- and 4-base combinations only (12 + 24 + 24 entries, none of
+        // length 1), so when the allele set collapses to one base python's lookup
+        // finds nothing and leaves the genome UNTOUCHED. Returning the base here
+        // made the caller WRITE it, clobbering an IUPAC code that a SNP record at
+        // the same position had already placed.
+        //
+        // The set collapses to one base on every indel record: REF is length 1, so
+        // SNPsProcess does not bail out, and the longer ALT is skipped by the
+        // `size() > 1` test, leaving only the reference base. A position carrying
+        // BOTH a SNP and an indel -- as separate biallelic records, which is how
+        // every CRISPRme-supplied VCF is normalised -- therefore lost its SNP.
+        // Measured on a real 120,000-record chr22 slice: 176 such positions were
+        // the ONLY bytes differing from enricher.py in 50.8 MB.
+        // verify_enricher.sh case 8 pins it.
+        case 1:  // A
+        case 2:  // C
+        case 4:  // G
+        case 8:  // T
+            return 0;
         case (1 | 4):     return 'R';  // A,G
         case (2 | 8):     return 'Y';  // C,T
         case (4 | 2):     return 'S';  // G,C
@@ -421,6 +437,17 @@ static void indel_to_fasta(const std::vector<std::string> &line, long &id_indel,
     long posv = strtol(line[1].c_str(), NULL, 10);
     long start_position = posv - 26;
     long end_position = posv + 26 + (long)line[3].size();
+    if (start_position < 0) {
+        // Matches enricher.py: the window is anchored with the REF base at index 25,
+        // which a negative start cannot satisfy. substr() would convert the negative
+        // offset to size_t and throw, where Python silently yields an empty window --
+        // so the two ports only agree if both skip the site.
+        // printf, not cerr: a write to stderr is fatal to the CRISPRme stage that
+        // calls this. Matches the file's existing <cstdio> idiom.
+        printf("WARNING: skipping indel at %s:%s -- fewer than 26 bases from the chromosome start\n",
+               currentChr.c_str(), line[1].c_str());
+        return;
+    }
     std::string sub_fasta = genomeStr.substr(start_position, end_position - start_position);
 
     for (size_t idx = 0; idx < indels.size(); ++idx) {
@@ -428,15 +455,17 @@ static void indel_to_fasta(const std::vector<std::string> &line, long &id_indel,
         if (!samps.empty()) {
             std::string indel_info =
                 currentChr + "_" + line[1] + "_" + line[3] + "_" + indels[idx];
-            // sub_fasta = sub_fasta[0:25] + re.sub(ref, indel, sub_fasta[25:], 1, IGNORECASE)
+            // allele_fasta = sub_fasta[0:25] + re.sub(ref, indel, sub_fasta[25:], 1, IGNORECASE)
+            // Derived from the REFERENCE window each time -- see enricher.py for why
+            // assigning back into sub_fasta compounds alleles at a multiallelic site.
             std::string head = sub_fasta.substr(0, 25);
             std::string tail = sub_fasta.substr(25);
-            sub_fasta = head + reSubFirstCI(line[3], indels[idx], tail);
+            std::string allele_fasta = head + reSubFirstCI(line[3], indels[idx], tail);
 
-            list_fasta_indels.push_back(sub_fasta + "\n" + "N\n");
+            list_fasta_indels.push_back(allele_fasta + "\n" + "N\n");
 
-            std::string refseq = genomeStr.substr(start_position, sub_fasta.size());
-            long end_fake_pos = start_fake_pos + (long)sub_fasta.size();
+            std::string refseq = genomeStr.substr(start_position, allele_fasta.size());
+            long end_fake_pos = start_fake_pos + (long)allele_fasta.size();
 
             std::string samplesJoined;
             for (size_t k = 0; k < samps.size(); ++k) {

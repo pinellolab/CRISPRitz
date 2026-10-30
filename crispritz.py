@@ -17,7 +17,40 @@ origin_path = os.path.dirname(os.path.realpath(__file__))
 # conda path
 conda_path = "opt/crispritz/"
 
-VERSION = "2.9.0"
+VERSION = "2.9.1"
+
+
+def _run_checked(argv, what):
+    """Run a compiled helper and FAIL if it did not exit cleanly.
+
+    subprocess.run() does not raise on a non-zero exit, and nothing here inspected
+    the return code, so a crashed binary looked like a completed step. For searchTST
+    that is a silent wrong answer rather than a loud one: a segfault writes nothing
+    to stderr and leaves a 0-byte targets file, and CRISPRme -- which decides a stage
+    failed by looking for output on stderr -- then reports "the search completed
+    successfully; the result set is empty" and exits 0. An empty off-target report is
+    indistinguishable from a real negative result, so it has to be impossible to
+    produce one this way.
+    """
+    rc = subprocess.run(argv).returncode
+    if rc != 0:
+        sys.stderr.write(
+            f"ERROR: {what} failed ({_exit_detail(rc)}). Its output is incomplete or "
+            f"absent, so it must not be treated as an empty result.\n"
+        )
+        sys.exit(1)
+
+
+def _exit_detail(rc):
+    """'exit code N', or 'signal NAME' for a child killed by a signal."""
+    if rc >= 0:
+        return f"exit code {rc}"
+    import signal as _signal
+
+    try:
+        return f"signal {_signal.Signals(-rc).name}"
+    except ValueError:
+        return f"signal {-rc}"
 
 if "--debug" in sys.argv[1:]:
     # for quick local tests
@@ -116,15 +149,16 @@ def indexGenome():
         if f.strip().split(".")[-1] != "fa":
             continue
         print("Indexing:", f)
-        subprocess.run(
+        _run_checked(
             [
                 corrected_origin_path + "buildTST",
                 str(dirGenome) + "/" + str(f),
                 str(dirPAM),
                 str(th),
                 max_bulges,
-            ]
-        )
+            ],
+        "buildTST (index build)",
+    )
     print("Finish indexing")
     print("Indexing runtime: %s seconds" % (time.time() - start_time))
 
@@ -270,7 +304,15 @@ def searchTST():
                 "ATTENTION! Check the total-edits option: --max-edits <n> (n is an integer)"
             )
             sys.exit()
-    subprocess.run(
+    # optional on-the-fly PAM filter: let ONE generous-flank PAM-less index (an
+    # all-N flank of width K, e.g. 8) serve ANY search PAM of length L <= K (e.g.
+    # NGG/NRG/NGA/NNGRRT/TTTV) by dropping candidates whose concrete flank does not
+    # match the search PAM, before they are emitted. A short search PAM is N-padded
+    # up to the stored width K on the distal side. OFF by default; 1 = on. L > K is
+    # a hard error (the index never stored those extra flank bases). See README
+    # section 3.3.3.
+    prune_pam = 1 if "--prune-pam" in sys.argv[1:] else 0
+    _run_checked(
         [
             corrected_origin_path + "searchTST",
             str(dirTSTgenome),
@@ -284,7 +326,9 @@ def searchTST():
             str(th),
             max_bulges,
             str(max_edits),
-        ]
+            str(prune_pam),
+        ],
+        "searchTST (index search)",
     )
     print("Search END")
     print("Search runtime: %s seconds" % (time.time() - start_time))
@@ -304,6 +348,8 @@ def searchBruteForce():
             "\n-bRNA <bRNA_num>: (Optional) Size of RNA bulges",
             "\n-bDNA <bDNA_num>: (Optional) Size of DNA bulges",
             "\n-th < num_thread >: (Optional) Number of threads to use. Default uses all of the available threads (ONE for bulge search)",
+            "\n--max-edits <n>: (Optional, indexed search) Cap the TOTAL number of edits (mismatches + DNA bulges + RNA bulges) per off-target. Omitted/negative disables the cap.",
+            "\n--prune-pam: (Optional, indexed search) On-the-fly PAM filter. Lets ONE generous-flank PAM-less index (built with an all-N 3' PAM of flank width K, e.g. 8) serve any 3' search PAM of length L <= K (e.g. NGG/NRG/NRR/NGA/NNGRRT): candidates whose concrete flanking PAM does not match the search PAM are skipped before they are emitted, giving the same off-target loci as a dedicated per-PAM index. A shorter 3' PAM is N-padded at its end up to the stored width K. A 5' PAM (e.g. TTTV) needs an index of exactly its width: a shorter 5' PAM is refused, and so is L > K. OFF by default (byte-identical to upstream). See README section 3.3.3.",
             "\n{-r,-p,-t}: Output type (-r off-targets list only, -p profile only, -t off-targets AND profile)\n",
         )
         sys.exit()
@@ -375,7 +421,7 @@ def searchBruteForce():
     # run searchBruteForce
     print("Search START")
     start_time = time.time()
-    subprocess.run(
+    _run_checked(
         [
             corrected_origin_path + "searchBruteForce",
             str(genomeDir),
@@ -386,7 +432,8 @@ def searchBruteForce():
             str(th),
             str(r),
             str(variant),
-        ]
+        ],
+        "searchBruteForce (brute-force search)",
     )
     print("Search END")
     print("Search runtime: %s seconds" % (time.time() - start_time))
@@ -397,6 +444,11 @@ def _enricher_command():
     Order: a binary named ``enricher`` on PATH, then the compiled binary shipped
     alongside the reference implementation, else the Python reference script.
     Returns a list suitable to prepend to the 5 positional enricher args.
+
+    The script runs under this same interpreter rather than its ``#!/usr/bin/env
+    python`` line: that is the interpreter with this install's dependencies (it
+    imports pandas), and the shebang needs a ``python`` on PATH, which Ubuntu 24.04
+    no longer provides -- there it failed with exit 127 on every chromosome.
     """
     found = shutil.which("enricher")
     if found:
@@ -404,11 +456,15 @@ def _enricher_command():
     compiled = corrected_origin_path + "Python_Scripts/Enrichment/enricher"
     if os.path.isfile(compiled) and os.access(compiled, os.X_OK):
         return [compiled]
-    return [corrected_origin_path + "Python_Scripts/Enrichment/enricher.py"]
+    return [sys.executable, corrected_origin_path + "Python_Scripts/Enrichment/enricher.py"]
 
 
 def genomeEnrichment_subprocess_VCF(altfile, genfile, dirGenome, doit, dirVCFFiles):
-    subprocess.run(
+    """Enrich one chromosome; return the enricher's exit status for the parent to
+    check. This runs in a Pool worker, so it must not exit the way _run_checked
+    does: a SystemExit kills the worker, its task never returns, and pool.join()
+    waits forever."""
+    return subprocess.run(
         _enricher_command()
         + [
             altfile,
@@ -417,7 +473,7 @@ def genomeEnrichment_subprocess_VCF(altfile, genfile, dirGenome, doit, dirVCFFil
             str(doit),
             dirVCFFiles,
         ]
-    )
+    ).returncode
 
 
 def _enrichment_workers(th_from_flag, th_provided, n_chroms):
@@ -566,6 +622,7 @@ def genomeEnrichment():
 
     print("Variants Extraction and Processing START")
     start_time = time.time()
+    jobs = []
     for elem in listChrs:
         # os.chdir(dirParsedFiles) #enter in parsed file directory
         chrom = ""
@@ -578,13 +635,34 @@ def genomeEnrichment():
         altfile = dirVCFFiles + "/" + elem
         genfile = str(dirGenome + "/" + chrom + contains_enr + ".fa")
         # pool to process TH vcf file in parallel
-        pool.apply_async(
+        jobs.append((elem, pool.apply_async(
             genomeEnrichment_subprocess_VCF,
             args=(altfile, genfile, dirGenome, doit, dirVCFFiles),
-        )
+        )))
     # wait until all threads are completed than join
     pool.close()
     pool.join()
+    # Nothing used to read these results, so an enricher that crashed, was killed
+    # or ran out of disk left add-variants at exit 0 with that chromosome's
+    # enriched genome, SNP dict, indel log and contigs missing or truncated -- and
+    # CRISPRme's index build, which trusts this exit status, went on to index
+    # whatever was there.
+    failed = []
+    for elem, job in jobs:
+        try:
+            rc = job.get()
+        except Exception as e:  # the worker itself raised
+            failed.append((elem, f"{type(e).__name__}: {e}"))
+            continue
+        if rc != 0:
+            failed.append((elem, _exit_detail(rc)))
+    if failed:
+        for elem, detail in failed:
+            sys.stderr.write(
+                f"ERROR: enriching {elem} failed ({detail}). Its enriched genome, SNP "
+                f"dict, indel log and indel contigs are incomplete or absent.\n"
+            )
+        sys.exit(1)
 
     for (
         f

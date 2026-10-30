@@ -57,6 +57,24 @@ int gruppo;
 bool pam_at_start;
 int len_guide_used;
 
+//a hard 'N' in the guide region makes a target unusable, so it is discarded: it
+//would otherwise reach the tree, which has no encoding for 'N' in a guide. An
+//'N' in the PAM region is kept instead of discarding the whole target: it is
+//stored as the 0000 nibble, which intersects nothing, so the PAM the user
+//searches with decides the target just as it does on a dedicated PAM index.
+//pam_in_front says which end of the extracted window holds the PAM. That depends
+//on the PAM side AND the strand, so every caller passes the end it then slices
+//the PAM from rather than having it inferred here.
+bool guideRegionHasN(string target, bool pam_in_front)
+{
+	size_t pam_width = pamRNA.length();
+	if (target.length() <= pam_width)
+		return target.find('N') != string::npos;
+	if (pam_in_front)
+		return target.find('N', pam_width) != string::npos;
+	return target.find('N') < target.length() - pam_width;
+}
+
 // function that inserts a guide DNA in TST
 void insert(string st, int i, int i2)
 {
@@ -389,6 +407,9 @@ void saveTST(int inizio, int fine, int part)
 			case 'V':
 				bitNuc += 0x07;
 				break;
+			case 'N':
+				bitNuc += 0x0; //'N' is the 0000 nibble: nothing to add
+				break;
 			default:
 				cerr << "The PAM cannot contain the character (" << *ppp << ")" << endl;
 				break;
@@ -403,7 +424,7 @@ void saveTST(int inizio, int fine, int part)
 				k = 0;
 			}
 
-			if (bitNuc)
+			if (k == 1)
 				bitNuc <<= 4; //if bitnuc already has one nt written, shift to write the second one
 			
 		} while (*ppp);
@@ -525,7 +546,7 @@ int main(int argc, char **argv)
 				target = chrSeq.substr(pamIndices[i] * -1, pamlen + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
 				// cout << "check target " << target << endl;
 
-				if (target.find('N') != std::string::npos) //if 'N' is in the target, remove the target
+				if (guideRegionHasN(target, true)) //if 'N' is in the target, remove the target
 				{
 					counter_index--;
 					discarded++;
@@ -547,7 +568,7 @@ int main(int argc, char **argv)
 				target = chrSeq.substr((pamIndices[i]), pamlen + max_bulges);
 				// cout << "check target " << target << endl;
 
-				if (target.find('N') != std::string::npos)
+				if (guideRegionHasN(target, false))
 				{
 					counter_index--;
 					discarded++;
@@ -600,6 +621,9 @@ int main(int argc, char **argv)
 							break;
 						case 'V':
 							tmp += 'B';
+							break;
+						case 'N':
+							tmp += 'N';
 							break;
 						default:
 							cerr << "The character (" << c << ") of the PAM is not part of the IUPAC nucleotide nomenclature" << endl;
@@ -632,7 +656,7 @@ int main(int argc, char **argv)
 				target = chrSeq.substr(pamIndices[i], pamlen + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
 				// cout << "check target pam end positive" << target << endl;
 
-				if (target.find('N') != std::string::npos) //if 'N' is in the target, remove the target
+				if (guideRegionHasN(target, false)) //if 'N' is in the target, remove the target
 				{
 					counter_index--;
 					discarded++;
@@ -652,7 +676,7 @@ int main(int argc, char **argv)
 				target = chrSeq.substr((pamIndices[i]) * -1, pamlen + max_bulges);
 				// cout << "check target pam end negative" << target << endl;
 
-				if (target.find('N') != std::string::npos)
+				if (guideRegionHasN(target, true))
 				{
 					counter_index--;
 					discarded++;
@@ -705,6 +729,9 @@ int main(int argc, char **argv)
 							break;
 						case 'V':
 							tmp += 'B';
+							break;
+						case 'N':
+							tmp += 'N';
 							break;
 						default:
 							cerr << "The character (" << c << ") of the PAM is not part of the IUPAC nucleotide nomenclature" << endl;
