@@ -143,23 +143,33 @@ iupac_code_scomposition = {
         }
 
 
+# base SET -> IUPAC letter, order-independent: the A/C/G/T bases present as a 4-bit
+# mask. Built from iupac_code, which has no single-base key, so one base maps to
+# nothing and leaves the genome unchanged.
+_BASE_BIT = {'A': 1, 'C': 2, 'G': 4, 'T': 8}
+_IUPAC_BY_MASK = {sum(_BASE_BIT[c] for c in spellings[0]): letter
+                  for letter, spellings in iupac_code.items()}
+
+
 def SNPsProcess(line):
     if len(line[3]) > 1: #se len ref > 1 significa che non è snp
         return
     line[1] = str(int(line[1])-1)  # taaac per corregere conta posizione da zero/uno
     altAlleles = line[4].strip().split(',') #list di tutti gli alleli alternative
     referenceNucleotide = genomeStr[int(line[1])] #nucleotide reference preso dalla stringa del fasta
-    iupac_value = set() #set che contiene nt reference + alt snps
-    iupac_value.add(referenceNucleotide)
-    for alt in altAlleles: #ciclo sugli alt nt
-        if len(alt) > 1: #se lun di alt nt è > 1 skippo perchè non è snp
-            continue
-        else:
-            iupac_value.add(alt) #add del nt alt al set di iupac
-    iupac_value = ''.join(iupac_value) #converto il set in una string
-    for key, value in iupac_code.items(): #cerco iupac value nel dict per avere il corrispettivo IUPAC nt
-        if iupac_value in value:
-            genomeList[int(line[1])] = str(key) #inserisco il IUPAC nt nel genoma enriched
+    # The reference base and every single-character ALT, as A/C/G/T bits. A member
+    # that is not A/C/G/T -- the '*' of a spanning deletion, an 'N', a lowercase
+    # base, an IUPAC reference base -- adds nothing, so the real SNP alleles beside
+    # it are still coded. Building the code from the whole set instead left the base
+    # unchanged whenever such a member was present, dropping a real SNP at every
+    # multiallelic '*' site. This is enricher.cpp's rule (baseBit/iupacFromMask).
+    mask = _BASE_BIT.get(referenceNucleotide, 0)
+    for alt in altAlleles:
+        if len(alt) == 1:
+            mask |= _BASE_BIT.get(alt, 0)
+    letter = _IUPAC_BY_MASK.get(mask)
+    if letter is not None:
+        genomeList[int(line[1])] = letter #inserisco il IUPAC nt nel genoma enriched
 
 
 # def SNPsProcess(line):

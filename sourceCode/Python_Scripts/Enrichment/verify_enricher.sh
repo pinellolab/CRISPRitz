@@ -13,8 +13,10 @@
 # deletion spanning SNPs, indels with overlapping windows, multiallelic records
 # mixing SNP and indel ALTs, unphased / missing / haploid genotypes, indels at
 # the chromosome start (window floor) and end, a REF that does not match the
-# FASTA, and same-POS SNP/indel orders beyond case 8. Besides the four outputs,
-# the file set and the run log (stdout+stderr, e.g. the skip warnings) must match.
+# FASTA, and same-POS SNP/indel orders beyond case 8. Case 17 covers multiallelic
+# SNP records whose ALTs include a non-A/C/G/T member ('*', 'N', a lowercase base)
+# or whose FASTA base is N. Besides the four outputs, the file set and the run log
+# (stdout+stderr, e.g. the skip warnings) must match.
 #
 # Prints "BYTE-IDENTICAL: PASS" only if every output diff is empty.
 #
@@ -311,6 +313,28 @@ lines.append(row(p, "rs1604", b(p), other(p,0), "AC=1;AF=0.1", ["0|1","0|0","0|0
 lines.append(row(p, "rs1604", b(p), other(p,1), "AC=1;AF=0.1", ["0|0","1|0","0|0","0|0","0|0"]))
 lines.append(row(p, "rs1605", b(p), b(p)+"CC", "AC=1;AF=0.1", ["0|0","0|0","1|0","0|0","0|0"]))
 
+# 17) MULTIALLELIC SNP records whose single-character ALTs include a member that is
+#     not A/C/G/T: the '*' of a GATK spanning deletion (1228, and with two real
+#     ALTs at 1230), an 'N' (1232), a lowercase base (1234); a FASTA N carrying
+#     two ALTs (1618, in the planted N run); and a split SNP record followed by a
+#     multiallelic '*' record at the same POS (1229). The A/C/G/T subset is coded
+#     and the other member adds nothing, so the real SNP is kept (enricher.py used
+#     to leave the base unchanged here, enricher.cpp coded the subset).
+p=1228
+lines.append(row(p, "rs1700", b(p), other(p)+",*", "AC=2,1;AF=0.2,0.1", ["0|1","0|2","1|2","0|0","0|0"]))
+p=1229
+lines.append(row(p, "rs1701", b(p), other(p,0), "AC=1;AF=0.1", ["0|1","0|0","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1702", b(p), other(p,1)+",*", "AC=1,1;AF=0.1,0.1", ["0|0","1|2","0|0","0|0","0|0"]))
+p=1230
+lines.append(row(p, "rs1703", b(p), other(p,0)+","+other(p,1)+",*", "AC=1,1,1;AF=0.1,0.1,0.1",
+                 ["1|2","0|3","0|0","0|0","0|0"]))
+p=1232
+lines.append(row(p, "rs1704", b(p), other(p)+",N", "AC=1,1;AF=0.1,0.1", ["0|1","2|0","0|0","0|0","0|0"]))
+p=1234
+lines.append(row(p, "rs1705", b(p), other(p,0)+","+other(p,1).lower(), "AC=1,1;AF=0.1,0.1",
+                 ["0|1","0|2","0|0","0|0","0|0"]))
+p=1618
+lines.append(row(p, "rs1706", b(p), "A,C", "AC=1,1;AF=0.1,0.1", ["0|1","0|2","0|0","0|0","0|0"]))
 
 # 14) THE CHROMOSOME EDGES (records listed last; the enricher does not need
 #     sorted input): an insertion at POS 1 and a 2-bp deletion at POS 25 have
