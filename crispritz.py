@@ -444,6 +444,11 @@ def _enricher_command():
     Order: a binary named ``enricher`` on PATH, then the compiled binary shipped
     alongside the reference implementation, else the Python reference script.
     Returns a list suitable to prepend to the 5 positional enricher args.
+
+    The script runs under this same interpreter rather than its ``#!/usr/bin/env
+    python`` line: that is the interpreter with this install's dependencies (it
+    imports pandas), and the shebang needs a ``python`` on PATH, which Ubuntu 24.04
+    no longer provides -- there it failed with exit 127 on every chromosome.
     """
     found = shutil.which("enricher")
     if found:
@@ -451,7 +456,7 @@ def _enricher_command():
     compiled = corrected_origin_path + "Python_Scripts/Enrichment/enricher"
     if os.path.isfile(compiled) and os.access(compiled, os.X_OK):
         return [compiled]
-    return [corrected_origin_path + "Python_Scripts/Enrichment/enricher.py"]
+    return [sys.executable, corrected_origin_path + "Python_Scripts/Enrichment/enricher.py"]
 
 
 def genomeEnrichment_subprocess_VCF(altfile, genfile, dirGenome, doit, dirVCFFiles):
