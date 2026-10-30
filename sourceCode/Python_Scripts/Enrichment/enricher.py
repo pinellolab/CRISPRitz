@@ -213,8 +213,10 @@ def SNPsProcess(line):
 def chromosomeSave():
     genomeStr = "".join(genomeList)
     os.chdir("./SNPs_genome/")
-    if not (os.path.isdir(dir_enr_name)):
-        os.mkdir(dir_enr_name)
+    # add-variants runs one enricher per chromosome in parallel, all into this one
+    # directory: two that reach here together both saw it missing and the second
+    # mkdir raised, losing that chromosome's outputs. enricher.cpp treats EEXIST as OK.
+    os.makedirs(dir_enr_name, exist_ok=True)
     outFile = open(dir_enr_name + '/' + genomeHeader[1:(len(genomeHeader)-1)]+'.enriched'+'.fa', 'w')
     outFile.write(genomeHeader+genomeStr+'\n')
     outFile.close()
