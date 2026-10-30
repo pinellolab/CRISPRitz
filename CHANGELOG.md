@@ -192,7 +192,14 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   whatever was there. Each worker now returns its enricher's exit status, and
   `add-variants` exits 1 naming every failed chromosome with its exit code or signal.
   Covered by `test/run_add_variants_status_test.sh`, which also fails rather than
-  hangs if a worker stops returning.
+  hangs if a worker stops returning. That test then found two failures the old code
+  had been hiding, both in the `enricher.py` path, and both are fixed: the script ran
+  through its `#!/usr/bin/env python` line, so with no `python` on PATH (Ubuntu 24.04
+  ships only `python3`) every chromosome failed with exit 127, and it now runs under
+  `crispritz.py`'s own interpreter; and two workers finishing together could race to
+  create the shared `SNPs_genome/<genome>_enriched/` directory, the loser raising
+  `FileExistsError` before writing its chromosome (3 of 6 runs on two small
+  chromosomes), which it now creates race-safely, as `enricher.cpp` already did.
 
 ### Known issues
 - **At a position carrying more than one SNP record, only the last record's ALT is
