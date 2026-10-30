@@ -144,10 +144,26 @@ static inline int baseBit(char c) {
 // Maps a mask of ACGT bits to the IUPAC letter reproduced by enricher.py.
 static char iupacFromMask(int mask) {
     switch (mask) {
-        case 1:  return 'A';
-        case 2:  return 'C';
-        case 4:  return 'G';
-        case 8:  return 'T';
+        // A SINGLE base is NOT a key in python's iupac_code: its values are the
+        // 2-, 3- and 4-base combinations only (12 + 24 + 24 entries, none of
+        // length 1), so when the allele set collapses to one base python's lookup
+        // finds nothing and leaves the genome UNTOUCHED. Returning the base here
+        // made the caller WRITE it, clobbering an IUPAC code that a SNP record at
+        // the same position had already placed.
+        //
+        // The set collapses to one base on every indel record: REF is length 1, so
+        // SNPsProcess does not bail out, and the longer ALT is skipped by the
+        // `size() > 1` test, leaving only the reference base. A position carrying
+        // BOTH a SNP and an indel -- as separate biallelic records, which is how
+        // every CRISPRme-supplied VCF is normalised -- therefore lost its SNP.
+        // Measured on a real 120,000-record chr22 slice: 176 such positions were
+        // the ONLY bytes differing from enricher.py in 50.8 MB.
+        // verify_enricher.sh case 8 pins it.
+        case 1:  // A
+        case 2:  // C
+        case 4:  // G
+        case 8:  // T
+            return 0;
         case (1 | 4):     return 'R';  // A,G
         case (2 | 8):     return 'Y';  // C,T
         case (4 | 2):     return 'S';  // G,C

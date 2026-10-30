@@ -130,6 +130,22 @@ p=330
 lines.append(row(p, "rs700,rs701", b(p), b(p)+"A," + b(p)+"AA",
                  "AC=2,1;AF=0.3,0.1", ["0|1","0|2","1|1","0|0","2|1"]))
 
+# 8) A SNP and an INDEL at the SAME POS, as SEPARATE BIALLELIC RECORDS (pos 300).
+#    This is NOT case 6: there the SNP alt and the insertion alt share one
+#    multiallelic record, while here they are two rows -- which is how every
+#    CRISPRme-supplied VCF is normalised (0 of 1,998,332 real chr22 records carry
+#    a comma in ALT). Measured on a real 120,000-record chr22 slice: the two ports
+#    disagree at exactly the 176 positions of this shape and nowhere else. The
+#    Python reference keeps the SNP's IUPAC code (C/A -> M); the C++ port writes
+#    the plain reference base, so the SNP disappears from the enriched genome --
+#    and a SNP co-occurring with an indel is precisely what the SNP+indel feature
+#    exists to find. None of the cases above could catch it.
+p=300
+lines.append(row(p, "rs800", b(p), ("T" if b(p)!="T" else "A"),
+                 "AC=1;AF=0.2", ["0|1","0|0","0|0","0|0","0|0"]))
+lines.append(row(p, "rs801", b(p), b(p)+"CC",
+                 "AC=1;AF=0.1", ["0|0","0|1","0|0","0|0","0|0"]))
+
 open(out,"w").write("\n".join(lines)+"\n")
 PY
 

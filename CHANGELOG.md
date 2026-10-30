@@ -51,6 +51,31 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   partitioning), the 8-flank==3-flank NGG equivalence, and the `L > K` hard error.
 
 ### Fixed
+- **The C++ `enricher` dropped a SNP wherever an indel shared its position,** so it was
+  not the byte-identical port of `enricher.py` that `add_variants.sh` claimed. Python's
+  `iupac_code` dict holds only the 2-, 3- and 4-base combinations (12 + 24 + 24 entries,
+  none of length 1), so when a record's allele set collapses to a single base the lookup
+  finds no key and the enriched genome is left untouched. `iupacFromMask` instead returned
+  that base, and the caller wrote it — clobbering the IUPAC code a SNP record at the same
+  position had already placed. The set collapses on **every** indel record: `REF` is
+  length 1 so `SNPsProcess` does not bail out, and the longer `ALT` is skipped, leaving
+  only the reference base. A position carrying both a SNP and an indel as **separate
+  biallelic records** — how every CRISPRme-supplied VCF is normalised — therefore lost its
+  SNP from the enriched genome, which is precisely the co-occurrence the SNP+indel feature
+  exists to find. Measured on a real 120,000-record chr22 slice with 4,091 samples: 176
+  such positions were the **only** bytes differing from `enricher.py` in 50.8 MB
+  (`R`→`G` ×39, `Y`→`T` ×38, `M`→`C` ×37, `W`→`T` ×30, `K`→`T` ×20, `S`→`G` ×12); after the
+  fix the two ports are byte-identical across all five outputs.
+  **No published index is affected:** `conda/build.sh` compiles `enricher` and never
+  installs it, and the CRISPRme Dockerfile builds only `buildTST`/`searchTST`/
+  `searchBruteForce`, so `_enricher_command()` has always fallen back to `enricher.py`.
+  Verified in the shipped image: no `enricher` binary on `PATH` or beside the reference.
+- **`verify_enricher.sh` could not have caught that** (and did not: it passed). Its
+  SNP+indel case put both alleles in ONE multiallelic record, while production VCFs are
+  split — 0 of 1,998,332 real chr22 records carry a comma in `ALT`. New case 8 plants a
+  SNP and an indel at the same position as two separate biallelic records, which is the
+  shape that fails; it reproduces the defect on the synthetic fixture
+  (`GGCTAWCACATCG` vs `GGCTAACACATCG`) and passes after the fix.
 - **A non-`.bin` file in the index directory crashed the search.** The directory scan
   skipped only `.` and `..`, so a sidecar such as `.pam_build` or `index_meta.json` was
   stat'd, pushed into the file list, and handed to `loadTST` as if it were a tree. The
