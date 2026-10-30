@@ -15,7 +15,7 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 
 ## [Unreleased]
 
-## [2.9.1] - 2026-10-29
+## [2.9.1] - 2026-10-30
 
 ### Added
 - **`search --prune-pam`: one generous-flank PAM-less index serves ANY PAM up to
@@ -24,15 +24,17 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   `K = 8`), then serve *any* PAM of length `L ≤ K` on the fly — no dedicated
   per-PAM index. At TST leaf emit (`saveIndices` + `saveIndices2`), each
   candidate's stored concrete flank is bit-AND-compared against the IUPAC-expanded
-  search PAM and skipped **before it is written or scored** if incompatible. A
-  search PAM shorter than `K` is **N-padded to width `K` on the distal side** — the
-  *end* for a 3′ PAM, the *front* for a 5′ PAM — because a real PAM is always
-  adjacent to the protospacer (proximal positions carry the real letters; the pad
-  N's cover the outer stored positions the short PAM does not constrain). This
-  yields the **same off-target loci** as a dedicated per-PAM index (proven for 3′
-  NGG and 5′ TTTV in `test/run_pam_filter_test.sh`: an 8-flank NGG search == a
-  dedicated 3-flank NGG index as a set). `L > K` is a **hard error** (the index
-  never stored those bases). Enable via `crispritz.py search … --prune-pam`, the
+  search PAM and skipped **before it is written or scored** if incompatible. A 3′
+  search PAM shorter than `K` is **N-padded to width `K` at its distal end**, because
+  a real PAM is always adjacent to the protospacer (proximal positions carry the real
+  letters; the pad N's cover the outer stored positions the short PAM does not
+  constrain). This yields the **same off-target loci** as a dedicated per-PAM index
+  (proven in `test/run_pam_filter_test.sh` for NGG, NRG, NRR, NNNN and a 6-nt PAM off
+  a `K = 8` index, and for an equal-width 5′ TTTV: an 8-flank NGG search == a
+  dedicated 3-flank NGG index as a set). A 5′ PAM must equal `K`: a shorter one is
+  refused, because the emit path trims the pad from the end of the reported sequence
+  while a 5′ pad sits at its front. `L > K` is a **hard error** (the index never
+  stored those bases). Enable via `crispritz.py search … --prune-pam`, the
   12th positional arg to `searchTST`, or the `CRISPRITZ_PAM_PRUNE` env var.
   **Default (flag absent) is a strict no-op — byte-identical to upstream.**
   Workflow + build recipe in README §3.3.3.
@@ -45,10 +47,21 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   index has more leaves but the same +2 bytes/leaf, so the percentage is unchanged.
   A generous `K = 8` flank is a ~10% premium that removes the need to store one
   index per PAM.
-- `test/run_pam_filter_test.sh`: 32-assertion regression covering default-off
-  byte-identity, the dedicated-index equivalence (3′ and 5′), the generous-flank
-  N-padding (NGG/NRG/NRR/NNNN(4)/6-nt PAM off a K = 8 index with exact PAM
-  partitioning), the 8-flank==3-flank NGG equivalence, and the `L > K` hard error.
+- `test/run_pam_filter_test.sh`: 31-assertion regression covering default-off
+  byte-identity, the dedicated-index equivalence (3′, and 5′ at equal width), the
+  generous-flank N-padding (NGG/NRG/NRR/NNNN(4)/6-nt PAM off a K = 8 index with exact
+  PAM partitioning), the 8-flank==3-flank NGG equivalence, the `L > K` hard error, and
+  the refusals of a shorter 5′ PAM off a wider flank and of a width mismatch with the
+  filter off.
+- `verify_enricher.sh` grows from 8 to 17 synthetic cases: the SNP+indel combinations
+  (SNPs inside an indel's window on the same haplotype, the other haplotype and another
+  sample; a deletion spanning SNPs; overlapping indel windows; multiallelic records
+  mixing SNP and indel ALTs; unphased, missing and haploid genotypes; a REF that does
+  not match the FASTA), the chromosome edges, and multiallelic SNPs whose ALTs include
+  `*`. Besides the four outputs it now compares the set of files each port writes and
+  their run logs.
+- `test/run_add_variants_status_test.sh`: `add-variants` fails, naming the chromosome,
+  when an enricher exits non-zero or is killed (see Fixed).
 
 ### Changed
 - **The compiled `enricher` is now installed, so it is the default enrichment path.**
@@ -58,9 +71,11 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   `enricher.py` through the real `add-variants` CLI on the FULL chr22 of HGDP + 1000
   Genomes -- 1,998,332 records, 4,091 samples, 2.7 GB of output: 1,776 s vs 974 s -- on the
   stage that dominates a from-scratch genome-wide build. Byte-identity holds at that same
-  scale: all five outputs match `enricher.py` hash for hash. It holds off Linux too:
-  built natively on macOS arm64 (Apple clang, libc++ rather than libstdc++), the port
-  reproduces those five full-chr22 hashes exactly, and so does `enricher.py` under pandas 3
+  scale: all four enricher outputs match `enricher.py` hash for hash (as does
+  `INDELs_genome/change_version.txt`, fixed text that `crispritz.py` writes). It holds
+  off Linux too: built natively on macOS arm64 (Apple clang, libc++ rather than
+  libstdc++), the port reproduces those full-chr22 hashes exactly, and so does
+  `enricher.py` under pandas 3
   (the recipe leaves pandas unpinned, and the indel log goes through a DataFrame). `zlib` was
   already in the recipe's build/host/run deps and `enricher.cpp` carries no OpenMP
   pragmas, so this ships on every platform the other three binaries do, through the same
@@ -82,7 +97,7 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   exists to find. Measured on a real 120,000-record chr22 slice with 4,091 samples: 176
   such positions were the **only** bytes differing from `enricher.py` in 50.8 MB
   (`R`→`G` ×39, `Y`→`T` ×38, `M`→`C` ×37, `W`→`T` ×30, `K`→`T` ×20, `S`→`G` ×12); after the
-  fix the two ports are byte-identical across all five outputs.
+  fix the two ports are byte-identical across all four enricher outputs.
   **Exposure.** A *packaged* install never ran the compiled port: `conda/build.sh`
   compiled `enricher` and did not install it, and CRISPRme's Dockerfile built only
   `buildTST`/`searchTST`/`searchBruteForce`, so `_enricher_command()` fell back to
@@ -145,6 +160,50 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   the site with a warning on stdout. `verify_enricher.sh` gained a site with two carried
   indel alleles (its previous "multiallelic indel" case was one SNP allele plus one
   insertion, so the per-allele loop ran once and could not catch this) and now runs in CI.
+- **A PAM/flank width mismatch mis-parsed the index, and a crashed engine read as an
+  empty result.** `loadTST` consumes exactly `ceil(len(search PAM)/2)` stored PAM bytes
+  per leaf, so the search PAM must have the width the index stored. Only the
+  `--prune-pam` path reconciled the two; with the filter off, a width-8 PAM-less index
+  searched with a 3-nt PAM desynchronised the leaf stream at the first leaf and ended in
+  a SIGSEGV. A segfault writes nothing to stderr and leaves a 0-byte targets file, and
+  nothing inspected the engine's exit status, so the caller saw a completed step and
+  reported a clean, empty off-target result — indistinguishable from a real negative.
+  The width check now runs whether or not the filter is on and refuses a mismatch with
+  an error naming both widths; and `buildTST`, `searchTST` and `searchBruteForce` run
+  through `_run_checked`, which exits non-zero on a bad status and names the signal.
+  `--prune-pam` also refuses a shorter 5′ PAM off a wider flank: its loci were right,
+  but every reported row carried the pad N's inside its PAM region, so a downstream
+  PAM filter would drop them all.
+- **`enricher.py` dropped a real SNP at a multiallelic site whose ALTs include `*`.** It
+  built a SNP's IUPAC code from the set {FASTA base} + {1-character ALTs} and looked the
+  joined string up among A/C/G/T spellings, so one member that is not A/C/G/T — the `*`
+  of a spanning deletion, an `N`, a lowercase base — left the base unchanged. At a
+  GATK-style record such as `C>A,*` the SNP `A` was therefore never coded, and an
+  off-target needing it could not be found, although the SNP dict listed its carriers.
+  The C++ port coded the A/C/G/T subset, so the two ports also disagreed on such input.
+  `enricher.py` now follows the C++ rule; wherever it wrote a code before, it writes the
+  same one. Split (biallelic) input, which every CRISPRme-supplied VCF is, cannot reach
+  this. Pinned by `verify_enricher.sh` case 17.
+- **`add-variants` exited 0 when an enricher failed.** It runs one enricher per
+  chromosome in a multiprocessing pool and never read the results, so an enricher that
+  crashed, was killed (by the OOM killer, say) or ran out of disk left `add-variants`
+  successful, with that chromosome's enriched genome, SNP dict, indel log and contigs
+  missing or truncated; CRISPRme's index build, which trusts that status, then indexed
+  whatever was there. Each worker now returns its enricher's exit status, and
+  `add-variants` exits 1 naming every failed chromosome with its exit code or signal.
+  Covered by `test/run_add_variants_status_test.sh`, which also fails rather than
+  hangs if a worker stops returning.
+
+### Known issues
+- **At a position carrying more than one SNP record, only the last record's ALT is
+  kept.** Normalising a VCF splits a multiallelic site into biallelic records, and each
+  record rebuilds the position's IUPAC code from the reference base and overwrites its
+  SNP dict entry, so in both ports an earlier record's ALT reaches neither the enriched
+  genome nor the dict, and an off-target that needs it cannot be found. Pre-existing in
+  every release. On HGDP + 1000 Genomes chr22, 43,389 positions carry more than one SNP
+  record, and 45,837 of 1,757,775 SNP records (2.6%) lose their ALT this way. A fix
+  changes the enriched genomes, and with them every index built from one, so it is
+  being investigated separately.
 
 ## [2.9.0] - 2026-10-08
 

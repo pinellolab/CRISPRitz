@@ -9,8 +9,8 @@
 # script if it is not on PATH.
 #
 # "Byte-identical" is a VERIFIED claim, not an assumption: verify_enricher.sh
-# diffs every output of both ports over a synthetic VCF covering 8 variant
-# shapes, and runs in CI as the `enricher-ports` job. It WAS an assumption until
+# diffs every output of both ports over a synthetic VCF of 17 cases (the SNP+indel
+# combinations among them), and runs in CI as the `enricher-ports` job. It WAS an assumption until
 # 2.9.1, and it was wrong -- the C++ port dropped a SNP wherever an indel shared
 # its position, which the fixture could not see because its SNP+indel case put
 # both alleles in ONE multiallelic record while real VCFs are split. See the
