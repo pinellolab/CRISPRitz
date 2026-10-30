@@ -89,12 +89,15 @@ bool pam_at_start;
 // with the search PAM are SKIPPED BEFORE they are written/scored. This is a
 // leaf-time skip-before-write, NOT a tree-descent prune: the PAM-less tree is
 // still traversed in full; the win is that excluded-PAM candidates are never
-// emitted, scored or post-processed. The result is identical to searching a
-// dedicated index built for that restrictive PAM (see test/run_pam_filter_test.sh).
+// emitted, scored or post-processed. The targets list is identical, as a set, to
+// searching a dedicated index built for that restrictive PAM (see
+// test/run_pam_filter_test.sh). The profile outputs are not: they count the
+// engine's duplicate rows, whose number depends on the tree's shape, and their
+// guide label carries the search PAM padded to the stored width K.
 //
 // Opt-in via: the 12th positional arg to searchTST (1 = on; crispritz.py
-// `search --prune-pam`), OR the environment variable CRISPRITZ_PAM_PRUNE being
-// set. Default (flag/env absent) is a strict no-op: the filter branch is never
+// `search --prune-pam`), OR the environment variable CRISPRITZ_PAM_PRUNE set to
+// anything but empty or "0". Default (flag/env absent) is a strict no-op: the filter branch is never
 // entered, so behaviour is byte-identical to upstream (see golden/minimal CI).
 bool PAM_PRUNE = false;
 int prune_pad = 0; // (K-L) distal N-pad width of a padded --prune-pam search;
@@ -1179,7 +1182,9 @@ int main(int argc, char **argv)
 	// (e.g. an 8-N index) serves ANY PAM of length <= K. The actual padding +
 	// searchPamBit construction happen in the length guard below, once K is known
 	// (K is read from the first .bin prefix). Here we only flip the mode on.
-	if (getenv("CRISPRITZ_PAM_PRUNE") != nullptr)
+	// any value but empty or "0": CRISPRITZ_PAM_PRUNE=0 must not switch the filter ON
+	const char *prune_env = getenv("CRISPRITZ_PAM_PRUNE");
+	if (prune_env != nullptr && prune_env[0] != '\0' && strcmp(prune_env, "0") != 0)
 		PAM_PRUNE = true;
 	if (PAM_PRUNE)
 		cout << "[PAM-FILTER] on-the-fly PAM filter ENABLED; raw search PAM region = "

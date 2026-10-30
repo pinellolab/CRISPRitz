@@ -358,15 +358,16 @@ Detailed input:
 Building (and storing/distributing) a separate index for every PAM (NGG, NRG, NGA,
 NNGRRT, TTTV, …) is wasteful: the costly part of an index is the protospacer tree,
 not the PAM. CRISPRitz can instead build **one PAM-less index with a generous all-N
-flank of width K**, then serve **any PAM of length L ≤ K** on the fly by N-padding the
-search PAM up to K and filtering candidates at leaf-emit time. The result is identical
-(same off-target loci) to a dedicated per-PAM index — see §[3.3.3.3](#Search_prune_pam_size).
+flank of width K**, then serve **any 3′ PAM of length L ≤ K** on the fly by N-padding the
+search PAM up to K and filtering candidates at leaf-emit time. The targets are identical
+(the same rows, coordinates and sequences) to a dedicated per-PAM index's; a 5′ PAM needs
+an index of exactly its width — see §[3.3.3.2](#Search_prune_pam_search).
 
 **<a name="Search_prune_pam_build">3.3.3.1</a> Build the generous-flank index.**  
 The stored flank width **K is exactly the PAM length declared in the PAM file**
 (`index-genome`/`search` read the trailing number). To serve any PAM up to K, build
 with an **all-N PAM file** whose total length is `spacer_length + K` and whose declared
-number is `K` (`-K` for a 5′ PAM). Example for a 20-nt spacer and a generous **K = 8**
+number is `K`. Example for a 20-nt spacer and a generous **K = 8**
 (recommended default — covers NGG, NGA, NNGRRT, NNNRRT and almost every characterized
 3′ PAM, with headroom):
 
@@ -379,32 +380,37 @@ NNNNNNNNNNNNNNNNNNNNNNNNNNNN 8
 crispritz.py index-genome hg38_generous8 hg38_dir/ pam_generous8.txt -bMax 2
 ```
 
-For a 5′ (Cas12a-style) generous index, negate the number:
-`NNNNNNNNNNNNNNNNNNNNNNNNNNNN -8`.
+A 5′ (Cas12a-style) PAM is served only by a PAM-less index of exactly its width, declared
+with a negative number (e.g. `NNNNNNNNNNNNNNNNNNNNNNNN -4` for TTTV): a shorter 5′ PAM off a
+wider flank is refused, because the reported sequence would carry the pad N's in its PAM.
 
 **<a name="Search_prune_pam_search">3.3.3.2</a> Search any PAM ≤ K with `--prune-pam`.**  
 Pass the real, short PAM file (its declared length is **L**, the true PAM length) and add
-`--prune-pam`. The engine N-pads the search PAM up to the index flank width K on the
-**distal** side (end for a 3′ PAM, front for a 5′ PAM — a real PAM is always adjacent to
-the protospacer, so its letters occupy the proximal positions and the pad-N's cover the
-outer stored positions the short PAM does not constrain), then skips any candidate whose
-concrete flank is incompatible with the search PAM **before it is written or scored**:
+`--prune-pam`. The engine N-pads a 3′ search PAM up to the index flank width K at its
+**distal** end (a real PAM is always adjacent to the protospacer, so its letters occupy the
+proximal positions and the pad-N's cover the outer stored positions the short PAM does not
+constrain), then skips any candidate whose concrete flank is incompatible with the search
+PAM **before it is written or scored**:
 
 ```bash
 # NGG off the K=8 generous index (no dedicated NGG index needed)
 crispritz.py search hg38_generous8/ pamNGG.txt guides.txt out_ngg \
     -index -mm 4 -bDNA 1 -bRNA 1 -th 4 -t --prune-pam
 
-# NGA, NNGRRT, TTTV … all served off the SAME index, just swap the PAM file:
-crispritz.py search hg38_generous8/ pamNGA.txt    guides.txt out_nga    -index -mm 4 -th 4 -t --prune-pam
-crispritz.py search hg38_generous8/ pamNNGRRT.txt guides.txt out_sauri  -index -mm 4 -th 4 -t --prune-pam
+# NGA, NNGRRT … all served off the SAME index, just swap the PAM file. Keep -bDNA/-bRNA:
+# without them crispritz.py dispatches to the brute-force search, which does not read an index.
+crispritz.py search hg38_generous8/ pamNGA.txt    guides.txt out_nga    -index -mm 4 -bDNA 1 -bRNA 1 -th 4 -t --prune-pam
+crispritz.py search hg38_generous8/ pamNNGRRT.txt guides.txt out_sauri  -index -mm 4 -bDNA 1 -bRNA 1 -th 4 -t --prune-pam
 ```
 
 Properties (all enforced by `test/run_pam_filter_test.sh`):
-- **Equivalent to a dedicated index.** The off-target loci returned for e.g. NGG off the
-  K = 8 index are the *same set* as a dedicated 3-flank NGG index. The only cosmetic
-  difference is the DNA/crRNA columns report the full K-base flank (`…GGGACGGC` vs `…GGG`);
-  for a 5′ PAM the reported start coordinate shifts left by `K−L` (the extra flank).
+- **Equivalent to a dedicated index.** The targets returned for e.g. NGG off the K = 8
+  index are the *same set of rows* as a dedicated 3-flank NGG index's, coordinates and
+  sequences included: the DNA/crRNA columns carry the L-base PAM a dedicated index reports.
+  The profile outputs (`-p`/`-t`) are not comparable between the two: they count the
+  engine's duplicate rows, whose number depends on the index tree's shape, and they label
+  the guide with the search PAM padded to K.
+- **A shorter 5′ PAM off a wider flank is refused**; an equal-width 5′ index is supported.
 - **`L > K` is a hard error** (the index never stored those extra flank bases — rebuild
   with a wider K).
 - **Default (no `--prune-pam`) is unchanged / byte-identical** to upstream.
