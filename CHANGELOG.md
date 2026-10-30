@@ -54,9 +54,11 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 - **The compiled `enricher` is now installed, so it is the default enrichment path.**
   `conda/build.sh` copies it to both places `crispritz.py`'s `_enricher_command()`
   checks — `$PREFIX/bin` (PATH) and beside the reference implementation — matching what
-  CRISPRme's `install_from_source.sh` already did. Measured **1.75x** faster than
-  `enricher.py` on a real `add-variants` run (full chr22, HGDP + 1000 Genomes, 4,091
-  samples), on the stage that dominates a from-scratch genome-wide build. `zlib` was
+  CRISPRme's `install_from_source.sh` already did. Measured **1.82x** faster than
+  `enricher.py` through the real `add-variants` CLI on the FULL chr22 of HGDP + 1000
+  Genomes -- 1,998,332 records, 4,091 samples, 2.7 GB of output: 1,776 s vs 974 s -- on the
+  stage that dominates a from-scratch genome-wide build. Byte-identity holds at that same
+  scale: all five outputs match `enricher.py` hash for hash. `zlib` was
   already in the recipe's build/host/run deps and `enricher.cpp` carries no OpenMP
   pragmas, so this ships on every platform the other three binaries do, through the same
   compiler invocation. Gated on the byte-identity fix above and on
