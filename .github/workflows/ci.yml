@@ -90,6 +90,14 @@ jobs:
       - name: Run flank-N regression test
         run: bash test/run_flank_n_test.sh
 
+      # Relaxing the PAM scan for an all-N PAM removed the out-of-bounds read that used
+      # to crash buildTST on a contig shorter than one target window, and left its
+      # wrapped unsigned loop running until memory ran out. Header-only, 10-bp and
+      # one-base-short contigs must exit 0 at once with no .bin, for 3' and 5' all-N
+      # and a dedicated PAM, under a timeout and a 4 GB address-space cap.
+      - name: buildTST on a contig too short for a target
+        run: bash test/run_short_contig_test.sh
+
   golden:
     name: golden search regression (Cas9 NGG + Cas12a TTTV)
     runs-on: ubuntu-latest

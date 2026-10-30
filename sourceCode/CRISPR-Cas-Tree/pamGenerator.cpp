@@ -316,6 +316,16 @@ string reversenuc(string pam)
 vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges, int max_mismatches)
 {
 	vector<int> indices; //to save indices for TST extraction
+	//a sequence shorter than one target window (pam_len + max_bulges) holds no
+	//target on either strand, so return before the scans. Their bounds below,
+	//genome_sequence.length() - pam_limit / - pam_len / - (pam_len + max_bulges),
+	//are unsigned and wrap on such a sequence -- an empty or header-only FASTA, as
+	//the enricher writes for a chromosome with no carried indel. For a constrained
+	//PAM the scan then read past the sequence and crashed; for an all-N PAM, whose
+	//scan reads nothing, it ran ~2^31 iterations pushing indices until the process
+	//was killed for memory. No target fits, so nothing reachable is lost.
+	if (genome_sequence.length() < (size_t)(pam_len + max_bulges))
+		return indices;
 	vector<bitset<4>> pam_bit = pam_bit_conversion(pam_sequence);
 	vector<bitset<4>> pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
 	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
