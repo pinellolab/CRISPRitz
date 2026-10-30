@@ -35,7 +35,8 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   refused, because the emit path trims the pad from the end of the reported sequence
   while a 5′ pad sits at its front. `L > K` is a **hard error** (the index never
   stored those bases). Enable via `crispritz.py search … --prune-pam`, the
-  12th positional arg to `searchTST`, or the `CRISPRITZ_PAM_PRUNE` env var.
+  12th positional arg to `searchTST`, or the `CRISPRITZ_PAM_PRUNE` env var (any value but
+  empty or `0`).
   **Default (flag absent) is a strict no-op — byte-identical to upstream.**
   Workflow + build recipe in README §3.3.3.
 - **Index-size cost of a wider flank is linear, not multiplicative.** The flank is
@@ -134,10 +135,11 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   and the prune test covered the N-pad that widens a search PAM to the stored width. The
   first is now relaxed only for a fully unconstrained PAM, the second is narrowed to the
   guide region (which cannot hold an `N`, the tree having no encoding for one), and the
-  third tests only the positions the real PAM covers. Carrying `N` through also needed two
-  encoding defects fixed: the writer shifted its nibble conditionally on the *value*, so a
-  nucleotide encoding to `0x0` lost its slot and displaced every following nibble, and the
-  loader's `case 0x0` was an unreachable no-op now free to carry `N`. Impact is
+  third tests only the positions the real PAM covers. A stored `N` is the `0x0` nibble,
+  which the loader's `case 0x0`, unreachable in a well-formed stream until now, is free to
+  carry. The writer's nibble shift was also rewritten to depend on the slot instead of the
+  value; that changes no byte (shifting a zero nibble is a no-op: identical output for all
+  6,725,600 PAM strings of length 1-8 over ACGTRYN), and fixed nothing. Impact is
   concentrated on the synthetic indel genome, which is `N`-separated roughly every 56
   bases: a width-31 window admitted 34,690,315 start positions on one contig against a
   width-26 window's 41,454,105, so 16.3% were invisible to a wider index. Real assembly
@@ -200,8 +202,28 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   create the shared `SNPs_genome/<genome>_enriched/` directory, the loser raising
   `FileExistsError` before writing its chromosome (3 of 6 runs on two small
   chromosomes), which it now creates race-safely, as `enricher.cpp` already did.
+- **`buildTST` ran away on a contig too short to hold one target, for an all-`N` PAM.**
+  Its PAM scan's bounds are `length - k` on an unsigned length, so a sequence shorter than
+  the target window wraps them to about 2^32. For a constrained PAM the scan then read
+  past the sequence and segfaulted, as it always had; the genomic-`N` fix above makes an
+  all-`N` PAM skip that read, so on such a contig the scan instead ran about 2^31
+  iterations pushing indices, reaching 20-28 GB within 15 s until it was killed for
+  memory, on a shared host possibly along with other users' jobs. A header-only FASTA is
+  enough, and the enricher writes one for every chromosome with no carried indel.
+  `searchPAMonGenome` now returns no target for a sequence shorter than
+  `pam_len + max_bulges`, which holds none on either strand, so `buildTST` finishes at
+  once, writes no `.bin` and exits 0 for any PAM, and `index-genome` skips such a contig
+  instead of stopping at it now that `buildTST`'s exit status is checked. Found by the
+  release review. Covered by `test/run_short_contig_test.sh` (header-only, 10-bp and
+  one-base-short contigs; 3′ and 5′ all-`N` and NGG PAMs; under a timeout and a 4 GB
+  memory cap), which the previous code fails at once with `std::bad_alloc`.
 
 ### Known issues
+- **Under `--prune-pam` the profile outputs (`-p`/`-t`) differ from a dedicated index's,**
+  though the targets list is identical as a set. The profiles count the engine's duplicate
+  rows, which only the targets list removes, and how many there are depends on the index
+  tree's shape; their guide label also carries the search PAM padded to the stored width
+  (`…GAGNNNNNNNN` for NGG off a `K = 8` index). CRISPRme does not read the profiles.
 - **At a position carrying more than one SNP record, only the last record's ALT is
   kept.** Normalising a VCF splits a multiallelic site into biallelic records, and each
   record rebuilds the position's IUPAC code from the reference base and overwrites its
