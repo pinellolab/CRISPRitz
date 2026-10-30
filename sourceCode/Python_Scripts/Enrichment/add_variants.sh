@@ -17,10 +17,12 @@
 # 2.9.1 CHANGELOG. Treat any change to either port as requiring that script to
 # pass.
 #
-# NOTE: conda/build.sh compiles this binary and does NOT install it, so a
-# packaged install falls back to enricher.py (crispritz.py `_enricher_command`).
-# Installing it changes which implementation production runs -- a deliberate
-# decision, not a packaging tidy-up.
+# NOTE: as of 2.9.1 conda/build.sh installs this binary into both places
+# crispritz.py's `_enricher_command` checks (PATH, then beside enricher.py), so
+# the compiled port is what a packaged install runs; before that it compiled the
+# binary but never installed it, and packaged installs ran enricher.py. Which
+# implementation production runs is therefore set by the recipe -- change it
+# deliberately, with verify_enricher.sh passing.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

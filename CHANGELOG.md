@@ -58,7 +58,10 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   `enricher.py` through the real `add-variants` CLI on the FULL chr22 of HGDP + 1000
   Genomes -- 1,998,332 records, 4,091 samples, 2.7 GB of output: 1,776 s vs 974 s -- on the
   stage that dominates a from-scratch genome-wide build. Byte-identity holds at that same
-  scale: all five outputs match `enricher.py` hash for hash. `zlib` was
+  scale: all five outputs match `enricher.py` hash for hash. It holds off Linux too:
+  built natively on macOS arm64 (Apple clang, libc++ rather than libstdc++), the port
+  reproduces those five full-chr22 hashes exactly, and so does `enricher.py` under pandas 3
+  (the recipe leaves pandas unpinned, and the indel log goes through a DataFrame). `zlib` was
   already in the recipe's build/host/run deps and `enricher.cpp` carries no OpenMP
   pragmas, so this ships on every platform the other three binaries do, through the same
   compiler invocation. Gated on the byte-identity fix above and on
