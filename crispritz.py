@@ -34,19 +34,23 @@ def _run_checked(argv, what):
     """
     rc = subprocess.run(argv).returncode
     if rc != 0:
-        import signal as _signal
-
-        detail = f"exit code {rc}"
-        if rc < 0:
-            try:
-                detail = f"signal {_signal.Signals(-rc).name}"
-            except ValueError:
-                detail = f"signal {-rc}"
         sys.stderr.write(
-            f"ERROR: {what} failed ({detail}). Its output is incomplete or absent, "
-            f"so it must not be treated as an empty result.\n"
+            f"ERROR: {what} failed ({_exit_detail(rc)}). Its output is incomplete or "
+            f"absent, so it must not be treated as an empty result.\n"
         )
         sys.exit(1)
+
+
+def _exit_detail(rc):
+    """'exit code N', or 'signal NAME' for a child killed by a signal."""
+    if rc >= 0:
+        return f"exit code {rc}"
+    import signal as _signal
+
+    try:
+        return f"signal {_signal.Signals(-rc).name}"
+    except ValueError:
+        return f"signal {-rc}"
 
 if "--debug" in sys.argv[1:]:
     # for quick local tests
@@ -451,7 +455,11 @@ def _enricher_command():
 
 
 def genomeEnrichment_subprocess_VCF(altfile, genfile, dirGenome, doit, dirVCFFiles):
-    subprocess.run(
+    """Enrich one chromosome; return the enricher's exit status for the parent to
+    check. This runs in a Pool worker, so it must not exit the way _run_checked
+    does: a SystemExit kills the worker, its task never returns, and pool.join()
+    waits forever."""
+    return subprocess.run(
         _enricher_command()
         + [
             altfile,
@@ -460,7 +468,7 @@ def genomeEnrichment_subprocess_VCF(altfile, genfile, dirGenome, doit, dirVCFFil
             str(doit),
             dirVCFFiles,
         ]
-    )
+    ).returncode
 
 
 def _enrichment_workers(th_from_flag, th_provided, n_chroms):
@@ -609,6 +617,7 @@ def genomeEnrichment():
 
     print("Variants Extraction and Processing START")
     start_time = time.time()
+    jobs = []
     for elem in listChrs:
         # os.chdir(dirParsedFiles) #enter in parsed file directory
         chrom = ""
@@ -621,13 +630,34 @@ def genomeEnrichment():
         altfile = dirVCFFiles + "/" + elem
         genfile = str(dirGenome + "/" + chrom + contains_enr + ".fa")
         # pool to process TH vcf file in parallel
-        pool.apply_async(
+        jobs.append((elem, pool.apply_async(
             genomeEnrichment_subprocess_VCF,
             args=(altfile, genfile, dirGenome, doit, dirVCFFiles),
-        )
+        )))
     # wait until all threads are completed than join
     pool.close()
     pool.join()
+    # Nothing used to read these results, so an enricher that crashed, was killed
+    # or ran out of disk left add-variants at exit 0 with that chromosome's
+    # enriched genome, SNP dict, indel log and contigs missing or truncated -- and
+    # CRISPRme's index build, which trusts this exit status, went on to index
+    # whatever was there.
+    failed = []
+    for elem, job in jobs:
+        try:
+            rc = job.get()
+        except Exception as e:  # the worker itself raised
+            failed.append((elem, f"{type(e).__name__}: {e}"))
+            continue
+        if rc != 0:
+            failed.append((elem, _exit_detail(rc)))
+    if failed:
+        for elem, detail in failed:
+            sys.stderr.write(
+                f"ERROR: enriching {elem} failed ({detail}). Its enriched genome, SNP "
+                f"dict, indel log and indel contigs are incomplete or absent.\n"
+            )
+        sys.exit(1)
 
     for (
         f

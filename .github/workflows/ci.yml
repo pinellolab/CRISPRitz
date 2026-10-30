@@ -39,24 +39,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # python3-pandas: enricher.py imports pandas, which the runner's python3 does
+      # not ship, so without it the reference port cannot run at all.
       - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends g++ zlib1g-dev
+          sudo apt-get install -y --no-install-recommends g++ zlib1g-dev python3-pandas
 
       # enricher.cpp is meant to be a faithful port of enricher.py, and the
       # packaged install silently falls back to the Python one when the binary is
-      # absent, so the two must not drift. verify_enricher.sh synthesizes a VCF
-      # covering biallelic and multiallelic SNPs, a non-PASS record, an insertion,
-      # a deletion, and a site carrying TWO indel alleles -- the case where a
-      # per-allele window built on the previous allele's output compounds them --
-      # then diffs all four outputs byte-for-byte.
+      # absent, so the two must not drift. verify_enricher.sh synthesizes a VCF of
+      # 17 cases -- biallelic and multiallelic SNPs, a non-PASS record, insertions,
+      # deletions, a site carrying TWO indel alleles (the case where a per-allele
+      # window built on the previous allele's output compounds them), the SNP+indel
+      # combinations, the chromosome edges, and multiallelic SNPs whose ALTs include
+      # '*' -- then diffs all four outputs byte-for-byte, plus the file set and the
+      # run log.
       - name: Build the C++ enricher
         run: g++ -std=c++11 -O2 sourceCode/Python_Scripts/Enrichment/enricher.cpp -o /tmp/enricher_opt -lz
 
       - name: enricher.py vs enricher.cpp, byte-for-byte
         working-directory: sourceCode/Python_Scripts/Enrichment
         run: bash verify_enricher.sh /tmp/enricher_opt
+
+      # add-variants runs one enricher per chromosome in a Pool and used to ignore
+      # their exit status, so a crashed or killed enricher left it at exit 0 with
+      # that chromosome missing. A stub enricher on PATH makes each outcome exact.
+      - name: add-variants fails when an enricher fails
+        run: bash test/run_add_variants_status_test.sh
 
   flank-n:
     name: hard genomic N in the stored PAM/flank region
