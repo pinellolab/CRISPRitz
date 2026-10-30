@@ -50,6 +50,18 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   N-padding (NGG/NRG/NRR/NNNN(4)/6-nt PAM off a K = 8 index with exact PAM
   partitioning), the 8-flank==3-flank NGG equivalence, and the `L > K` hard error.
 
+### Changed
+- **The compiled `enricher` is now installed, so it is the default enrichment path.**
+  `conda/build.sh` copies it to both places `crispritz.py`'s `_enricher_command()`
+  checks — `$PREFIX/bin` (PATH) and beside the reference implementation — matching what
+  CRISPRme's `install_from_source.sh` already did. Measured **1.75x** faster than
+  `enricher.py` on a real `add-variants` run (full chr22, HGDP + 1000 Genomes, 4,091
+  samples), on the stage that dominates a from-scratch genome-wide build. `zlib` was
+  already in the recipe's build/host/run deps and `enricher.cpp` carries no OpenMP
+  pragmas, so this ships on every platform the other three binaries do, through the same
+  compiler invocation. Gated on the byte-identity fix above and on
+  `verify_enricher.sh` covering the shape that broke it.
+
 ### Fixed
 - **The C++ `enricher` dropped a SNP wherever an indel shared its position,** so it was
   not the byte-identical port of `enricher.py` that `add_variants.sh` claimed. Python's
@@ -66,10 +78,19 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   such positions were the **only** bytes differing from `enricher.py` in 50.8 MB
   (`R`→`G` ×39, `Y`→`T` ×38, `M`→`C` ×37, `W`→`T` ×30, `K`→`T` ×20, `S`→`G` ×12); after the
   fix the two ports are byte-identical across all five outputs.
-  **No published index is affected:** `conda/build.sh` compiles `enricher` and never
-  installs it, and the CRISPRme Dockerfile builds only `buildTST`/`searchTST`/
-  `searchBruteForce`, so `_enricher_command()` has always fallen back to `enricher.py`.
-  Verified in the shipped image: no `enricher` binary on `PATH` or beside the reference.
+  **Exposure.** A *packaged* install never ran the compiled port: `conda/build.sh`
+  compiled `enricher` and did not install it, and CRISPRme's Dockerfile built only
+  `buildTST`/`searchTST`/`searchBruteForce`, so `_enricher_command()` fell back to
+  `enricher.py`. Verified inside the shipped image: no `enricher` on `PATH` and none
+  beside the reference. A **source** install is different — CRISPRme's
+  `install_from_source.sh` has compiled and installed the binary to both places
+  `_enricher_command()` checks, so such an install *did* use the C++ port, and an
+  enriched genome it produced is missing the SNP at every position that also carries an
+  indel. **No published index is affected:** the enriched genomes behind them were built
+  through the image, confirmed by direct measurement on the artifacts — chr22:10684299
+  carries a SNP (`C>A`) and an indel (`C>CTATA`) as separate records, and every enriched
+  `chr22.enriched.fa` on the build host holds `M` there (the Python enricher's output),
+  not `C`.
 - **`verify_enricher.sh` could not have caught that** (and did not: it passed). Its
   SNP+indel case put both alleles in ONE multiallelic record, while production VCFs are
   split — 0 of 1,998,332 real chr22 records carry a comma in `ALT`. New case 8 plants a
