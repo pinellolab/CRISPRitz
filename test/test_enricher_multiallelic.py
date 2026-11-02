@@ -325,6 +325,32 @@ class EnricherMultiallelicTests(object):
             "S1:.|1,S4:1|1;%s,%s;h3;0.3" % (ref1(p), a3),
         ])
 
+    def test_dict_passes_conflicting_phase_through(self):
+        """Split records phased independently (as in HGDP + 1000 Genomes) can put two ALTs
+        of one position on ONE haplotype slot: 0|1 under one ALT and 0|1 under the other
+        (chr22:10661629, NA18869), 1|0 and 1|0, or more ALT copies than the slots hold
+        (1|1 and 0|1), up to three ALTs on one slot. The enricher copies every record's
+        genotypes into its entry verbatim -- it neither resolves the conflict nor drops a
+        carrier -- and CRISPRme has to (docs/MULTIALLELIC_ENRICHMENT.md, section 6.3). S4
+        is the consistent case, one ALT per slot."""
+        p = 240
+        a1, a2 = others(p)[:2]
+        recs = [rec(p, "c1", ref1(p), a1, "AC=5;AF=0.625", ["0|1", "1|0", "1|1", "1|0"]),
+                rec(p, "c2", ref1(p), a2, "AC=4;AF=0.5", ["0|1", "1|0", "0|1", "0|1"])]
+        r = self.run_enricher(recs)
+        self.assertEqual(r.entries(p), [
+            "S1:0|1,S2:1|0,S3:1|1,S4:1|0;%s,%s;c1;0.625" % (ref1(p), a1),
+            "S1:0|1,S2:1|0,S3:0|1,S4:0|1;%s,%s;c2;0.5" % (ref1(p), a2)])
+        self.assertEqual(r.base(p), code_of({ref1(p), a1, a2}))
+        q = 245
+        b1, b2, b3 = others(q)
+        recs = [rec(q, "t" + x, ref1(q), x, "AC=1;AF=" + af, ["0|1", "0|0", "0|0", "0|0"])
+                for x, af in ((b1, "0.3"), (b2, "0.001"), (b3, "0.2"))]
+        r = self.run_enricher(recs)
+        self.assertEqual(r.entries(q), ["S1:0|1;%s,%s;t%s;%s" % (ref1(q), x, x, af)
+                                        for x, af in ((b1, "0.3"), (b2, "0.001"), (b3, "0.2"))])
+        self.assertEqual(r.base(q), code_of({ref1(q), b1, b3}))  # b2 is the rarest
+
     def test_record_without_carriers_is_listed(self):
         p = 165
         a1, a2 = others(p)[:2]
