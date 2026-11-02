@@ -31,7 +31,14 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   writes (a full disk used to leave a cut-short `.bin` behind an exit 0) and refuses `-bMax`
   above 31.
 - `crispritz.py index-info <index_dir>` prints each `.bin`'s format and build parameters as
-  JSON, reading only its first and last bytes (the reference reader for CRISPRme).
+  JSON, reading only its header, the start of its body and its last bytes (the reference
+  reader for CRISPRme, docs/INDEX_FORMAT.md section 7), and exits 1 on a `.bin` that
+  `searchTST` would refuse whatever the search, with an `error` entry saying why (an
+  unknown or malformed header, reserved flag bits, `max_bulges` above 31, a cut-short file,
+  a header guide length other than the body's, a header PAM other than the file name's, a
+  leaf count below 1). Its `writes_format`, and `INDEX_FORMAT` in `crispritz.py`, give the
+  index format this CRISPRitz builds, for a reader that must know the format of an index it
+  has just built that holds no `.bin` to read (docs/INDEX_FORMAT.md section 8).
 - `test/run_boundary_test.sh`: sites at every distance from contig ends and `N` runs, both
   strands, 3' and 5' PAMs, dedicated and PAM-less indexes, with and without `--prune-pam`,
   search guides of the index's length and longer and shorter ones (21-nt SaCas9 and 23-nt
@@ -48,8 +55,10 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
 - `test/run_index_format_test.sh`: the format-2 header and trailer, `index-info`, a
   directory mixing both formats, `max_bulges` taken from the header, the reader's
   refusals (cut-short file, PAM side mismatch, unknown version, a header guide length
-  other than the body's, `-bMax` above 31), and the stdout note for a search guide
-  longer or shorter than the index's.
+  other than the body's, `-bMax` above 31), the stdout note for a search guide
+  longer or shorter than the index's, and `index-info` against `searchTST` on 18 files
+  damaged in one way each: both refuse every one, for the same reason, and the reader in
+  docs/INDEX_FORMAT.md section 7 returns what `index-info` does.
 
 ### Changed
 - **New indexes are format 2, which CRISPRitz 2.9.1 and earlier cannot search** (2.9.1

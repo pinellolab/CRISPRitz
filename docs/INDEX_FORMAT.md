@@ -222,13 +222,27 @@ the header and reads the body as format 2; otherwise they are `numLeaves` and th
 file is format 1. Each `.bin` is decoded on its own, so a directory mixing formats
 still searches correctly (though `buildTST` never makes one).
 
-The search refuses, with an error on stderr and exit 1:
+The search refuses, with an error on stderr and exit 1, before it searches (the leaf
+count: as it loads the file):
 
-* a format version it does not know (> 2), or reserved header bits set;
-* a header `pam_len` that differs from the file name's PAM prefix, or a PAM side
-  (3'/5') that differs from the search PAM's;
+* a file it cannot open, or too short to hold the magic (fewer than 4 bytes);
+* a format version it does not know (> 2);
+* a malformed header: the magic followed by a version other than 2, reserved flag bits
+  set, `pam_len` outside 1..1000, `header_len` other than `28 + pam_len`, `guide_len`
+  below 1, or `max_bulges` outside 0..31;
+* a format-2 file cut short: inside its header, or not ending in the trailer;
 * a header `guide_len` that differs from the body's `len_guide` (malformed);
-* a format-2 file that does not end in the trailer (cut short).
+* a header PAM other than the file name's PAM prefix;
+* a leaf count below 1, in either format (2.9.1 refuses that too);
+* and, depending on the search: a search PAM that does not fit the stored PAM width
+  (the file name's PAM prefix; for format 2 also `pam_len`): it must be as wide, or
+  under `--prune-pam` a narrower 3' PAM, N-padded to it (section 12); or a PAM side
+  (3'/5') other than the search PAM's.
+
+`crispritz.py index-info` makes every one of these checks that does not depend on the
+search (section 7). Loading a file, the search also refuses a node count below 1, and
+reports on stderr a flank nibble that is no IUPAC code (both as 2.9.1 did); those lie in
+or past the leaves, which `index-info` does not read.
 
 If `max_bulges` on the command line differs from a format-2 header's, the header
 wins for decoding coordinates and a note goes to stdout (stderr is fatal in
@@ -377,29 +391,104 @@ contig end under `--prune-pam` (B4), or whose PAM ends on a contig's last base (
 
 ## 7. Reading the stamp without loading the tree
 
-Any reader (CRISPRme, scripts) can classify an index from the first bytes of one
-`.bin`. Reference implementation (also `crispritz.py index-info <index_dir>`, which
-prints this for every `.bin` as JSON):
+Any reader (CRISPRme, scripts) can classify an index from the first bytes of its `.bin`
+files, and must refuse what `searchTST` refuses before it relies on them. The function
+below is the reference implementation; it is `crispritz.py`'s own, and
+`test/run_index_format_test.sh` checks that this copy returns what `crispritz.py
+index-info` does for every file of its corpus (good files of both formats, and 18 damaged
+in one way each). `crispritz.py index-info <index_dir>` prints its result for every `.bin`
+of a directory as JSON, with `writes_format`, the format this CRISPRitz builds (its
+`INDEX_FORMAT`, section 8), and exits 1 when the directory holds no `.bin` or a `.bin`
+with an `error` entry.
+
+An `error` entry means `searchTST` refuses the file whatever the search: the function
+makes every check of section 5 that does not depend on the search, in `searchTST`'s order,
+reading the header, the two ints that open the body and the last 4 bytes. (A format-1 file
+of 4 to 7 bytes, which it calls too short, `searchTST` refuses when it reads the node
+count.) A format-1 file has no end marker, so one cut short after its first 8 bytes is not
+seen; nor is damage inside the leaves or the tree of either format, which `searchTST`
+finds only as it loads them, if at all (CRISPRme's `bin_problem` walks the leaves,
+section 8).
 
 ```python
-import struct
-
 CZI_MAGIC = b"CZI\xfe"
 
+
 def read_index_header(path):
-    """Format and build parameters of a CRISPRitz .bin, without reading the tree."""
-    with open(path, "rb") as fh:
+    """The index format and build parameters of the CRISPRitz .bin ``path``, read from
+    its header, the two ints that open its body and its last 4 bytes, without loading
+    the tree (docs/INDEX_FORMAT.md section 7). An "error" entry says why searchTST
+    refuses the file: every check searchTST makes on a file's own bytes and name
+    before it reads its leaves is made here, in the same order. A format-1 file has no
+    end marker, so one cut short after its first 8 bytes is not seen here."""
+    import os
+    import struct
+
+    def refused(info, why):
+        info["error"] = why
+        return info
+
+    try:
+        fh = open(path, "rb")
+    except OSError as exc:
+        return refused({"format": None}, "cannot be opened (%s)" % exc.strerror)
+    with fh:
         head = fh.read(28)
-        if head[:4] != CZI_MAGIC:              # format 1: numLeaves, len_guide
+        if head[:4] != CZI_MAGIC:
+            # format 1 (CRISPRitz <= 2.9.1): no header, the file opens with numLeaves
+            # and len_guide
+            if len(head) < 8:
+                return refused({"format": None}, "too short to be a CRISPRitz index (.bin) file")
             leaves, guide = struct.unpack("=ii", head[:8])
-            return {"format": 1, "num_leaves": leaves, "guide_len": guide}
+            info = {"format": 1, "num_leaves": leaves, "guide_len": guide}
+            if leaves <= 0:
+                return refused(info, "not a valid CRISPRitz index (.bin) file (numLeaves=%d)" % leaves)
+            return info
+        if len(head) < 28:
+            return refused({"format": None}, "cut-short index header")
         version, header_len, flags, guide, pam_len, mb = struct.unpack("=6i", head[4:28])
-        pam = fh.read(pam_len).decode("ascii")
+        info = {
+            "format": version if version >= 2 else None,
+            "pam_at_start": bool(flags & 1),
+            "pamless": bool(flags & 2),
+            "guide_len": guide,
+            "pam_len": pam_len,
+            "max_bulges": mb,
+        }
+        if version > 2:
+            return refused(info, "index format %d, newer than this CRISPRitz reads (formats 1 and "
+                                 "2): update CRISPRitz, or rebuild the index with this one" % version)
+        # bit 0: PAM at the 5' end, bit 1: PAM-less; max_bulges fits pad_valid's 5 bits
+        if (version != 2 or flags & ~3 or not 1 <= pam_len <= 1000 or header_len != 28 + pam_len
+                or guide < 1 or not 0 <= mb <= 31):
+            return refused(info, "malformed index header (version %d, flags %d, PAM length %d, "
+                                 "header length %d, guide length %d, max bulges %d)"
+                           % (version, flags, pam_len, header_len, guide, mb))
+        pam = fh.read(pam_len)
+        info["pam"] = pam.decode("ascii", "replace")
+        if len(pam) < pam_len:
+            return refused(info, "cut-short index header")
+        fh.seek(-4, os.SEEK_END)
+        info["complete"] = fh.read(4) == CZI_MAGIC
+        if not info["complete"]:
+            return refused(info, "cut short: it does not end in the end-of-index marker")
         fh.seek(header_len)
-        leaves = struct.unpack("=i", fh.read(4))[0]
-    return {"format": version, "pam_at_start": bool(flags & 1),
-            "pamless": bool(flags & 2), "guide_len": guide, "pam_len": pam_len,
-            "max_bulges": mb, "pam": pam, "num_leaves": leaves}
+        body = fh.read(8)
+    if len(body) < 8:
+        return refused(info, "cut short: no leaf count and guide length after its header")
+    leaves, body_guide = struct.unpack("=ii", body)
+    info["num_leaves"] = leaves
+    if body_guide != guide:
+        return refused(info, "malformed index: its header gives guide length %d, its body %d"
+                       % (guide, body_guide))
+    # searchTST reads a format-2 file only if its header PAM is its name's prefix
+    named = os.fsencode(os.path.basename(path)).split(b"_", 1)[0]
+    if pam != named:
+        return refused(info, "holds the PAM/flank region '%s' but is named for '%s'"
+                       % (info["pam"], os.fsdecode(named)))
+    if leaves <= 0:
+        return refused(info, "not a valid CRISPRitz index (.bin) file (numLeaves=%d)" % leaves)
+    return info
 ```
 
 ## 8. CRISPRme changes needed
@@ -564,9 +653,19 @@ compared for both versions; the other sizes agree to the byte).
    to the oracle's. Seven searches, two of them with 21- and 19-nt guides on the 20-nt
    index (313 and 427 rows byte-identical to 2.9.1's away from index 0).
 3. **Index format** (`test/run_index_format_test.sh`): header and trailer, `index-info`,
-   a directory mixing both formats, `max_bulges` from the header, the refusals (a
-   header guide length other than the body's among them), and the stdout note for a
-   21- and a 19-nt search guide on a 20-nt index (none for a 20-nt one).
+   `INDEX_FORMAT` against `CZI_FORMAT_VERSION` and the files `buildTST` writes, a
+   directory mixing both formats, `max_bulges` from the header, the refusals (a
+   header guide length other than the body's among them), the stdout note for a
+   21- and a 19-nt search guide on a 20-nt index (none for a 20-nt one), and
+   `index-info` against `searchTST` on 18 files damaged in one way each (every check
+   of section 5 that does not depend on the search, a reserved flag bit, `max_bulges`
+   32 and -1, a header PAM other than the file name's, a leaf count of 0 in either
+   format among them) and, run as a user other than root, an unreadable one: both
+   refuse each, for the same reason, and the reader of section 7 returns what
+   `index-info` does for the 18 and the good files (36). The `index-info` of the
+   previous commit (`520a69a`) accepts 12 of the 18. The boundary suite runs
+   `index-info` on each index it builds (exit 0, nothing on stderr, the header's
+   parameters those of the build).
 4. **Existing tests** (`run_golden_test.sh`, `run_minimal_test.sh`,
    `run_pam_filter_test.sh`, `run_flank_n_test.sh`, `run_short_contig_test.sh`) pass;
    the golden outputs are byte-identical (their genome holds no boundary site).

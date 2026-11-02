@@ -205,6 +205,28 @@ while IFS='|' read -r ispec sspecs; do
     || fail "index-genome ${ipam} -bMax ${mb}: $(tail -3 "${WORK}/${name}.index.log")"
   idx="$(ls -d "${LIB}/genome_library/"*"_${mb}_${name}")"
   echo "--- index ${ipam}, -bMax ${mb}: $(ls "${idx}" | wc -l | tr -d ' ') .bin files"
+  # index-info accepts every .bin of the build (exit 0, nothing on stderr: searchTST
+  # would not refuse one), and a format-2 header holds the build's parameters
+  ( cd "${WORK}" && "${PYTHON}" "${CZ}" index-info "${idx}" > "${name}.info.json" 2> "${name}.info.err" < /dev/null ) \
+    || fail "index-info ${name}: $(head -3 "${WORK}/${name}.info.err")"
+  [ ! -s "${WORK}/${name}.info.err" ] || fail "index-info ${name} wrote to stderr"
+  "${PYTHON}" - "${WORK}/${name}.info.json" "${PAMS}/${ipam}.txt" "${mb}" <<'PY' || fail "index-info ${name}: a header is not the build's"
+import json, sys
+info = json.load(open(sys.argv[1]))
+motif, limit = open(sys.argv[2]).read().split()
+limit, mb = int(limit), int(sys.argv[3])
+pam = motif[:-limit] if limit < 0 else motif[-limit:]
+want = {"format": 2, "pam_at_start": limit < 0, "pamless": set(pam) == {"N"},
+        "guide_len": len(motif) - abs(limit), "pam_len": abs(limit), "max_bulges": mb,
+        "pam": pam, "complete": True}
+assert info["files"], info
+for name, f in info["files"].items():
+    assert "error" not in f and f["num_leaves"] > 0, (name, f)
+    if f["format"] == 2:
+        assert {k: f[k] for k in want} == want, (name, f, want)
+    else:  # format 1: an engine of 2.9.1 or earlier (the KEEP_GOING measurement)
+        assert f["format"] == 1 and f["guide_len"] == want["guide_len"], (name, f)
+PY
   for sspec in ${sspecs}; do
     spam="${sspec%%:*}"; prune="${sspec##*:}"
     gfile="$(guides_for "${spam}")"

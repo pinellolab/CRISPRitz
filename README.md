@@ -256,7 +256,8 @@ to an alignment that would need them. Up to 2.9.1 such targets were dropped,
 even perfect matches within `-bMax` nt of a contig end or an `N` run, a PAM on a contig's last
 bases was never indexed, and a reverse-strand PAM at a contig's first base was reported on
 the `+` strand. Each `.bin` now starts with a header naming its format and build parameters,
-which `crispritz.py index-info` prints without loading the index:
+which `crispritz.py index-info` prints without loading the index (it exits 1, naming the
+file and the reason, if a `.bin` is one the search would refuse):
 
 ```
 crispritz.py index-info genome_library/NGG_2_hg19_ref/

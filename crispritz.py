@@ -18,6 +18,13 @@ origin_path = os.path.dirname(os.path.realpath(__file__))
 conda_path = "opt/crispritz/"
 
 VERSION = "2.9.1"
+# The index format this CRISPRitz's buildTST writes: CZI_FORMAT_VERSION in
+# sourceCode/CRISPR-Cas-Tree/include/indexFormat.h (test/run_index_format_test.sh
+# checks they agree). An index's own format is read from its .bin files
+# (index-info); this is for an index this CRISPRitz has just built that holds no
+# .bin to read (docs/INDEX_FORMAT.md section 8). Read it from this file as CRISPRme
+# reads VERSION. CRISPRitz 2.9.1 and earlier have none and write format 1.
+INDEX_FORMAT = 2
 
 
 def _run_checked(argv, what):
@@ -693,50 +700,98 @@ CZI_MAGIC = b"CZI\xfe"
 
 
 def read_index_header(path):
-    """Index format and build parameters of a CRISPRitz .bin, read from its first and
-    last bytes without loading the tree (docs/INDEX_FORMAT.md section 7)."""
+    """The index format and build parameters of the CRISPRitz .bin ``path``, read from
+    its header, the two ints that open its body and its last 4 bytes, without loading
+    the tree (docs/INDEX_FORMAT.md section 7). An "error" entry says why searchTST
+    refuses the file: every check searchTST makes on a file's own bytes and name
+    before it reads its leaves is made here, in the same order. A format-1 file has no
+    end marker, so one cut short after its first 8 bytes is not seen here."""
+    import os
     import struct
 
-    with open(path, "rb") as fh:
+    def refused(info, why):
+        info["error"] = why
+        return info
+
+    try:
+        fh = open(path, "rb")
+    except OSError as exc:
+        return refused({"format": None}, "cannot be opened (%s)" % exc.strerror)
+    with fh:
         head = fh.read(28)
         if head[:4] != CZI_MAGIC:
+            # format 1 (CRISPRitz <= 2.9.1): no header, the file opens with numLeaves
+            # and len_guide
             if len(head) < 8:
-                return {"format": None, "error": "too short to be a CRISPRitz index"}
+                return refused({"format": None}, "too short to be a CRISPRitz index (.bin) file")
             leaves, guide = struct.unpack("=ii", head[:8])
-            return {"format": 1, "num_leaves": leaves, "guide_len": guide}
+            info = {"format": 1, "num_leaves": leaves, "guide_len": guide}
+            if leaves <= 0:
+                return refused(info, "not a valid CRISPRitz index (.bin) file (numLeaves=%d)" % leaves)
+            return info
         if len(head) < 28:
-            return {"format": None, "error": "cut-short index header"}
+            return refused({"format": None}, "cut-short index header")
         version, header_len, flags, guide, pam_len, mb = struct.unpack("=6i", head[4:28])
         info = {
-            "format": version,
+            "format": version if version >= 2 else None,
             "pam_at_start": bool(flags & 1),
             "pamless": bool(flags & 2),
             "guide_len": guide,
             "pam_len": pam_len,
             "max_bulges": mb,
         }
-        if version == 2 and 0 < pam_len <= 1000 and header_len == 28 + pam_len:
-            info["pam"] = fh.read(pam_len).decode("ascii", "replace")
-            fh.seek(header_len)
-            info["num_leaves"] = struct.unpack("=i", fh.read(4))[0]
-            fh.seek(-4, os.SEEK_END)
-            info["complete"] = fh.read(4) == CZI_MAGIC
+        if version > 2:
+            return refused(info, "index format %d, newer than this CRISPRitz reads (formats 1 and "
+                                 "2): update CRISPRitz, or rebuild the index with this one" % version)
+        # bit 0: PAM at the 5' end, bit 1: PAM-less; max_bulges fits pad_valid's 5 bits
+        if (version != 2 or flags & ~3 or not 1 <= pam_len <= 1000 or header_len != 28 + pam_len
+                or guide < 1 or not 0 <= mb <= 31):
+            return refused(info, "malformed index header (version %d, flags %d, PAM length %d, "
+                                 "header length %d, guide length %d, max bulges %d)"
+                           % (version, flags, pam_len, header_len, guide, mb))
+        pam = fh.read(pam_len)
+        info["pam"] = pam.decode("ascii", "replace")
+        if len(pam) < pam_len:
+            return refused(info, "cut-short index header")
+        fh.seek(-4, os.SEEK_END)
+        info["complete"] = fh.read(4) == CZI_MAGIC
+        if not info["complete"]:
+            return refused(info, "cut short: it does not end in the end-of-index marker")
+        fh.seek(header_len)
+        body = fh.read(8)
+    if len(body) < 8:
+        return refused(info, "cut short: no leaf count and guide length after its header")
+    leaves, body_guide = struct.unpack("=ii", body)
+    info["num_leaves"] = leaves
+    if body_guide != guide:
+        return refused(info, "malformed index: its header gives guide length %d, its body %d"
+                       % (guide, body_guide))
+    # searchTST reads a format-2 file only if its header PAM is its name's prefix
+    named = os.fsencode(os.path.basename(path)).split(b"_", 1)[0]
+    if pam != named:
+        return refused(info, "holds the PAM/flank region '%s' but is named for '%s'"
+                       % (info["pam"], os.fsdecode(named)))
+    if leaves <= 0:
+        return refused(info, "not a valid CRISPRitz index (.bin) file (numLeaves=%d)" % leaves)
     return info
 
 
 def indexInfo():
-    """crispritz.py index-info <index_dir>: the format of every .bin of an index, as
-    JSON on stdout. Exits 1 when the directory holds no .bin or a .bin that is not a
-    whole index of a format this CRISPRitz reads (1 or 2)."""
+    """crispritz.py index-info <index_dir>: the format of every .bin of an index, and
+    the index format this CRISPRitz writes, as JSON on stdout. Exits 1 when the
+    directory holds no .bin, or a .bin that searchTST refuses whatever the search
+    (read_index_header gives it an "error" entry)."""
     import json
 
     if len(sys.argv) < 3 or "help" in sys.argv[2:]:
         print(
             "crispritz.py index-info <index_dir>\n"
             "\nPrints, as JSON, the index format of each .bin of a TST index (1: built by "
-            "CRISPRitz <= 2.9.1; 2: built by 2.9.2 or later, see docs/INDEX_FORMAT.md) and, "
-            "for format 2, the parameters it was built with. Reads only each file's first "
-            "and last bytes."
+            "CRISPRitz <= 2.9.1; 2: built by 2.9.2 or later, see docs/INDEX_FORMAT.md), "
+            "for format 2 the parameters it was built with, and, as writes_format, the "
+            "format this CRISPRitz builds. Reads only each file's header, the start of its "
+            "body and its last bytes. Exits 1 if the directory holds no .bin, or a .bin "
+            "that searchTST would refuse (its \"error\" entry says why)."
         )
         sys.exit()
     index_dir = os.path.realpath(sys.argv[2])
@@ -744,16 +799,21 @@ def indexInfo():
     files = {}
     for name in sorted(listdir(index_dir)):
         path = join(index_dir, name)
-        if name.endswith(".bin") and isfile(path):
+        # the files searchTST takes for trees: regular files named <name>.bin
+        if len(name) > 4 and name.endswith(".bin") and isfile(path):
             files[name] = read_index_header(path)
     formats = sorted({str(i["format"]) for i in files.values()})
-    bad = [n for n, i in files.items() if i["format"] not in (1, 2) or i.get("complete") is False]
-    print(json.dumps({"index": index_dir, "formats": formats, "files": files}, indent=1))
+    bad = [n for n, i in files.items() if "error" in i]
+    print(json.dumps({"index": index_dir, "formats": formats, "writes_format": INDEX_FORMAT,
+                      "files": files}, indent=1))
     if not files or bad:
+        why = ["%s: %s" % (n, files[n]["error"]) for n in bad[:5]]
+        if len(bad) > 5:
+            why.append("and %d more" % (len(bad) - 5))
         sys.stderr.write(
             "ERROR: %s\n"
             % ("no .bin index files in " + index_dir if not files
-               else "not a whole index of a known format: " + ", ".join(bad))
+               else "searchTST would refuse " + "; ".join(why))
         )
         sys.exit(1)
 
