@@ -30,11 +30,12 @@ using namespace std;
  * 	-Added column Cluster Position
  * 
  * Note: all databases created before 25/10/2019 are missing the length of the guide in the .bin file. This search is not compatible.
- * To avoid this issue, comment the line
- * fileTree.read((char *)&offset_guide_len, sizeof(int));
- * and instead write
- * offset_guide_len = 20;
- * (or the right size of the guide the tree was build)
+ * To avoid this issue, replace the read of indexGuideLen in loadTST
+ * fileTree.read((char *)&indexGuideLen, sizeof(int));
+ * with
+ * indexGuideLen = 20;
+ * (or the right size of the guide the tree was build), and skip the guide-length
+ * check and note in main(), which read it from the same place.
  */
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))

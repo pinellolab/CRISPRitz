@@ -564,13 +564,17 @@ compared for both versions; the other sizes agree to the byte).
    to the oracle's. Seven searches, two of them with 21- and 19-nt guides on the 20-nt
    index (313 and 427 rows byte-identical to 2.9.1's away from index 0).
 3. **Index format** (`test/run_index_format_test.sh`): header and trailer, `index-info`,
-   a directory mixing both formats, `max_bulges` from the header, and the refusals.
+   a directory mixing both formats, `max_bulges` from the header, the refusals (a
+   header guide length other than the body's among them), and the stdout note for a
+   21- and a 19-nt search guide on a 20-nt index (none for a 20-nt one).
 4. **Existing tests** (`run_golden_test.sh`, `run_minimal_test.sh`,
    `run_pam_filter_test.sh`, `run_flank_n_test.sh`, `run_short_contig_test.sh`) pass;
    the golden outputs are byte-identical (their genome holds no boundary site).
    `run_short_contig_test.sh` now also requires a contig exactly one target long to
    be indexed.
-5. **AddressSanitizer**: all three binaries, over every test above, on arm64 and amd64.
+5. **AddressSanitizer**: all three binaries, over every test above, on arm64 and amd64
+   (the short-contig test without its `ulimit -v` cap, under which ASan cannot reserve
+   its shadow memory).
 6. **Platforms**: arm64 (Docker on Apple Silicon: g++ 14.2, and `make -f
    Makefile_conda` in `gcc:12`) and amd64 (ml008, g++ 14.2); every test passes on each.
 7. **hg38**: see section 10 for build cost and leaf-level comparison, and:
@@ -605,6 +609,20 @@ compared for both versions; the other sizes agree to the byte).
    * search time, chr22 NGG, the 50 guides, three alternating rounds (wall s): 2.9.1 on
      the format-1 index 81.5 / 87.4 / 80.7, 2.9.2 on it 70.3 / 82.9 / 78.5 (output
      byte-identical each round), 2.9.2 on the format-2 index 79.6 / 81.3 / 80.3.
+   * guide length (section 5.1), chr22, the format-2 NGG `-bMax 2` index (20-nt), the
+     same 50 guides, `-mm 4 -bDNA 1 -bRNA 1`, amd64, this branch against its state
+     before the guide-length fix (`546333f`; the two `buildTST`s build byte-identical
+     `.bin` files):
+     - 20-nt guides: byte-identical output (5,234,321 rows);
+     - 21-nt guides (an `A` added at the far end): 3,264,009 rows; `546333f` reported
+       1,102 more, and those are exactly its rows that are not chr22's bases at their
+       Position (`check_rows.py`), e.g. a "perfect match" at 16,320,445 (-) whose 21st
+       base is an N; at `-bDNA 0 -bRNA 0` the indexed search equals `searchBruteForce`
+       (22,499 rows), where `546333f` had 6 rows more;
+     - 19-nt guides (the far base dropped): 6,020,396 rows, 24 more than `546333f`,
+       all DNA-bulged alignments at sites next to an N run that use no pad base; none
+       lost;
+     - every row of the three searches is chr22's bases at its Position.
 
 ## 12. Not changed
 
