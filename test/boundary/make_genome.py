@@ -22,7 +22,14 @@ from 3, NNGRRT from 6, an 8-wide PAM-less flank from 8; 5': TTTV from t = 4). Th
      a contig end or an N run (IDX-15 at t = L, IDX-4 for t < K), perfect and
      3-mismatch sites;
   C  both sides tight: d = 0..2 and t in {2, 3, 4, 8}, contig ends on both sides;
-  D  an N inside the guide region (never a site), and interior controls.
+  D  an N inside the guide region (never a site), and interior controls;
+  E  for a search guide longer or shorter than the index's (docs/INDEX_FORMAT.md 5.1):
+     the bases beyond the guide's far end are EXT (read outward), so the test's longer
+     guides -- the guide plus EXT[:x] at its far end -- match there: d = 0..4 bases of
+     EXT, then a contig end or an N run, perfect, 2-mismatch and 1-bulge sites, and an
+     interior control; and the guide with its far x = 1, 2 bases cut off by a contig end
+     or an N run, which a shorter guide matches but an index built for this guide's
+     length does not hold.
 
 Each case is written on the + strand as above and, reverse-complemented, on the -
 strand, which also swaps contig start and end. A few IUPAC codes are sprinkled into
@@ -38,6 +45,7 @@ import sys
 GUIDE = "GACTTAGCCTAAGGTCTACG"
 P3 = "TGGAGTCA"
 P5 = "GCAGTTTA"
+EXT = "TCAG"  # E cases: the bases beyond the guide's far end, read outward
 COMP = {"A": "T", "C": "G", "G": "C", "T": "A", "R": "Y", "Y": "R", "S": "S", "W": "W",
         "K": "M", "M": "K", "B": "V", "V": "B", "D": "H", "H": "D", "N": "N"}
 CHANGE = {"A": "C", "C": "A", "G": "T", "T": "G"}
@@ -128,6 +136,34 @@ def main():
     for name in ("m0", "m1", "m4", "dna1", "rna1"):
         add(f"D_interior_{name}", rnd(far, True), name, ctx(8) + rnd(far, True) if side == "3"
             else rnd(far, True) + ctx(8))
+
+    # E: a known context beyond the far end (EXT), then a boundary; and cut guides
+    def ext(d):  # the d bases beyond the far end, in genome (5' -> 3') order
+        return EXT[:d][::-1] if side == "3" else EXT[:d]
+
+    def pamside8():
+        return ctx(8) + rnd(far, True) if side == "3" else rnd(far, True) + ctx(8)
+
+    for btype in ("end", "N"):
+        for d in range(0, 5):
+            for name in ("m0", "m2", "dna1", "rna1"):
+                if side == "3":
+                    distal = ext(d) if btype == "end" else rnd(far, True) + "N" * 8 + ext(d)
+                else:
+                    distal = ext(d) if btype == "end" else ext(d) + "N" * 8 + rnd(far, True)
+                add(f"E_{btype}_d{d}_{name}", distal, name, pamside8())
+    add("E_interior_m0", rnd(far, True) + ext(4) if side == "3" else ext(4) + rnd(far, True),
+        "m0", pamside8())
+    for btype in ("end", "N"):
+        for x in (1, 2):
+            if side == "3":
+                cut = GUIDE[x:]
+                left = "" if btype == "end" else rnd(far, True) + "N" * 8
+                cases.append((f"E_{btype}_cut{x}", left + cut + pamside8()))
+            else:
+                cut = GUIDE[:-x]
+                right = "" if btype == "end" else "N" * 8 + rnd(far, True)
+                cases.append((f"E_{btype}_cut{x}", pamside8() + cut + right))
 
     gdir = os.path.join(out, "genome")
     os.makedirs(gdir, exist_ok=True)

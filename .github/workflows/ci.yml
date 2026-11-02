@@ -160,9 +160,12 @@ jobs:
       # Perfect, 1-4-mismatch and 1-bulge sites at every distance 0..4 from a contig
       # start, a contig end and an N run, both strands, 3' and 5' PAMs, the PAM 0..9
       # bases from an end; dedicated indexes at -bMax 0-3 and PAM-less K=3/K=8 (and
-      # 5' K=4) indexes with and without --prune-pam. Every indexed search, run
-      # through crispritz.py, must equal test/boundary/oracle.py (a brute-force aligner
-      # over the FASTA) as a set of rows, and every 0-bulge one searchBruteForce too.
+      # 5' K=4) indexes with and without --prune-pam; search guides longer and shorter
+      # than the index's (CRISPRme's 21-nt SaCas9 and 23-nt Cas12a guides off 20-nt
+      # indexes). Every indexed search, run through crispritz.py, must equal
+      # test/boundary/oracle.py (a brute-force aligner over the FASTA) as a set of
+      # rows, every row its contig's own bases, every 0-bulge one searchBruteForce too,
+      # and every --prune-pam one the dedicated index of the same guide length.
       - name: Run boundary test (full matrix)
         run: bash test/run_boundary_test.sh
 

@@ -61,6 +61,11 @@ printf 'TTTV%s -4\n' "${N20}"      > "${FIX}/pam_TTTV.txt"
 printf 'GACTTAGCCTAAGGTCTACGNNN\n' > "${FIX}/guide3.txt"
 printf 'GACTTAGCCTAAGGTCTACGNNNNNNNN\n' > "${FIX}/guide8.txt"
 printf 'NNNNGACTTAGCCTAAGGTCTACG\n' > "${FIX}/guide5.txt"
+# guides longer and shorter than the index's 20 nt (docs/INDEX_FORMAT.md 5.1)
+printf 'N%sNGG 3\n' "${N20}"       > "${FIX}/pam_NGG21.txt"
+printf '%sNGG 3\n' "${N20#N}"      > "${FIX}/pam_NGG19.txt"
+printf 'TGACTTAGCCTAAGGTCTACGNNN\n' > "${FIX}/guide21.txt"
+printf 'ACTTAGCCTAAGGTCTACGNNN\n'   > "${FIX}/guide19.txt"
 
 build() {  # <index dir name> <pam file>
   mkdir -p "${FIX}/$1"

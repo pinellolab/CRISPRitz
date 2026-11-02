@@ -67,13 +67,15 @@ static const unsigned char LEAF_SKIP = 0x4;      // a format-1 index-0 artefact 
 
 // What each thread needs to know about the .bin it is searching, set by loadTST:
 // the index format, the max_bulges its coordinates are decoded with (format 2:
-// its header's; format 1: the command line's, as 2.9.1 does) and whether its build
-// PAM is all N.
+// its header's; format 1: the command line's, as 2.9.1 does), whether its build
+// PAM is all N, and offset = the index's guide length minus the search's (2.9.1's
+// offset_guide_len, a global then: each thread now keeps the one of its own .bin).
 struct IndexFacts
 {
 	int format;
 	int mb;
 	bool pamless;
+	int offset;
 };
 vector<IndexFacts> idxFacts;
 
@@ -192,9 +194,13 @@ bool buildPamConstrained = false;
 //    leaf exists only so a shorter PAM can be served (its real PAM bases are tested
 //    above); without the filter it would be reported with a flank that is not there
 //    and, on the minus strand, a coordinate before the contig start;
-//  - an alignment that consumed more pad bases (dnaUsed - rnaUsed) than lie on the
-//    contig before an N or its end (pad_valid). Format 1 stored only whole windows,
-//    so it never skips there.
+//  - an alignment that consumed more pad bases than lie on the contig before an N or
+//    its end (pad_valid). It consumed len_guide + dnaUsed - rnaUsed stored bases, of
+//    which the index's guide region holds the first len_guide + offset (offset = the
+//    index's guide length minus the search's), so dnaUsed - rnaUsed - offset of them
+//    are pad bases: a search guide longer than the index's reaches into the pad even
+//    without a bulge, a shorter one only with DNA bulges. Format 1 stored only whole
+//    windows, so it never skips there.
 static inline bool leafSkipped(const Tleaf &leaf, int thr, int dnaUsed, int rnaUsed)
 {
 	if (leaf.info & LEAF_SKIP)
@@ -206,7 +212,7 @@ static inline bool leafSkipped(const Tleaf &leaf, int thr, int dnaUsed, int rnaU
 	}
 	else if (idxFacts[thr].pamless && (leaf.info & LEAF_FLANK_OFF))
 		return true;
-	return dnaUsed - rnaUsed > (int)leaf.pad_valid;
+	return dnaUsed - rnaUsed - idxFacts[thr].offset > (int)leaf.pad_valid;
 }
 
 //Create matrix for profiling //num_thr = number of layers of the matrix. Each thr update his own layer
@@ -457,8 +463,6 @@ void deSerialize(vector<Tnode> &albero, ifstream &fileTree, vector<bitset<4>> &p
 	} // go to eqkid
 }
 
-int offset_guide_len; //Number to sum to the position column when i create a tree for a 20 len guide and i search a guide with != 20 len
-
 // The header of a .bin (docs/INDEX_FORMAT.md). Format 1 (CRISPRitz <= 2.9.1) has
 // none: its first int is the leaf count. Format 2 starts with CZI_MAGIC.
 struct IndexHeader
@@ -578,9 +582,13 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 	}
 	targetOnDNA[thr].resize(numLeaves);
 
-	fileTree.read((char *)&offset_guide_len, sizeof(int));
-	//offset_guide_len = 20;
-	offset_guide_len = offset_guide_len - len_guide;
+	// The guide length the index was built for. offset (2.9.1's offset_guide_len) is
+	// added to the coordinates of PAM-right windows when the search guide is shorter
+	// or longer than that, and counts the pad bases an alignment consumes (leafSkipped).
+	// main() has checked it against a format-2 header.
+	int indexGuideLen = 0;
+	fileTree.read((char *)&indexGuideLen, sizeof(int));
+	idxFacts[thr].offset = indexGuideLen - len_guide;
 
 	char in = 0;
 	for (int i = 0; i < numLeaves; i++)
@@ -915,22 +923,22 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 				}
 				else
 				{ // PAM-right window (3' PAM: plus strand; 5' PAM: minus strand)
-					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
+					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + idxFacts[thr].offset);
 					if (bulTypeRNA == 0 && bulTypeDNA == 0)
 					{ // X case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + idxFacts[thr].offset);
 					}
 					else if (bulTypeRNA > 0 && bulTypeDNA == 0)
 					{ //RNA case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len - (bulRNA - bR));
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + idxFacts[thr].offset - (bulRNA - bR));
 					}
 					else if (bulTypeRNA == 0 && bulTypeDNA > 0)
 					{ //DNA case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD));
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + idxFacts[thr].offset + (bulDNA - bD));
 					}
 					else
 					{ //DNA case and RNA case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD) - (bulRNA - bR));
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + idxFacts[thr].offset + (bulDNA - bD) - (bulRNA - bR));
 					}
 
 					if (pam_at_start)
@@ -1107,22 +1115,22 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 				}
 				else
 				{ // PAM-right window (3' PAM: plus strand; 5' PAM: minus strand)
-					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
+					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + idxFacts[thr].offset);
 					if (bulTypeRNA == 0 && bulTypeDNA == 0)
 					{ // X case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + idxFacts[thr].offset);
 					}
 					else if (bulTypeRNA > 0 && bulTypeDNA == 0)
 					{ //RNA case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len - (bulRNA - bR));
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + idxFacts[thr].offset - (bulRNA - bR));
 					}
 					else if (bulTypeRNA == 0 && bulTypeDNA > 0)
 					{ //DNA case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD));
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + idxFacts[thr].offset + (bulDNA - bD));
 					}
 					else
 					{ //DNA case and RNA case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD) - (bulRNA - bR));
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + idxFacts[thr].offset + (bulDNA - bD) - (bulRNA - bR));
 					}
 
 					if (pam_at_start)
@@ -1601,9 +1609,12 @@ int main(int argc, char **argv)
 	// format-2 file built for another PAM width or PAM side than the search reads it
 	// with -- before any thread starts. A format-1 file (CRISPRitz <= 2.9.1) has no
 	// header and is searched as 2.9.1 searched it, but for the index-0 fix (IDX-14).
+	// A search guide of another length than the index's is searched (as in 2.9.1),
+	// with a note on stdout saying what that changes (section 5.1).
 	{
 		int nFormat[3] = {0, 0, 0};
 		bool mbNoted = false;
+		vector<int> guideLenNoted;
 		for (size_t f = 0; f < file_stats_vec.size(); ++f)
 		{
 			const string &fn = file_stats_vec[f].file_name;
@@ -1619,6 +1630,36 @@ int main(int argc, char **argv)
 				return 1;
 			}
 			nFormat[h.format]++;
+			// the body opens with numLeaves and the guide length the index was built
+			// for (a file too short for them is refused by loadTST, as in 2.9.1)
+			int body[2];
+			if (hf.read((char *)body, sizeof(body)))
+			{
+				if (h.format == 2 && body[1] != h.guideLen)
+				{
+					cerr << "ERROR: '" << path << "' has a malformed index: its header gives guide length "
+						 << h.guideLen << ", its body " << body[1] << "." << endl;
+					return 1;
+				}
+				int gi = body[1], gs = pamlen - pamlimit, imb = h.format == 2 ? h.mb : max_bulges;
+				if (gi != gs && find(guideLenNoted.begin(), guideLenNoted.end(), gi) == guideLenNoted.end())
+				{
+					// stdout, not stderr: CRISPRme treats any stderr output as a failure
+					guideLenNoted.push_back(gi);
+					cout << "NOTE: the index was built for " << gi << "-nt guides and the search guides are "
+						 << gs << " nt; ";
+					if (gs > gi)
+						cout << "it holds " << gi + imb << " bases a site, so an alignment is found only if its "
+							 << "DNA bulges minus RNA bulges are at most " << gi + imb - gs << " (an index built for "
+							 << gs << "-nt guides with max_bulges " << imb << " allows " << imb << ").";
+					else
+						cout << "it holds a site only if the site's " << gi << "-nt guide region lies on the "
+							 << "contig with no N, so a target within " << gi - gs << " nt of a contig end or "
+							 << "an N run on its side away from the PAM is not found (an index built for " << gs
+							 << "-nt guides finds it).";
+					cout << " See docs/INDEX_FORMAT.md, section 5.1." << endl;
+				}
+			}
 			if (h.format != 2)
 				continue;
 			string prefix = fn.substr(0, fn.find('_'));

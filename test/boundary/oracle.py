@@ -15,8 +15,16 @@ What counts as a target follows docs/INDEX_FORMAT.md section 3 (index format 2):
   matches no PAM letter) -- for a dedicated index (index PAM = search PAM) and for
   --prune-pam off a PAM-less index alike; without --prune-pam on a PAM-less (all-N)
   index of width K the K flank bases must lie inside the contig, whatever they hold;
-* the pad, the mb bases beyond the guide's far end, may only be consumed (by DNA
-  bulges) up to the first base that is off the contig or N.
+* the pad, the mb bases beyond the guide's far end, may only be consumed up to the
+  first base that is off the contig or N.
+
+The guide region of a site is the index's: Gi bases, Gi = the guide length of the PAM
+file the index was built with. The search guide has Gs bases (its own PAM file's), and
+Gs may differ from Gi (section 5.1): a site is still a Gi-base guide region (so a
+shorter guide cannot reach a site whose Gi-base region runs off the contig or holds an
+N), the stored string still has Gi + mb bases, and an alignment that consumes
+Gs + dna - rna of them uses the pad when that exceeds Gi -- without a bulge too, when
+Gs > Gi.
 
 How a guide aligns to a site follows searchTST's search (nearsearch): reading guide and
 target from the PAM outward, each guide base is a match (their IUPAC bits meet; no
@@ -72,16 +80,18 @@ def pam_ok(bases, pattern):
     return True
 
 
-def alignments(T, g, G, mb, pad_valid, mm, bdna, brna):
-    """Every alignment searchTST reports between guide g and stored string T (both
-    read from the PAM outward; T is guide region + pad, length G + mb). Yields
-    (guide columns, target columns, mismatches, dna bulges, rna bulges)."""
-    L = G + mb
-    limit = G + pad_valid  # target bases an alignment may consume
+def alignments(T, g, Gi, mb, pad_valid, mm, bdna, brna):
+    """Every alignment searchTST reports between guide g (Gs = len(g) bases) and stored
+    string T (both read from the PAM outward; T is the index's Gi-base guide region +
+    pad, length Gi + mb). Yields (guide columns, target columns, mismatches, dna
+    bulges, rna bulges)."""
+    Gs = len(g)
+    L = Gi + mb
+    limit = Gi + pad_valid  # target bases an alignment may consume
     out = []
 
     def rec(i, j, d, bD, bR, gc, tc):
-        if i == G:  # the last guide base is placed: report
+        if i == Gs:  # the last guide base is placed: report
             out.append((gc, tc, mm - d, bdna - bD, brna - bR))
             return
         if j >= limit:  # the next target base is not there
@@ -100,7 +110,7 @@ def alignments(T, g, G, mb, pad_valid, mm, bdna, brna):
                 rec(i + 1, j, d, bD, bR - 1, gc + g[i], tc + "-")
             if bD > 0:
                 rec(i, j + 1, d, bD - 1, bR, gc + "-", tc + t)
-        elif i == G - 1:  # the leaf: the last guide base on the last stored base
+        elif i == Gs - 1:  # the leaf: the last guide base on the last stored base
             if match:
                 out.append((gc + g[i], tc + t, mm - d, bdna - bD, brna - bR))
             elif d > 0:
@@ -124,10 +134,11 @@ def main():
     a = ap.parse_args()
 
     spat, side, L, slen = read_pam_file(a.pam)
-    ipat, iside, K, _ = read_pam_file(a.index_pam)
+    ipat, iside, K, ilen = read_pam_file(a.index_pam)
     assert side == iside, "PAM sides differ"
     pamless = set(ipat) == {"N"}
-    G = slen - L
+    Gs = slen - L  # the search guide length
+    Gi = ilen - K  # the guide length the index was built for
     mb = a.mb
     if not a.prune:
         assert K == L, "without --prune-pam the search PAM must have the index's width"
@@ -149,17 +160,17 @@ def main():
             def at(x):
                 return Q[x] if 0 <= x < n else OFF
 
-            for g0 in range(0, n - G + 1):  # guide region Q[g0 : g0 + G]
-                guide_region = Q[g0:g0 + G]
+            for g0 in range(0, n - Gi + 1):  # guide region Q[g0 : g0 + Gi]
+                guide_region = Q[g0:g0 + Gi]
                 if "N" in guide_region:
                     continue
                 if side == "3":
-                    pam = [at(x) for x in range(g0 + G, g0 + G + width)]
+                    pam = [at(x) for x in range(g0 + Gi, g0 + Gi + width)]
                     pad = [at(x) for x in range(g0 - 1, g0 - 1 - mb, -1)]
                     T = guide_region[::-1]
                 else:
                     pam = [at(x) for x in range(g0 - width, g0)]
-                    pad = [at(x) for x in range(g0 + G, g0 + G + mb)]
+                    pad = [at(x) for x in range(g0 + Gi, g0 + Gi + mb)]
                     T = guide_region
                 if flank_only:
                     if any(b is OFF for b in pam):
@@ -172,19 +183,19 @@ def main():
                 T = T + "".join(pad[:pad_valid]) + "A" * (mb - pad_valid)
                 pam_str = "".join(pam)
                 for line in guides:
-                    guide = line[:G] if side == "3" else line[L:L + G]
+                    guide = line[:Gs] if side == "3" else line[L:L + Gs]
                     g = guide[::-1] if side == "3" else guide
-                    for gc, tc, m, dna, rna in alignments(T, g, G, mb, pad_valid,
+                    for gc, tc, m, dna, rna in alignments(T, g, Gi, mb, pad_valid,
                                                          a.mm, a.bdna, a.brna):
-                        consumed = G + dna - rna  # target bases of the alignment
+                        consumed = Gs + dna - rna  # target bases of the alignment
                         if side == "3":
                             crrna = gc[::-1] + "N" * width
                             dna_s = tc[::-1] + pam_str
                             if strand == "+":
-                                pos = g0 + G - consumed
-                                cluster = g0
+                                pos = g0 + Gi - consumed
+                                cluster = g0 + Gi - Gs
                             else:
-                                pos = n - g0 - G - width
+                                pos = n - g0 - Gi - width
                                 cluster = pos
                         else:
                             crrna = "N" * width + gc
@@ -194,7 +205,7 @@ def main():
                                 cluster = pos
                             else:
                                 pos = n - g0 - consumed
-                                cluster = n - g0 - G
+                                cluster = n - g0 - Gs
                         if dna and rna:
                             btype = "RNA,DNA"
                         elif rna:

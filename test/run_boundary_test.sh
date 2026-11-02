@@ -20,7 +20,16 @@
 # set of rows, oracle.py: an independent brute-force aligner that reads the FASTA
 # directly, enumerates the sites of docs/INDEX_FORMAT.md section 3 and aligns with
 # searchTST's alignment rules. Every 0-bulge search must also equal crispritz.py
-# search without bulges, i.e. searchBruteForce, which uses no index.
+# search without bulges, i.e. searchBruteForce, which uses no index. Every row must be
+# its contig's own bases at its position (check_rows.py).
+#
+# Some searches use a guide longer or shorter than the index's (section 5.1: e.g.
+# CRISPRme's 21-nt SaCas9 NNGRRT guides and 23-nt Cas12a TTTV guides off a 20-nt
+# index). A longer guide must equal the brute force at 0 bulges; a shorter one finds
+# a subset of it, missing only the sites whose index-length guide region does not
+# fit, which oracle.py's model of a dedicated index for the shorter guide must equal.
+# And --prune-pam off a PAM-less index must give the same rows as a dedicated index
+# built for the same guide length and -bMax (PAIRS).
 #
 # Configuration via environment variables:
 #   CXX, CXXFLAGS     : compiler and extra flags (e.g. ASan)
@@ -89,54 +98,99 @@ mkpam NGG    "${N20}NGG" 3
 mkpam NRG    "${N20}NRG" 3
 mkpam NG     "${N20}NG" 2
 mkpam NNGRRT "${N20}NNGRRT" 6
+mkpam NNGRRT21 "N${N20}NNGRRT" 6   # CRISPRme's 21bp-NNGRRT-SaCas9.txt: 21-nt guides
+mkpam NGG21  "N${N20}NGG" 3
+mkpam NGG19  "${N20#N}NGG" 3
 mkpam NNN    "${N20}NNN" 3
 mkpam N8     "${N20}NNNNNNNN" 8
 mkpam TTTV   "TTTV${N20}" -4
+mkpam TTTV23 "TTTV${N20}NNN" -4     # CRISPRme's 23bp-TTTV-Cas12a.txt: 23-nt guides
+mkpam TTTV19 "TTTV${N20#N}" -4
 mkpam NNNN5  "NNNN${N20}" -4
 
 pamless() { [ -z "$(sed 's/ .*//' "${PAMS}/$1.txt" | tr -d N)" ]; }  # an all-N PAM
 
 GUIDE="GACTTAGCCTAAGGTCTACG"
 GUIDE2="GACTTAGCCTAAGGTCTAGC"   # two mismatches next to a 3' PAM: a second guide
-guides_for() {  # <pam name> -> guide file padded to that PAM's width
-  local name=$1 line w side
+EXT="TCAG"                      # make_genome.py's E cases: the bases beyond the far end
+glen() {  # <pam name> -> the guide length of that PAM file
+  local line motif w
+  line="$(cat "${PAMS}/$1.txt")"; motif="${line%% *}"; w="${line##* }"; w="${w#-}"
+  echo $(( ${#motif} - w ))
+}
+fit() {  # <guide> <side> <length>: the 20-nt guide cut or extended at its far end
+  local g=$1 side=$2 n=$3 x
+  if [ "${n}" -le 20 ]; then
+    if [ "${side}" = 3 ]; then echo "${g:$((20 - n))}"; else echo "${g:0:${n}}"; fi
+  else
+    x="${EXT:0:$((n - 20))}"
+    if [ "${side}" = 3 ]; then  # EXT reads outward: reversed in front of a 3' guide
+      local r="" i
+      for (( i = ${#x} - 1; i >= 0; i-- )); do r="${r}${x:i:1}"; done
+      echo "${r}${g}"
+    else echo "${g}${x}"; fi
+  fi
+}
+guides_for() {  # <pam name> -> guide file of that PAM's guide length, padded to its width
+  local name=$1 line w side n
   line="$(cat "${PAMS}/${name}.txt")"
   w="${line##* }"
   side=3; [ "${w#-}" != "${w}" ] && side=5 && w="${w#-}"
+  n="$(glen "${name}")"
   local pad; pad="$(printf 'N%.0s' $(seq 1 "${w}"))"
-  local f="${WORK}/guides_${name}.txt"
-  if [ "${side}" = 3 ]; then printf '%s%s\n%s%s\n' "${GUIDE}" "${pad}" "${GUIDE2}" "${pad}" > "${f}"
-  else printf '%s%s\n%s%s\n' "${pad}" "${GUIDE}" "${pad}" "${GUIDE2}" > "${f}"; fi
+  local f="${WORK}/guides_${name}.txt" g1 g2
+  g1="$(fit "${GUIDE}" "${side}" "${n}")"; g2="$(fit "${GUIDE2}" "${side}" "${n}")"
+  if [ "${side}" = 3 ]; then printf '%s%s\n%s%s\n' "${g1}" "${pad}" "${g2}" "${pad}" > "${f}"
+  else printf '%s%s\n%s%s\n' "${pad}" "${g1}" "${pad}" "${g2}" > "${f}"; fi
   echo "${f}"
 }
 
 # --- the matrix
 # index: <side> <index PAM> <max bulges> | <search PAM>:<prune 0|1> ...
+# (NNGRRT21, NGG21, TTTV23: guides longer than the index's 20 nt; NGG19, TTTV19:
+# shorter)
+# PAIRS: <index>.<search PAM>.p1=<index>.<search PAM>.p0 -- a --prune-pam search and a
+# dedicated index of the same guide length and -bMax, which must give the same rows
+# for every search both ran.
 if [ -n "${QUICK}" ]; then
   INDEXES="
 3 NGG 0 | NGG:0
-3 NGG 2 | NGG:0
-3 N8 2 | NGG:1 NG:1 NNGRRT:1 N8:0
+3 NGG 2 | NGG:0 NGG21:0 NGG19:0
+3 NNGRRT 2 | NNGRRT21:0
+3 N8 2 | NGG:1 NG:1 NNGRRT:1 NNGRRT21:1 N8:0
 5 TTTV 2 | TTTV:0
-5 NNNN5 2 | TTTV:1 NNNN5:0"
+5 TTTV 3 | TTTV23:0
+5 NNNN5 2 | TTTV:1 NNNN5:0
+5 NNNN5 3 | TTTV23:1"
   SEARCHES="0,0,0 4,0,0 1,1,0 1,0,1 1,2,2"
+  PAIRS="b3N82.NGG.p1=b3NGG2.NGG.p0 b3N82.NNGRRT21.p1=b3NNGRRT2.NNGRRT21.p0
+b5NNNN52.TTTV.p1=b5TTTV2.TTTV.p0 b5NNNN53.TTTV23.p1=b5TTTV3.TTTV23.p0"
 else
   INDEXES="
 3 NGG 0 | NGG:0
 3 NGG 1 | NGG:0
-3 NGG 2 | NGG:0
+3 NGG 2 | NGG:0 NGG21:0 NGG19:0
 3 NGG 3 | NGG:0
 3 NRG 2 | NRG:0
+3 NNGRRT 2 | NNGRRT:0 NNGRRT21:0
+3 NNGRRT21 2 | NNGRRT21:0
 3 NNN 2 | NGG:1 NRG:1 NG:1 NNN:0
-3 N8 2 | NGG:1 NRG:1 NG:1 NNGRRT:1 N8:0
+3 N8 2 | NGG:1 NRG:1 NG:1 NNGRRT:1 NNGRRT21:1 NGG21:1 NGG19:1 N8:0
 3 N8 1 | NGG:1 N8:0
 5 TTTV 0 | TTTV:0
-5 TTTV 2 | TTTV:0
-5 NNNN5 2 | TTTV:1 NNNN5:0"
+5 TTTV 2 | TTTV:0 TTTV19:0
+5 TTTV 3 | TTTV:0 TTTV23:0
+5 NNNN5 2 | TTTV:1 TTTV19:1 NNNN5:0
+5 NNNN5 3 | TTTV23:1"
   SEARCHES="0,0,0 4,0,0 1,1,0 1,0,1 2,1,1 0,2,0 0,0,2 1,2,2 0,3,0 1,3,1"
+  PAIRS="b3N82.NGG.p1=b3NGG2.NGG.p0 b3N82.NRG.p1=b3NRG2.NRG.p0 b3NNN2.NGG.p1=b3NGG2.NGG.p0
+b3NNN2.NRG.p1=b3NRG2.NRG.p0 b3N82.NNGRRT.p1=b3NNGRRT2.NNGRRT.p0
+b3N82.NNGRRT21.p1=b3NNGRRT2.NNGRRT21.p0 b3N82.NGG21.p1=b3NGG2.NGG21.p0
+b3N82.NGG19.p1=b3NGG2.NGG19.p0 b5NNNN52.TTTV.p1=b5TTTV2.TTTV.p0
+b5NNNN52.TTTV19.p1=b5TTTV2.TTTV19.p0 b5NNNN53.TTTV23.p1=b5TTTV3.TTTV23.p0"
 fi
 
-n_cmp=0; n_bf=0; n_rows=0
+n_cmp=0; n_bf=0; n_rows=0; n_sub=0; n_pair=0; n_chk=0
 LIB="${WORK}/lib"; mkdir -p "${LIB}"
 body() { tail -n +2 "$1" | LC_ALL=C sort; }
 
@@ -174,16 +228,38 @@ while IFS='|' read -r ispec sspecs; do
       rows="$(wc -l < "${WORK}/${tag}.oracle" | tr -d ' ')"
       [ "${rows}" -gt 0 ] || fail "${tag}: no rows (vacuous comparison)"
       n_cmp=$((n_cmp + 1)); n_rows=$((n_rows + rows))
+      # every row is its contig's own bases at its position (independent of the oracle)
+      if ! "${PYTHON}" "${SCRIPT_DIR}/boundary/check_rows.py" "${genome}" "${WORK}/${tag}.targets.txt" \
+           > "${WORK}/${tag}.chk"; then
+        [ -n "${KEEP_GOING:-}" ] || head -5 "${WORK}/${tag}.chk"
+        differs "${tag}: $(tail -1 "${WORK}/${tag}.chk")"
+      fi
+      n_chk=$((n_chk + $(tail -1 "${WORK}/${tag}.chk" | awk '{print $1}')))
       # 0 bulges: the brute-force scan must agree too (it needs real PAM bases, so a
       # PAM-less index searched without --prune-pam, whose flank is unconstrained, is
-      # left out)
+      # left out). A search guide shorter than the index's finds a subset of the
+      # brute force: the sites whose index-length guide region fits; the brute force
+      # then equals the oracle's dedicated index for the shorter guide.
       if [ "${bd}" = 0 ] && [ "${br}" = 0 ] && { [ "${prune}" = 1 ] || ! pamless "${ipam}"; }; then
         ( cd "${WORK}" && "${PYTHON}" "${CZ}" search "${genome}/" "${PAMS}/${spam}.txt" "${gfile}" "${tag}.bf" \
             -mm "${mm}" -th 1 -r > "${tag}.bf.log" 2> "${tag}.bf.err" ) || fail "${tag}: brute-force search failed"
         [ ! -s "${WORK}/${tag}.bf.err" ] || fail "${tag}: brute-force search wrote to stderr"
-        if ! diff <(body "${WORK}/${tag}.targets.txt") <(body "${WORK}/${tag}.bf.targets.txt") > "${WORK}/${tag}.bf.diff"; then
-          [ -n "${KEEP_GOING:-}" ] || { echo "  indexed (<) vs brute force (>):"; head -12 "${WORK}/${tag}.bf.diff"; }
-          differs "${tag}: indexed 0-bulge search != searchBruteForce ($(grep -c '^<' "${WORK}/${tag}.bf.diff" || true) only indexed, $(grep -c '^>' "${WORK}/${tag}.bf.diff" || true) only brute force)"
+        if [ "$(glen "${spam}")" -ge "$(glen "${ipam}")" ]; then
+          if ! diff <(body "${WORK}/${tag}.targets.txt") <(body "${WORK}/${tag}.bf.targets.txt") > "${WORK}/${tag}.bf.diff"; then
+            [ -n "${KEEP_GOING:-}" ] || { echo "  indexed (<) vs brute force (>):"; head -12 "${WORK}/${tag}.bf.diff"; }
+            differs "${tag}: indexed 0-bulge search != searchBruteForce ($(grep -c '^<' "${WORK}/${tag}.bf.diff" || true) only indexed, $(grep -c '^>' "${WORK}/${tag}.bf.diff" || true) only brute force)"
+          fi
+        else
+          only_idx="$(LC_ALL=C comm -23 <(body "${WORK}/${tag}.targets.txt") <(body "${WORK}/${tag}.bf.targets.txt") | wc -l | tr -d ' ')"
+          only_bf="$(LC_ALL=C comm -13 <(body "${WORK}/${tag}.targets.txt") <(body "${WORK}/${tag}.bf.targets.txt") | wc -l | tr -d ' ')"
+          [ "${only_idx}" = 0 ] || differs "${tag}: ${only_idx} rows of the indexed search are not in searchBruteForce's"
+          [ "${only_bf}" -gt 0 ] || differs "${tag}: a guide shorter than the index's found every brute-force row (no cut site lost?)"
+          "${PYTHON}" "${SCRIPT_DIR}/boundary/oracle.py" --genome "${genome}" --guides "${gfile}" \
+            --pam "${PAMS}/${spam}.txt" --index-pam "${PAMS}/${spam}.txt" --mb 0 \
+            --mm "${mm}" --bdna 0 --brna 0 > "${WORK}/${tag}.oracle_ded"
+          diff -q <(body "${WORK}/${tag}.bf.targets.txt") "${WORK}/${tag}.oracle_ded" > /dev/null \
+            || differs "${tag}: searchBruteForce != the oracle's dedicated index for the shorter guide"
+          n_sub=$((n_sub + 1))
         fi
         n_bf=$((n_bf + 1))
       fi
@@ -192,6 +268,20 @@ while IFS='|' read -r ispec sspecs; do
   echo "    ok: every search of ${ipam} -bMax ${mb} == oracle (${n_cmp} comparisons so far)"
 done <<< "${INDEXES}"
 
+# --prune-pam off a PAM-less index == a dedicated index of the same guide length and -bMax
+for pair in ${PAIRS}; do
+  a="${pair%%=*}"; b="${pair##*=}"
+  for s in ${SEARCHES}; do
+    IFS=, read -r mm bd br <<< "${s}"
+    fa="${WORK}/${a}.mm${mm}.b${bd}${br}.targets.txt"; fb="${WORK}/${b}.mm${mm}.b${bd}${br}.targets.txt"
+    [ -f "${fa}" ] && [ -f "${fb}" ] || continue
+    diff -q <(body "${fa}") <(body "${fb}") > /dev/null \
+      || differs "${a} != ${b} at -mm ${mm} -bDNA ${bd} -bRNA ${br}: --prune-pam and the dedicated index differ"
+    n_pair=$((n_pair + 1))
+  done
+done
+[ "${n_pair}" -gt 0 ] || fail "no --prune-pam/dedicated pair was compared"
+
 [ "${n_bad}" = 0 ] || fail "${n_bad} searches differ from their reference"
 echo ""
-echo "boundary test: PASSED (${n_cmp} indexed searches == oracle, ${n_rows} rows; ${n_bf} of them also == searchBruteForce)"
+echo "boundary test: PASSED (${n_cmp} indexed searches == oracle, ${n_rows} rows, ${n_chk} rows checked against their contig; ${n_bf} 0-bulge searches checked against searchBruteForce, ${n_sub} of them with a shorter guide; ${n_pair} --prune-pam searches == the dedicated index)"

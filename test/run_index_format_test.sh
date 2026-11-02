@@ -12,8 +12,12 @@
 #                   decodes coordinates with its own, with a note on stdout (stderr is
 #                   fatal to CRISPRme).
 #   4. REFUSALS   : a cut-short file, a PAM side other than the index's, an unknown future
-#                   format version, and -bMax above 31 at build time each fail with an
-#                   error naming the reason, not a crash or a silent wrong result.
+#                   format version, a header guide length other than the body's, and
+#                   -bMax above 31 at build time each fail with an error naming the
+#                   reason, not a crash or a silent wrong result.
+#   5. GUIDE LENGTH : a search guide longer or shorter than the index's is searched, with
+#                   a note on stdout naming both lengths (docs/INDEX_FORMAT.md 5.1); the
+#                   boundary suite checks its rows.
 #
 # Configuration: CXX, CXXFLAGS, BUILDTST, SEARCHTST (prebuilt binaries), PYTHON,
 # KEEP_WORKDIR.
@@ -103,8 +107,25 @@ printf 'NNNNNNNNNNNNNNNNNNNNNNN -3\n' > n3_5p.txt
 search v2 n3_5p.txt 2 s_side;              refused "5' search PAM on a 3' index" "was built for a PAM at the 3' end" s_side.err
 mkdir -p v3 && cp v2/NGG_f1_1.bin v3/ && printf '\003' | dd of=v3/NGG_f1_1.bin bs=1 seek=4 conv=notrunc 2> /dev/null
 search v3 "${FIX}/pam_NGG.txt" 2 s_v3;     refused "format version 3" "is index format 3" s_v3.err
+mkdir -p glen && cp v2/NGG_f1_1.bin glen/ && printf '\025' | dd of=glen/NGG_f1_1.bin bs=1 seek=16 conv=notrunc 2> /dev/null
+search glen "${FIX}/pam_NGG.txt" 2 s_glen; refused "header guide length 21, body 20" "header gives guide length 21, its body 20" s_glen.err
 mkdir -p b32 && set +e && ( cd b32 && "${BT}" "${FIX}/genome/f1.fa" "${FIX}/pam_NGG.txt" 1 32 > /dev/null 2> ../b32.err ); RC=$?; set -e
 refused "buildTST -bMax 32" "max bulges must be 0 to 31" b32.err
 [ -z "$(ls b32)" ] || fail "buildTST -bMax 32 wrote files"
+
+echo "########## 5. GUIDE LENGTH other than the index's ##########"
+for g in 21 19; do
+  set +e
+  "${ST}" v2/ "${FIX}/guide${g}.txt" 2 1 1 "${FIX}/pam_NGG${g}.txt" "s_g${g}" r 1 2 > "s_g${g}.log" 2> "s_g${g}.err"
+  RC=$?
+  set -e
+  [ "${RC}" = 0 ] && [ ! -s "s_g${g}.err" ] || fail "${g}-nt guides: exit ${RC}, stderr '$(cat "s_g${g}.err")'"
+  [ "$(grep -c "^NOTE: the index was built for 20-nt guides and the search guides are ${g} nt" "s_g${g}.log")" = 1 ] \
+    || fail "${g}-nt guides: no single guide-length note on stdout"
+  [ "$(tail -n +2 "s_g${g}.targets.txt" | wc -l)" -gt 0 ] || fail "${g}-nt guides: no rows"
+  echo "  ok: ${g}-nt guides on the 20-nt index: $(tail -n +2 "s_g${g}.targets.txt" | wc -l | tr -d ' ') rows, one note on stdout"
+done
+search v2 "${FIX}/pam_NGG.txt" 2 s_g20
+! grep -q "^NOTE: the index was built for" s_g20.log || fail "a note for a guide of the index's own length"
 
 echo "index-format test: PASSED"
