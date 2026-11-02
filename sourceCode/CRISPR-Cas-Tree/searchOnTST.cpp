@@ -51,11 +51,12 @@ typedef struct tnode
 typedef struct tleaf
 {
 	int guideIndex; // window start ws, decoded from either format by loadTST
-	char *guideDNA;
 	int next;
-	bitset<4> *guideDNA_bit;
 	unsigned char info;      // LEAF_* bits below, decoded by loadTST
 	unsigned char pad_valid; // pad bases an alignment may consume (format 1: all)
+	// (the two bytes sit in what was padding: a leaf stays 32 bytes, as in 2.9.1)
+	char *guideDNA;
+	bitset<4> *guideDNA_bit;
 } Tleaf;
 
 // Tleaf.info. Format 1 stores the strand in the sign of the leaf index, format 2 in
