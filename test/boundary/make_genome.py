@@ -16,7 +16,7 @@ so the first t context bases decide which PAMs it holds (3': NG from t = 2, NGG/
 from 3, NNGRRT from 6, an 8-wide PAM-less flank from 8; 5': TTTV from t = 4). Then:
 
   A  distal boundary: d = 0..4 random bases, then a contig end or an N run, beyond the
-     guide's far end (the pad side; IDX-13), for perfect, 2-mismatch, 4-mismatch,
+     guide's far end (the pad side; IDX-13), for perfect, 1- to 4-mismatch,
      DNA-bulge and RNA-bulge sites;
   B  PAM-side boundary: t = 0..8 context bases (t = 9: all 8 and one random base), then
      a contig end or an N run (IDX-15 at t = L, IDX-4 for t < K), perfect and
@@ -96,7 +96,7 @@ def main():
     # A: distal boundary at d
     for btype in ("end", "N"):
         for d in range(0, 5):
-            for name in ("m0", "m2", "m4", "dna1", "rna1"):
+            for name in ("m0", "m1", "m2", "m3", "m4", "dna1", "rna1"):
                 inner = rnd(d)
                 if side == "3":
                     distal = inner if btype == "end" else rnd(far, True) + "N" * 8 + inner
