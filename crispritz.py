@@ -686,6 +686,78 @@ def genomeEnrichment():
     print("Runtime: %s seconds" % (time.time() - start_time))
 
 
+# The first and last 4 bytes of an index (.bin) of format 2 (CRISPRitz 2.9.2 on). See
+# docs/INDEX_FORMAT.md: format 1 (CRISPRitz <= 2.9.1) has no header, its first int is
+# the leaf count.
+CZI_MAGIC = b"CZI\xfe"
+
+
+def read_index_header(path):
+    """Index format and build parameters of a CRISPRitz .bin, read from its first and
+    last bytes without loading the tree (docs/INDEX_FORMAT.md section 7)."""
+    import struct
+
+    with open(path, "rb") as fh:
+        head = fh.read(28)
+        if head[:4] != CZI_MAGIC:
+            if len(head) < 8:
+                return {"format": None, "error": "too short to be a CRISPRitz index"}
+            leaves, guide = struct.unpack("=ii", head[:8])
+            return {"format": 1, "num_leaves": leaves, "guide_len": guide}
+        if len(head) < 28:
+            return {"format": None, "error": "cut-short index header"}
+        version, header_len, flags, guide, pam_len, mb = struct.unpack("=6i", head[4:28])
+        info = {
+            "format": version,
+            "pam_at_start": bool(flags & 1),
+            "pamless": bool(flags & 2),
+            "guide_len": guide,
+            "pam_len": pam_len,
+            "max_bulges": mb,
+        }
+        if version == 2 and 0 < pam_len <= 1000 and header_len == 28 + pam_len:
+            info["pam"] = fh.read(pam_len).decode("ascii", "replace")
+            fh.seek(header_len)
+            info["num_leaves"] = struct.unpack("=i", fh.read(4))[0]
+            fh.seek(-4, os.SEEK_END)
+            info["complete"] = fh.read(4) == CZI_MAGIC
+    return info
+
+
+def indexInfo():
+    """crispritz.py index-info <index_dir>: the format of every .bin of an index, as
+    JSON on stdout. Exits 1 when the directory holds no .bin or a .bin that is not a
+    whole index of a format this CRISPRitz reads (1 or 2)."""
+    import json
+
+    if len(sys.argv) < 3 or "help" in sys.argv[2:]:
+        print(
+            "crispritz.py index-info <index_dir>\n"
+            "\nPrints, as JSON, the index format of each .bin of a TST index (1: built by "
+            "CRISPRitz <= 2.9.1; 2: built by 2.9.2 or later, see docs/INDEX_FORMAT.md) and, "
+            "for format 2, the parameters it was built with. Reads only each file's first "
+            "and last bytes."
+        )
+        sys.exit()
+    index_dir = os.path.realpath(sys.argv[2])
+    checkExistance(index_dir, "d")
+    files = {}
+    for name in sorted(listdir(index_dir)):
+        path = join(index_dir, name)
+        if name.endswith(".bin") and isfile(path):
+            files[name] = read_index_header(path)
+    formats = sorted({str(i["format"]) for i in files.values()})
+    bad = [n for n, i in files.items() if i["format"] not in (1, 2) or i.get("complete") is False]
+    print(json.dumps({"index": index_dir, "formats": formats, "files": files}, indent=1))
+    if not files or bad:
+        sys.stderr.write(
+            "ERROR: %s\n"
+            % ("no .bin index files in " + index_dir if not files
+               else "not a whole index of a known format: " + ", ".join(bad))
+        )
+        sys.exit(1)
+
+
 def removeFile(to_remove):
     """
     Remove file given his path in input
@@ -713,6 +785,7 @@ def callHelp():
         "\ncrispritz.py add-variants FUNCTION TO ADD VARIANTS DATA TO A FASTA GENOME",
         "\ncrispritz.py index-genome FUNCTION TO CREATE GENOME INDEX TO PERFORM FAST SEARCHES WITH BULGES",
         "\ncrispritz.py search FUNCTION TO PERFORM SEARCHES ON A GENOME (INDEXED OR PLAIN FASTA)",
+        "\ncrispritz.py index-info FUNCTION TO PRINT THE FORMAT AND BUILD PARAMETERS OF A GENOME INDEX",
         "\n",
         "\nADD help TO ANY FUNCTION TO VISUALIZE A BRIEF HELP PAGE (example: crispritz.py index-genome help)\n",
     )
@@ -728,6 +801,8 @@ elif sys.argv[1] == "search" and ("-bDNA" in sys.argv[1:] or "-bRNA" in sys.argv
     searchTST()
 elif sys.argv[1] == "search":
     searchBruteForce()
+elif sys.argv[1] == "index-info":
+    indexInfo()
 elif sys.argv[1] == "add-variants":
     genomeEnrichment()
 else:

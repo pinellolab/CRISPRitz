@@ -59,6 +59,7 @@ while read -r tag idx guide pam mm bd br prune index0; do
     "${WORK}/${tag}" r 1 2 -1 "${prune}" > "${WORK}/${tag}.log" 2> "${WORK}/${tag}.err" \
     || fail "${tag}: searchTST exited non-zero: $(tail -2 "${WORK}/${tag}.err")"
   [ ! -s "${WORK}/${tag}.err" ] || fail "${tag}: searchTST wrote to stderr: $(head -2 "${WORK}/${tag}.err")"
+  grep -q "INDEX FORMAT: 1 " "${WORK}/${tag}.log" || fail "${tag}: the index was not read as format 1"
   new="${WORK}/${tag}.targets.txt"
   old="${FIX}/expected_291/${tag}.targets.txt"
 

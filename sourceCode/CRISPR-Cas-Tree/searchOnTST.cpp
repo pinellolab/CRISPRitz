@@ -10,6 +10,7 @@
 #include <bitset>
 #include "detailedOutput.h"
 #include "convert.h"
+#include "include/indexFormat.h"
 #include <stdint.h>
 #include <dirent.h> //for directory reading files
 #include <array>
@@ -53,13 +54,27 @@ typedef struct tleaf
 	char *guideDNA;
 	int next;
 	bitset<4> *guideDNA_bit;
-	unsigned char info; // LEAF_* bits below, decoded by loadTST
+	unsigned char info;      // LEAF_* bits below, decoded by loadTST
+	unsigned char pad_valid; // pad bases an alignment may consume (format 1: all)
 } Tleaf;
 
-// Tleaf.info: the index stores the strand in the sign of the leaf index; loadTST
-// turns it into these, so the emit path reads one form.
-static const unsigned char LEAF_LEFT = 0x1; // window = flank|guide|pad (PAM-left)
-static const unsigned char LEAF_SKIP = 0x4; // an index-0 artefact of the builder (IDX-14)
+// Tleaf.info. Format 1 stores the strand in the sign of the leaf index, format 2 in
+// a flag; loadTST turns both into these, so the emit path reads one form.
+static const unsigned char LEAF_LEFT = 0x1;      // window = flank|guide|pad (PAM-left)
+static const unsigned char LEAF_FLANK_OFF = 0x2; // part of the flank is off the contig
+static const unsigned char LEAF_SKIP = 0x4;      // a format-1 index-0 artefact (IDX-14)
+
+// What each thread needs to know about the .bin it is searching, set by loadTST:
+// the index format, the max_bulges its coordinates are decoded with (format 2:
+// its header's; format 1: the command line's, as 2.9.1 does) and whether its build
+// PAM is all N.
+struct IndexFacts
+{
+	int format;
+	int mb;
+	bool pamless;
+};
+vector<IndexFacts> idxFacts;
 
 struct file_stats_struct
 {
@@ -162,19 +177,35 @@ static inline bool pamPrune_reject(const bitset<4> *leafPam)
 }
 // ---- END PROTOTYPE globals ----
 
-// The build PAM region, from the .bin file-name prefix (the only record of it in an
-// index), as bitsets; and whether it constrains any position. Used to recognise the
-// index-0 artefact (see loadTST).
+// The build PAM region, from the .bin file-name prefix (the only record of it in a
+// format-1 index), as bitsets; and whether it constrains any position. Used to
+// recognise the format-1 index-0 artefact (see loadTST).
 vector<bitset<4>> buildPamBit;
 bool buildPamConstrained = false;
 
-// Whether the emit path must skip this leaf: an index-0 artefact (LEAF_SKIP), or,
-// under --prune-pam, a flank incompatible with the search PAM (as before).
-static inline bool leafSkipped(const Tleaf &leaf)
+// Whether the emit path must skip this leaf for an alignment that used dnaUsed DNA
+// and rnaUsed RNA bulges:
+//  - a format-1 index-0 artefact (LEAF_SKIP);
+//  - --prune-pam: a flank incompatible with the search PAM (as before);
+//  - no --prune-pam on a PAM-less index: a flank that runs off the contig. Such a
+//    leaf exists only so a shorter PAM can be served (its real PAM bases are tested
+//    above); without the filter it would be reported with a flank that is not there
+//    and, on the minus strand, a coordinate before the contig start;
+//  - an alignment that consumed more pad bases (dnaUsed - rnaUsed) than lie on the
+//    contig before an N or its end (pad_valid). Format 1 stored only whole windows,
+//    so it never skips there.
+static inline bool leafSkipped(const Tleaf &leaf, int thr, int dnaUsed, int rnaUsed)
 {
 	if (leaf.info & LEAF_SKIP)
 		return true;
-	return PAM_PRUNE && pamPrune_reject(leaf.guideDNA_bit);
+	if (PAM_PRUNE)
+	{
+		if (pamPrune_reject(leaf.guideDNA_bit))
+			return true;
+	}
+	else if (idxFacts[thr].pamless && (leaf.info & LEAF_FLANK_OFF))
+		return true;
+	return dnaUsed - rnaUsed > (int)leaf.pad_valid;
 }
 
 //Create matrix for profiling //num_thr = number of layers of the matrix. Each thr update his own layer
@@ -427,6 +458,85 @@ void deSerialize(vector<Tnode> &albero, ifstream &fileTree, vector<bitset<4>> &p
 
 int offset_guide_len; //Number to sum to the position column when i create a tree for a 20 len guide and i search a guide with != 20 len
 
+// The header of a .bin (docs/INDEX_FORMAT.md). Format 1 (CRISPRitz <= 2.9.1) has
+// none: its first int is the leaf count. Format 2 starts with CZI_MAGIC.
+struct IndexHeader
+{
+	int format = 1;
+	int version = 1;
+	int headerLen = 0;
+	int flags = 0;
+	int guideLen = 0;
+	int pamLen = 0;
+	int mb = 0;
+	string pam;
+};
+
+// Reads the header of the open .bin f, leaving f at the leaf count (the start of
+// the file for format 1, header_len for format 2). Returns false, with the reason
+// in err, for a file it must not read: a format it does not know, a malformed
+// header, or a format-2 file that does not end in the end-of-index marker (cut
+// short, e.g. by a full disk). The marker is checked before any of the tree is
+// read, because deserializing a cut-short tree reads past its end.
+static bool readIndexHeader(ifstream &f, IndexHeader &h, string &err)
+{
+	char m[4];
+	if (!f.read(m, 4))
+	{
+		err = "is too short to be a CRISPRitz index (.bin) file";
+		return false;
+	}
+	if (memcmp(m, CZI_MAGIC, 4) != 0)
+	{
+		h = IndexHeader();
+		f.seekg(0);
+		return true;
+	}
+	int v[6];
+	if (!f.read((char *)v, sizeof(v)))
+	{
+		err = "has a cut-short index header";
+		return false;
+	}
+	h.format = 2;
+	h.version = v[0];
+	h.headerLen = v[1];
+	h.flags = v[2];
+	h.guideLen = v[3];
+	h.pamLen = v[4];
+	h.mb = v[5];
+	if (h.version > CZI_FORMAT_VERSION)
+	{
+		err = "is index format " + to_string(h.version) + ", which is newer than this CRISPRitz " +
+			  "reads (formats 1 and 2): update CRISPRitz, or rebuild the index with this one";
+		return false;
+	}
+	if (h.version != CZI_FORMAT_VERSION || (h.flags & ~CZI_FLAG_KNOWN) != 0 || h.pamLen < 1 ||
+		h.pamLen > 1000 || h.headerLen != CZI_HEADER_FIXED + h.pamLen || h.guideLen < 1 ||
+		h.mb < 0 || h.mb > CZI_MAX_BULGES)
+	{
+		err = "has a malformed index header (version " + to_string(h.version) + ", flags " +
+			  to_string(h.flags) + ", PAM length " + to_string(h.pamLen) + ", header length " +
+			  to_string(h.headerLen) + ")";
+		return false;
+	}
+	h.pam.assign(h.pamLen, ' ');
+	if (!f.read(&h.pam[0], h.pamLen))
+	{
+		err = "has a cut-short index header";
+		return false;
+	}
+	char t[4];
+	f.seekg(-4, ios::end);
+	if (!f.read(t, 4) || memcmp(t, CZI_MAGIC, 4) != 0)
+	{
+		err = "is cut short: it does not end in the end-of-index marker";
+		return false;
+	}
+	f.seekg(h.headerLen);
+	return true;
+}
+
 /**
  * Function that recreates the TST starting from the .bin file. In the first part, the array of leaves is read and the PAM are converted
  * from a 4 bits representation to a IUPAC nucleotide. After that, the deSerialize function is called to recreate the TST
@@ -440,6 +550,20 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 {
 	int thr = omp_get_thread_num();
 	fileTree.open(path, ios::in | ios::binary);
+
+	// main() has already read every header and refused a bad one; read this file's
+	// again, for this thread. Format 2 decodes coordinates with its own max_bulges,
+	// format 1 with the command line's, as 2.9.1 did.
+	IndexHeader hdr;
+	string hdrErr;
+	if (!readIndexHeader(fileTree, hdr, hdrErr))
+	{
+		cerr << "ERROR: '" << path << "' " << hdrErr << "." << endl;
+		exit(1);
+	}
+	idxFacts[thr].format = hdr.format;
+	idxFacts[thr].mb = hdr.format == 2 ? hdr.mb : max_bulges;
+	idxFacts[thr].pamless = hdr.format == 2 ? (hdr.flags & CZI_FLAG_PAMLESS) != 0 : !buildPamConstrained;
 
 	fileTree.read((char *)&numLeaves, sizeof(int)); // read number of leaves
 	// Defense-in-depth: refuse to load a non-tree file (it should already be filtered to
@@ -575,35 +699,51 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 		// cout << "pam rna read " << str << endl;
 
 		Tleaf &leaf = targetOnDNA[thr][i];
-		fileTree.get(in); // read index of next PAM with same guide
-		if (in == '0')
-			leaf.next = 0;
-		else
-			fileTree.read((char *)&leaf.next, sizeof(int));
+		fileTree.get(in); // format 1: '0' or '_' and the next leaf; format 2: the leaf flags
+		if (hdr.format == 1)
+		{
+			if (in == '0')
+				leaf.next = 0;
+			else
+				fileTree.read((char *)&leaf.next, sizeof(int));
 
-		// The sign of a leaf index is the strand: < 0 is a PAM-left window (3' PAM
-		// minus strand, 5' PAM plus strand) at -index, > 0 a PAM-right one. Index 0 is
-		// ambiguous: the builder makes it PAM-left for a 3' PAM and PAM-right for a 5'
-		// one, so read it the same way (IDX-14; 2.9.1 read index 0 as PAM-right for
-		// both, so a reverse-strand PAM at a contig's first base came out on the +
-		// strand).
-		int gi = leaf.guideIndex;
-		leaf.guideIndex = gi < 0 ? -gi : gi;
-		leaf.info = (gi < 0 || (gi == 0 && !pam_at_start)) ? LEAF_LEFT : 0;
-		// The builder also took a window of the OTHER shape that starts at 0 (a 3'
-		// PAM-right window whose guide starts at max_bulges, a 5' PAM-left one whose PAM
-		// is at base 0) for index 0, and stored it from the wrong bases. Its flank then
-		// matches the build PAM only where those bases hold a real PAM of the shape
-		// index 0 is read as -- and then it is that real window, which the scan found
-		// too. So an index-0 flank that fails the build PAM is such an artefact: drop
-		// it. (An all-N build PAM: every window is real, nothing to drop.)
-		if (gi == 0 && buildPamConstrained)
-			for (size_t j = 0; j < buildPamBit.size() && j < pamRNA.size(); j++)
-				if ((leaf.guideDNA_bit[j] & buildPamBit[j]).none())
-				{
-					leaf.info |= LEAF_SKIP;
-					break;
-				}
+			// The sign of a format-1 leaf index is the strand: < 0 is a PAM-left window
+			// (3' PAM minus strand, 5' PAM plus strand) at -index, > 0 a PAM-right one.
+			// Index 0 is ambiguous: the 2.9.1 builder makes it PAM-left for a 3' PAM and
+			// PAM-right for a 5' one, so read it the same way (IDX-14; 2.9.1 read index
+			// 0 as PAM-right for both, so a reverse-strand PAM at a contig's first base
+			// came out on the + strand).
+			int gi = leaf.guideIndex;
+			leaf.guideIndex = gi < 0 ? -gi : gi;
+			leaf.info = (gi < 0 || (gi == 0 && !pam_at_start)) ? LEAF_LEFT : 0;
+			leaf.pad_valid = 255; // format 1 kept only windows that fit: the whole pad is real
+			// That builder also took a window of the OTHER shape that starts at 0 (a 3'
+			// PAM-right window whose guide starts at max_bulges, a 5' PAM-left one whose
+			// PAM is at base 0) for index 0, and stored it from the wrong bases. Its flank
+			// then matches the build PAM only where those bases hold a real PAM of the
+			// shape index 0 is read as -- and then it is that real window, which the scan
+			// found too. So an index-0 flank that fails the build PAM is such an artefact:
+			// drop it. (An all-N build PAM: every window is real, nothing to drop.)
+			if (gi == 0 && buildPamConstrained)
+				for (size_t j = 0; j < buildPamBit.size() && j < pamRNA.size(); j++)
+					if ((leaf.guideDNA_bit[j] & buildPamBit[j]).none())
+					{
+						leaf.info |= LEAF_SKIP;
+						break;
+					}
+		}
+		else
+		{
+			unsigned char lflags = (unsigned char)in;
+			if (lflags & CZI_LEAF_HAS_NEXT)
+				fileTree.read((char *)&leaf.next, sizeof(int));
+			else
+				leaf.next = 0;
+			// format 2 stores the window start itself, signed, and the shape in a flag
+			leaf.info = ((lflags & CZI_LEAF_PAM_LEFT) ? LEAF_LEFT : 0) |
+						((lflags & CZI_LEAF_FLANK_OFF) ? LEAF_FLANK_OFF : 0);
+			leaf.pad_valid = lflags & CZI_LEAF_PAD_MASK;
+		}
 	}
 
 	fileTree.read((char *)&numNodes, sizeof(int)); // read number of nodes
@@ -696,8 +836,10 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 			// the index is PAM-less so the descent still visits every node; we only
 			// avoid writing the excluded-PAM entries. Advancing `index` to the next
 			// entry then `continue` mirrors the normal end-of-loop advance below.
-			// leafSkipped also drops the index-0 artefact of the builder.
-			if (leafSkipped(targetOnDNA[thr][index]))
+			// leafSkipped also drops the leaves a format-2 index stores for boundary
+			// sites when this alignment needs bases they lack (pad or flank off the
+			// contig), and the format-1 index-0 artefact.
+			if (leafSkipped(targetOnDNA[thr][index], thr, bulDNA - bD, bulRNA - bR))
 			{
 				index = (targetOnDNA[thr][index].next + 1) * -1;
 				continue;
@@ -772,22 +914,22 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 				}
 				else
 				{ // PAM-right window (3' PAM: plus strand; 5' PAM: minus strand)
-					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
+					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
 					if (bulTypeRNA == 0 && bulTypeDNA == 0)
 					{ // X case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
 					}
 					else if (bulTypeRNA > 0 && bulTypeDNA == 0)
 					{ //RNA case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len - (bulRNA - bR));
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len - (bulRNA - bR));
 					}
 					else if (bulTypeRNA == 0 && bulTypeDNA > 0)
 					{ //DNA case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD));
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD));
 					}
 					else
 					{ //DNA case and RNA case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD) - (bulRNA - bR));
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD) - (bulRNA - bR));
 					}
 
 					if (pam_at_start)
@@ -891,8 +1033,10 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 			// On-the-fly PAM filter (bulge path): skip this leaf entry BEFORE
 			// emitting if its stored concrete flank PAM is incompatible with the
 			// search PAM. Same semantics as saveIndices; advance to the next entry.
-			// leafSkipped also drops the index-0 artefact of the builder.
-			if (leafSkipped(targetOnDNA[thr][index]))
+			// leafSkipped also drops the leaves a format-2 index stores for boundary
+			// sites when this alignment needs bases they lack (pad or flank off the
+			// contig), and the format-1 index-0 artefact.
+			if (leafSkipped(targetOnDNA[thr][index], thr, bulDNA - bD, bulRNA - bR))
 			{
 				index = (targetOnDNA[thr][index].next + 1) * -1;
 				continue;
@@ -962,22 +1106,22 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 				}
 				else
 				{ // PAM-right window (3' PAM: plus strand; 5' PAM: minus strand)
-					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
+					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
 					if (bulTypeRNA == 0 && bulTypeDNA == 0)
 					{ // X case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
 					}
 					else if (bulTypeRNA > 0 && bulTypeDNA == 0)
 					{ //RNA case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len - (bulRNA - bR));
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len - (bulRNA - bR));
 					}
 					else if (bulTypeRNA == 0 && bulTypeDNA > 0)
 					{ //DNA case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD));
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD));
 					}
 					else
 					{ //DNA case and RNA case
-						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD) - (bulRNA - bR));
+						cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + idxFacts[thr].mb - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len + (bulDNA - bD) - (bulRNA - bR));
 					}
 
 					if (pam_at_start)
@@ -1445,11 +1589,67 @@ int main(int argc, char **argv)
 	}
 	// ---- END PAM filter length guard + N-padding ----
 
-	// The build PAM, for recognising the index-0 artefact in loadTST.
+	// The build PAM, for recognising the format-1 index-0 artefact in loadTST.
 	buildPamBit = pamPrune_bit_conversion(index_pam_prefix);
 	for (size_t j = 0; j < buildPamBit.size(); j++)
 		if (!buildPamBit[j].all())
 			buildPamConstrained = true;
+
+	// Read every .bin's header before searching (docs/INDEX_FORMAT.md): refuse a
+	// format this engine does not know, a malformed or cut-short format-2 file, and a
+	// format-2 file built for another PAM width or PAM side than the search reads it
+	// with -- before any thread starts. A format-1 file (CRISPRitz <= 2.9.1) has no
+	// header and is searched as 2.9.1 searched it, but for the index-0 fix (IDX-14).
+	{
+		int nFormat[3] = {0, 0, 0};
+		bool mbNoted = false;
+		for (size_t f = 0; f < file_stats_vec.size(); ++f)
+		{
+			const string &fn = file_stats_vec[f].file_name;
+			string path = string(genome_dir) + "/" + fn;
+			ifstream hf(path, ios::in | ios::binary);
+			IndexHeader h;
+			string err;
+			if (!hf)
+				err = "cannot be opened";
+			if (!err.empty() || !readIndexHeader(hf, h, err))
+			{
+				cerr << "ERROR: '" << path << "' " << err << "." << endl;
+				return 1;
+			}
+			nFormat[h.format]++;
+			if (h.format != 2)
+				continue;
+			string prefix = fn.substr(0, fn.find('_'));
+			if (h.pam != prefix || (size_t)h.pamLen != pamRNA.size())
+			{
+				cerr << "ERROR: '" << path << "' holds a " << h.pamLen << "-nt PAM/flank region ('"
+					 << h.pam << "') but is named for '" << prefix << "' and searched at "
+					 << pamRNA.size() << " nt; refusing to read it." << endl;
+				return 1;
+			}
+			if (((h.flags & CZI_FLAG_PAM_AT_START) != 0) != pam_at_start)
+			{
+				cerr << "ERROR: '" << path << "' was built for a PAM at the "
+					 << ((h.flags & CZI_FLAG_PAM_AT_START) ? "5'" : "3'") << " end, but the search PAM is at the "
+					 << (pam_at_start ? "5'" : "3'") << " end (the sign of the PAM file's length)." << endl;
+				return 1;
+			}
+			if (h.mb != max_bulges && !mbNoted)
+			{
+				// stdout, not stderr: CRISPRme treats any stderr output as a failure
+				cout << "NOTE: the index was built with max_bulges=" << h.mb << " (command line: "
+					 << max_bulges << "); its coordinates are decoded with " << h.mb << "." << endl;
+				mbNoted = true;
+			}
+		}
+		cout << "INDEX FORMAT:";
+		if (nFormat[1])
+			cout << " 1 (CRISPRitz <= 2.9.1) x" << nFormat[1];
+		if (nFormat[2])
+			cout << " 2 x" << nFormat[2];
+		cout << endl;
+	}
 
 	sort(file_stats_vec.begin(), file_stats_vec.end(), compareBySize);
 
@@ -1526,6 +1726,7 @@ int main(int argc, char **argv)
 	chrName_glb.resize(num_thr);
 	guideI.resize(num_thr);
 	targetOnDNA.resize(num_thr);
+	idxFacts.resize(num_thr);
 	albero_glb.resize(num_thr);
 	ti.resize(num_thr);
 	gi.resize(num_thr);

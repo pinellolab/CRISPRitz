@@ -149,7 +149,7 @@ endian on every platform CRISPRitz is built for), exactly as format 1.
 header
   off  size  field
   0    4     magic        bytes 43 5A 49 FE ("CZI" 0xFE); as an int32 it is
-                          negative (-28,681,661), so a format-1 reader refuses it
+                          negative (-28,747,197), so a format-1 reader refuses it
   4    4     version      2
   8    4     header_len   28 + K: offset of numLeaves
   12   4     flags        bit 0: PAM at the 5' end; bit 1: PAM-less (all-N) build
@@ -242,7 +242,7 @@ rebuild adds them.
 | | format-1 index (built by <= 2.9.1) | format-2 index (built by 2.9.2) |
 |-|------------------------------------|----------------------------------|
 | CRISPRitz <= 2.9.0 | as before | fails loudly: `numLeaves` negative, `std::length_error` |
-| CRISPRitz 2.9.1 | as before | fails loudly: `'...' is not a valid CRISPRitz index (.bin) file (numLeaves=-28681661)`, exit 1 |
+| CRISPRitz 2.9.1 | as before | fails loudly: `'...' is not a valid CRISPRitz index (.bin) file (numLeaves=-28747197)`, exit 1 |
 | CRISPRitz 2.9.2 searchTST | byte-identical to 2.9.1 except index-0 rows (B1) | full B1-B4 semantics |
 | CRISPRitz 2.9.2 searchBruteForce | - (no index) | - ; B2 applies at once |
 

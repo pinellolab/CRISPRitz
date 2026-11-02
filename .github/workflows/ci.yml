@@ -140,6 +140,26 @@ jobs:
       - name: Run format-1 compatibility test
         run: bash test/run_format1_test.sh
 
+  boundary:
+    name: sites at contig ends and N runs == independent brute-force oracle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+
+      # Perfect, 1-4-mismatch and 1-bulge sites at every distance 0..4 from a contig
+      # start, a contig end and an N run, both strands, 3' and 5' PAMs, the PAM 0..9
+      # bases from an end; dedicated indexes at -bMax 0-3 and PAM-less K=3/K=8 (and
+      # 5' K=4) indexes with and without --prune-pam. Every indexed search, run
+      # through crispritz.py, must equal test/boundary/oracle.py (a brute-force aligner
+      # over the FASTA) as a set of rows, and every 0-bulge one searchBruteForce too.
+      - name: Run boundary test (full matrix)
+        run: bash test/run_boundary_test.sh
+
   asan:
     name: AddressSanitizer (#105 regression guard, WTN + DNA bulge)
     runs-on: ubuntu-latest
@@ -165,6 +185,18 @@ jobs:
           CXXFLAGS: "-fsanitize=address -g -O1"
           # No leak detection: we only guard against memory-safety errors
           # (heap-buffer-overflow / invalid free), and abort on any ASan error.
+          ASAN_OPTIONS: "detect_leaks=0:abort_on_error=1"
+
+      # The boundary suite under ASan: all three binaries (buildTST, searchTST,
+      # searchBruteForce) instrumented, over index format 2's boundary sites (pad
+      # and flank off the contig, signed window starts) and the format-1 reader.
+      - name: Run ASan boundary + format-1 tests
+        run: |
+          QUICK=1 bash test/run_boundary_test.sh
+          bash test/run_format1_test.sh
+        env:
+          OMP_NUM_THREADS: "1"
+          CXXFLAGS: "-fsanitize=address -g -O1"
           ASAN_OPTIONS: "detect_leaks=0:abort_on_error=1"
 
   arm64-build:

@@ -1,4 +1,5 @@
 #include "pamGenerator.cpp"
+#include "include/indexFormat.h"
 #include <iostream>
 #include <ostream>
 #include <omp.h>
@@ -34,11 +35,12 @@ typedef struct tnode
 
 typedef struct tleaf
 {
-	int guideIndex;
+	int guideIndex; // window start ws (signed; see PamSite in pamGenerator.cpp)
 	//INSERIRE BITSET CON bitset<#sample> CHE CONTIENE INFO SAMPLES
 	string guideDNA;
 	string pamDNA;
 	int next;
+	unsigned char lflags; // CZI_LEAF_PAM_LEFT | CZI_LEAF_FLANK_OFF | pad_valid (HAS_NEXT is added at save)
 } Tleaf;
 
 #define MAXWORDS 32000000
@@ -57,22 +59,110 @@ int gruppo;
 bool pam_at_start;
 int len_guide_used;
 
-//a hard 'N' in the guide region makes a target unusable, so it is discarded: it
-//would otherwise reach the tree, which has no encoding for 'N' in a guide. An
-//'N' in the PAM region is kept instead of discarding the whole target: it is
-//stored as the 0000 nibble, which intersects nothing, so the PAM the user
-//searches with decides the target just as it does on a dedicated PAM index.
-//pam_in_front says which end of the extracted window holds the PAM. That depends
-//on the PAM side AND the strand, so every caller passes the end it then slices
-//the PAM from rather than having it inferred here.
-bool guideRegionHasN(string target, bool pam_in_front)
+int max_bulges_g;	   // max_bulges, the pad width
+bool pam_unconstrained_g; // the build PAM is all N
+
+//the window of a site, pam_len + max_bulges bases from ws, with every position off the
+//contig written as 'N'. Off-contig and genomic N are treated alike from here on: in
+//the flank both are the 0000 nibble, which matches no PAM letter; in the pad both end
+//the bases an alignment may consume; in the guide both discard the site.
+string siteWindow(int ws, int width)
 {
-	size_t pam_width = pamRNA.length();
-	if (target.length() <= pam_width)
-		return target.find('N') != string::npos;
-	if (pam_in_front)
-		return target.find('N', pam_width) != string::npos;
-	return target.find('N') < target.length() - pam_width;
+	long n = (long)chrSeq.size();
+	if (ws >= 0 && (long)ws + width <= n)
+		return chrSeq.substr(ws, width);
+	string w(width, 'N');
+	for (int i = 0; i < width; i++)
+	{
+		long p = (long)ws + i;
+		if (p >= 0 && p < n)
+			w[i] = chrSeq[p];
+	}
+	return w;
+}
+
+//complement, base by base, of a window (IUPAC codes to their complements, N to N)
+string complementSeq(const string &target)
+{
+	string tmp;
+	tmp.reserve(target.size());
+	for (char c : target) //complemento dei nucleotidi per pam negativa
+		switch (c)
+		{
+		case 'A':
+			tmp += 'T';
+			break;
+		case 'T':
+			tmp += 'A';
+			break;
+		case 'C':
+			tmp += 'G';
+			break;
+		case 'G':
+			tmp += 'C';
+			break;
+		case 'R':
+			tmp += 'Y';
+			break;
+		case 'Y':
+			tmp += 'R';
+			break;
+		case 'S':
+			tmp += 'S';
+			break;
+		case 'W':
+			tmp += 'W';
+			break;
+		case 'M':
+			tmp += 'K';
+			break;
+		case 'K':
+			tmp += 'M';
+			break;
+		case 'H':
+			tmp += 'D';
+			break;
+		case 'D':
+			tmp += 'H';
+			break;
+		case 'B':
+			tmp += 'V';
+			break;
+		case 'V':
+			tmp += 'B';
+			break;
+		case 'N':
+			tmp += 'N';
+			break;
+		default:
+			cerr << "The character (" << c << ") of the PAM is not part of the IUPAC nucleotide nomenclature" << endl;
+			tmp += 'N';
+			break;
+		}
+	return tmp;
+}
+
+//Applies the format-2 rules to a leaf whose guideDNA (the TST string: the guide read
+//from the PAM outward, then the pad) and pamDNA are set. Returns false when the site is
+//to be discarded: a hard 'N' (or a base off the contig) in the GUIDE region, which the
+//tree has no encoding for. In the pad, the bases before the first 'N' or off-contig
+//position are the ones an alignment may consume (pad_valid); the rest are stored as
+//'A' -- an alignment that reaches them is rejected at search time whatever they hold,
+//so any symbol of the tree's alphabet serves. Until 2.9.1 an 'N' in the pad discarded
+//the whole site, though a 0-bulge alignment needs none of it (IDX-13). An 'N' in the
+//flank is kept as the 0000 nibble, as in 2.9.1. flank_off: part of the flank lies off
+//the contig (only an all-N PAM stores such a site).
+bool finishLeaf(Tleaf &leaf, bool left, bool flank_off)
+{
+	size_t guide_len = leaf.guideDNA.size() - max_bulges_g;
+	if (leaf.guideDNA.find('N') < guide_len)
+		return false;
+	size_t first_n = leaf.guideDNA.find('N', guide_len);
+	int pad_valid = first_n == string::npos ? max_bulges_g : (int)(first_n - guide_len);
+	for (size_t i = guide_len + pad_valid; i < leaf.guideDNA.size(); i++)
+		leaf.guideDNA[i] = 'A';
+	leaf.lflags = (left ? CZI_LEAF_PAM_LEFT : 0) | (flank_off ? CZI_LEAF_FLANK_OFF : 0) | (unsigned char)pad_valid;
+	return true;
 }
 
 // function that inserts a guide DNA in TST
@@ -347,7 +437,22 @@ void saveTST(int inizio, int fine, int part)
 {
 	double start, end;
 	int arrayDim = fine - inizio;
-	fileTree.open(pamRNA + "_" + chrName + "_" + to_string(part) + ".bin", ios::out | ios::binary);
+	string fileName = pamRNA + "_" + chrName + "_" + to_string(part) + ".bin";
+	fileTree.open(fileName, ios::out | ios::binary);
+	if (!fileTree.is_open())
+	{
+		cerr << "ERROR: cannot create the index file '" << fileName << "'." << endl;
+		exit(1);
+	}
+
+	// format-2 header (docs/INDEX_FORMAT.md): magic, version, header length, flags,
+	// guide length, PAM length, max bulges, then the build PAM region
+	int header[6] = {CZI_FORMAT_VERSION, CZI_HEADER_FIXED + (int)pamRNA.size(),
+					 (pam_at_start ? CZI_FLAG_PAM_AT_START : 0) | (pam_unconstrained_g ? CZI_FLAG_PAMLESS : 0),
+					 len_guide_used, (int)pamRNA.size(), max_bulges_g};
+	fileTree.write(CZI_MAGIC, 4);
+	fileTree.write((char *)header, sizeof(header));
+	fileTree.write(pamRNA.data(), pamRNA.size());
 
 	fileTree.write((char *)&arrayDim, sizeof(int));		  // write number of targets
 	fileTree.write((char *)&len_guide_used, sizeof(int)); //write len of guide etc etc
@@ -429,20 +534,25 @@ void saveTST(int inizio, int fine, int part)
 			
 		} while (*ppp);
 
+		// the leaf flags (format 2: in place of the '0'/'_' marker), then the next leaf
+		// with the same string if there is one
+		unsigned char lflags = targetOnDNA[i].lflags | (targetOnDNA[i].next ? CZI_LEAF_HAS_NEXT : 0);
+		fileTree.put((char)lflags);
 		if (targetOnDNA[i].next)
-		{ // write index of next
-			fileTree.put('_');
 			fileTree.write((char *)&targetOnDNA[i].next, sizeof(int));
-		}
-		else
-		{
-			fileTree.put('0');
-		}
 	}
 	fileTree.write((char *)&nodeUsed, sizeof(int)); // write number of nodes
 	serialize(&tree[0]);							// serialize TST
+	fileTree.write(CZI_MAGIC, 4);					// end-of-index marker
 
+	// every write above is checked here, at once: a full disk used to leave a cut-short
+	// .bin behind an exit 0, which every later search then failed on
 	fileTree.close();
+	if (fileTree.fail())
+	{
+		cerr << "ERROR: writing the index file '" << fileName << "' failed (disk full?)." << endl;
+		exit(1);
+	}
 }
 
 /* TIMING */
@@ -470,7 +580,7 @@ int main(int argc, char **argv)
 	string line;											  // line of fasta file
 	double start, end, globalstart, globalend, globalpartial; // start and end time, global start and end time
 	// vector<string> all_pam;									  // vector of all possible pam RNA
-	vector<int> pamIndices;									  // vector of target indices of pam RNA on DNA
+	vector<PamSite> pamIndices;								  // the sites of the contig (window start + shape)
 	ifstream fasta(argv[1]);								  // input fasta file
 	ifstream pamfile(argv[2]);								  // input pam.txt
 	int par_thr = stoi(argv[3]);							  //thread to use in parallel algorithm
@@ -520,6 +630,15 @@ int main(int argc, char **argv)
 		pamRNA = pam.substr(0, pamlimit); // if pam_at_start is set, then PAM = TTTNNNNNNNNNNNNNNNNNNNNN -4, i select the first 4 chars
 	}
 
+	// a format-2 leaf records how many pad bases are real in 5 bits
+	if (max_bulges < 0 || max_bulges > CZI_MAX_BULGES)
+	{
+		cerr << "ERROR: max bulges must be 0 to " << CZI_MAX_BULGES << " (got " << max_bulges << ")." << endl;
+		return 1;
+	}
+	max_bulges_g = max_bulges;
+	pam_unconstrained_g = pamUnconstrained(pamRNA);
+
 	// ------------------- SEARCH PAM IN THE CHROMOSOME -------------------
 	start = omp_get_wtime();
 	//search pam sequences on the target genome, necessary to extract all putative targets
@@ -535,218 +654,55 @@ int main(int argc, char **argv)
 	int i = 0;
 	int counter_index = 0;
 	targetOnDNA.resize(pamIndices.size());
-	if (pam_at_start)
+	const int window = pamlen + max_bulges;
+	const int pamWidth = (int)pamRNA.length();
+	for (i = 0; i < pamIndices.size(); i++)
 	{
-		for (i = 0; i < pamIndices.size(); i++)
+		const PamSite &site = pamIndices[i];
+		string target = siteWindow(site.ws, window); //pad + guide + PAM, off-contig bases as 'N'
+		Tleaf &leaf = targetOnDNA[counter_index];
+		leaf.guideIndex = site.ws;
+		leaf.next = 0;
+		// part of the flank off the contig: left of 0 for a PAM-left window, past the
+		// end for a PAM-right one (whose flank follows the pad and the guide)
+		bool flank_off = site.left ? site.ws < 0
+								   : (long)site.ws + max_bulges + len_guide_used + pamWidth > (long)chrSeq.size();
+
+		// orient the window as 2.9.1 did, into the TST string (guideDNA: the guide from
+		// the PAM outward, then the pad) and the stored flank (pamDNA)
+		if (pam_at_start && site.left) // 5' PAM, plus strand: [PAM|guide|pad]
 		{
-
-			string target;
-			if (pamIndices[i] < 0) //String found in positive strand (PAM AT BEGINNING case)
-			{
-				target = chrSeq.substr(pamIndices[i] * -1, pamlen + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
-				// cout << "check target " << target << endl;
-
-				if (guideRegionHasN(target, true)) //if 'N' is in the target, remove the target
-				{
-					counter_index--;
-					discarded++;
-				}
-				else
-				{
-
-					string tmp_pam_str;
-					tmp_pam_str = target.substr(0, pamRNA.length());
-					reverse(tmp_pam_str.begin(), tmp_pam_str.end());
-
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges),
-														 tmp_pam_str,
-														 0}; //salvo l'indice del target
-				}
-			}
-			else
-			{
-				target = chrSeq.substr((pamIndices[i]), pamlen + max_bulges);
-				// cout << "check target " << target << endl;
-
-				if (guideRegionHasN(target, false))
-				{
-					counter_index--;
-					discarded++;
-				}
-				else
-				{
-
-					string tmp;
-					for (char &c : target) //complemento dei nucleotidi per pam negativa
-						switch (c)
-						{
-						case 'A':
-							tmp += 'T';
-							break;
-						case 'T':
-							tmp += 'A';
-							break;
-						case 'C':
-							tmp += 'G';
-							break;
-						case 'G':
-							tmp += 'C';
-							break;
-						case 'R':
-							tmp += 'Y';
-							break;
-						case 'Y':
-							tmp += 'R';
-							break;
-						case 'S':
-							tmp += 'S';
-							break;
-						case 'W':
-							tmp += 'W';
-							break;
-						case 'M':
-							tmp += 'K';
-							break;
-						case 'K':
-							tmp += 'M';
-							break;
-						case 'H':
-							tmp += 'D';
-							break;
-						case 'D':
-							tmp += 'H';
-							break;
-						case 'B':
-							tmp += 'V';
-							break;
-						case 'V':
-							tmp += 'B';
-							break;
-						case 'N':
-							tmp += 'N';
-							break;
-						default:
-							cerr << "The character (" << c << ") of the PAM is not part of the IUPAC nucleotide nomenclature" << endl;
-							tmp += 'N';
-							break;
-						}
-
-					reverse(tmp.begin(), tmp.end());
-
-					string tmp_pam_str;
-					tmp_pam_str = tmp.substr(0, pamRNA.length());
-					reverse(tmp_pam_str.begin(), tmp_pam_str.end());
-
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length(), pamlen - pamRNA.length() + max_bulges),
-														 tmp_pam_str,
-														 0}; //salvo l'indice del target
-				}
-			}
-
-			counter_index++;
+			string tmp_pam_str = target.substr(0, pamWidth);
+			reverse(tmp_pam_str.begin(), tmp_pam_str.end());
+			leaf.guideDNA = target.substr(pamWidth, pamlen - pamWidth + max_bulges);
+			leaf.pamDNA = tmp_pam_str;
 		}
-	}
-	else
-	{ //PAM AT END
-		for (i = 0; i < pamIndices.size(); i++)
+		else if (pam_at_start) // 5' PAM, minus strand: [pad|guide rc|PAM rc]
 		{
-			string target;
-			if (pamIndices[i] > 0)
-			{
-				target = chrSeq.substr(pamIndices[i], pamlen + max_bulges); //extract target + pam + 2 char for bulges from the chromosome
-				// cout << "check target pam end positive" << target << endl;
-
-				if (guideRegionHasN(target, false)) //if 'N' is in the target, remove the target
-				{
-					counter_index--;
-					discarded++;
-				}
-				else
-				{
-
-					reverse(target.begin(), target.end()); //reverse per aggiungere nell'albero
-
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], target.substr(pamRNA.length()),
-														 target.substr(0, pamRNA.length()), 0}; //salvo l'indice del target
-																								// cout << "pam saved positive " << targetOnDNA[counter_index].pamDNA << endl;
-				}
-			}
-			else
-			{
-				target = chrSeq.substr((pamIndices[i]) * -1, pamlen + max_bulges);
-				// cout << "check target pam end negative" << target << endl;
-
-				if (guideRegionHasN(target, true))
-				{
-					counter_index--;
-					discarded++;
-				}
-				else
-				{
-
-					string tmp;
-					for (char &c : target) //complemento dei nucleotidi per pam negativa
-						switch (c)
-						{
-						case 'A':
-							tmp += 'T';
-							break;
-						case 'T':
-							tmp += 'A';
-							break;
-						case 'C':
-							tmp += 'G';
-							break;
-						case 'G':
-							tmp += 'C';
-							break;
-						case 'R':
-							tmp += 'Y';
-							break;
-						case 'Y':
-							tmp += 'R';
-							break;
-						case 'S':
-							tmp += 'S';
-							break;
-						case 'W':
-							tmp += 'W';
-							break;
-						case 'M':
-							tmp += 'K';
-							break;
-						case 'K':
-							tmp += 'M';
-							break;
-						case 'H':
-							tmp += 'D';
-							break;
-						case 'D':
-							tmp += 'H';
-							break;
-						case 'B':
-							tmp += 'V';
-							break;
-						case 'V':
-							tmp += 'B';
-							break;
-						case 'N':
-							tmp += 'N';
-							break;
-						default:
-							cerr << "The character (" << c << ") of the PAM is not part of the IUPAC nucleotide nomenclature" << endl;
-							tmp += 'N';
-							break;
-						}
-
-					targetOnDNA[counter_index] = (Tleaf){pamIndices[i], tmp.substr(pamRNA.length()),
-														 tmp.substr(0, pamRNA.length()), 0};
-					// cout << "pam saved negative " << targetOnDNA[counter_index].pamDNA << endl;
-				}
-			}
-
-			counter_index++;
+			string tmp = complementSeq(target);
+			reverse(tmp.begin(), tmp.end());
+			string tmp_pam_str = tmp.substr(0, pamWidth);
+			reverse(tmp_pam_str.begin(), tmp_pam_str.end());
+			leaf.guideDNA = tmp.substr(pamWidth, pamlen - pamWidth + max_bulges);
+			leaf.pamDNA = tmp_pam_str;
 		}
+		else if (!site.left) // 3' PAM, plus strand: [pad|guide|PAM]
+		{
+			reverse(target.begin(), target.end()); //reverse per aggiungere nell'albero
+			leaf.guideDNA = target.substr(pamWidth);
+			leaf.pamDNA = target.substr(0, pamWidth);
+		}
+		else // 3' PAM, minus strand: [PAM rc|guide rc|pad]
+		{
+			string tmp = complementSeq(target);
+			leaf.guideDNA = tmp.substr(pamWidth);
+			leaf.pamDNA = tmp.substr(0, pamWidth);
+		}
+
+		if (finishLeaf(leaf, site.left, flank_off))
+			counter_index++;
+		else
+			discarded++;
 	}
 	targetOnDNA.shrink_to_fit();
 
