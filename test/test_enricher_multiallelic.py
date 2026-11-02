@@ -226,6 +226,25 @@ class EnricherMultiallelicTests(object):
                 rec(p, "rsc", ref1(p), c, "AC=1;AF=1.5E-3", ["0|1", "0|0", "0|0", "0|0"])]
         self.assertEqual(self.run_enricher(recs).base(p), code_of({ref1(p), a, c}))
 
+    def test_four_bases_ranked_by_af_fields(self):
+        """No INFO/AF (a sites-only merge such as CRISPRme's mega: AF_<dataset>, AF_max):
+        the ALTs rank by their highest AF_* value, not all 0 (which would leave the choice
+        to base order); with AF and AF_* both present the higher counts."""
+        p = 230
+        a, b, c = others(p)
+        # base order alone would leave out c; AF_max says b is the rarest
+        recs = [rec(p, "m" + x, ref1(p), x, info, ["0|0", "0|0", "0|0", "0|0"])
+                for x, info in ((a, "AF_one=0.01;AF_max=0.01"), (b, "AF_two=0.0002;AF_max=0.0002"),
+                                (c, "AF_one=0.2;AF_two=0.3;AF_max=0.3"))]
+        r = self.run_enricher(recs, header=None)
+        self.assertEqual(r.base(p), code_of({ref1(p), a, c}))
+        # AF 0.001 but AF_pop 0.4 for a: a is common somewhere, so c (0.002) is left out
+        q = 235
+        a, b, c = others(q)
+        recs = [rec(q, "n" + x, ref1(q), x, info, ["0|1", "0|0", "0|0", "0|0"])
+                for x, info in ((a, "AC=1;AF=0.001;AF_pop=0.4"), (b, "AC=1;AF=0.01"), (c, "AC=1;AF=0.002"))]
+        self.assertEqual(self.run_enricher(recs).base(q), code_of({ref1(q), a, b}))
+
     def test_four_bases_joined_record_no_longer_writes_N(self):
         """A record listing three SNP ALTs used to write N, a gap to the search."""
         p = 110

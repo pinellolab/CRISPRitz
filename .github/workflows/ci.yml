@@ -49,7 +49,7 @@ jobs:
       # enricher.cpp is meant to be a faithful port of enricher.py, and the
       # packaged install silently falls back to the Python one when the binary is
       # absent, so the two must not drift. verify_enricher.sh synthesizes a VCF of
-      # 28 cases -- biallelic and multiallelic SNPs, a non-PASS record, insertions,
+      # 29 cases -- biallelic and multiallelic SNPs, a non-PASS record, insertions,
       # deletions, a site carrying TWO indel alleles (the case where a per-allele
       # window built on the previous allele's output compounds them), the SNP+indel
       # combinations, the chromosome edges, multiallelic SNPs whose ALTs include

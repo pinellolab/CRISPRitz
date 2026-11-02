@@ -45,8 +45,8 @@ genomeList = list(genomeStr)
 # because a letter there cannot tell a code this script wrote from an ambiguity code the
 # reference FASTA already holds.
 snp_mask = bytearray(len(genomeStr))
-# Every single-base A/C/G/T ALT seen, with its AF, for the positions that end up holding
-# all four bases (see resolveFourBasePositions). Three parallel arrays: ~17 bytes/ALT.
+# Every single-base A/C/G/T ALT seen, with its frequency (_rank_af), for the positions
+# that end up holding all four bases (see resolveFourBasePositions). ~17 bytes per ALT.
 alt_af_pos = array('q')
 alt_af_bit = array('B')
 alt_af_val = array('d')
@@ -166,17 +166,29 @@ _IUPAC_BY_MASK = {sum(_BASE_BIT[c] for c in spellings[0]): letter
                   for letter, spellings in iupac_code.items()}
 
 
-# A plain decimal number (what an AF value is), else 0.0. Spelled out rather than left
-# to float(), which also takes 'nan', 'inf', '1_000' and surrounding spaces, so that
-# enricher.cpp (strtod behind the same check) reads every AF string the same way.
+# A plain decimal number (what an AF value is). Spelled out rather than left to float(),
+# which also takes 'nan', 'inf', '1_000' and surrounding spaces, so that enricher.cpp
+# (strtod behind the same check) reads every AF string the same way.
 _AF_NUMBER = re.compile(r'[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\Z')
 
 
-def _af_number(text):
-    return float(text) if _AF_NUMBER.match(text) else 0.0
+def _rank_af(line, k):
+    """How frequent ALT k of this record is, to rank the ALTs of a four-base position:
+    the highest of its INFO/AF and every INFO/AF_<x> value (0 when there is none). A
+    genotyped panel carries AF; a sites-only merge such as CRISPRme's mega carries only
+    per-dataset AF_<x> and AF_max, where AF alone would rank every ALT 0 and leave the
+    choice to base order. Ranking only: the dict's AF field is still INFO/AF."""
+    vals = []
+    for entry in line[7].split(";"):
+        key, sep, value = entry.partition("=")
+        if sep and (key == "AF" or key.startswith("AF_")):
+            v = value.split(",")
+            if k < len(v) and _AF_NUMBER.match(v[k]):
+                vals.append(float(v[k]))
+    return max(vals) if vals else 0.0
 
 
-def SNPsProcess(line, pos_AF):
+def SNPsProcess(line):
     if len(line[3]) > 1: #se len ref > 1 significa che non è snp
         return
     line[1] = str(int(line[1])-1)  # taaac per corregere conta posizione da zero/uno
@@ -203,16 +215,13 @@ def SNPsProcess(line, pos_AF):
     # file: the others reached neither the enriched genome nor the search. Now the
     # code is that of the site written as one record with every ALT, in any order.
     mask = snp_mask[pos] or _BASE_BIT.get(referenceNucleotide, 0)
-    afs = None
     for k, alt in enumerate(altAlleles):
         bit = _BASE_BIT.get(alt, 0) if len(alt) == 1 else 0
         if bit:
             mask |= bit
-            if afs is None:
-                afs = _af_value(line, pos_AF).split(',')
             alt_af_pos.append(pos)
             alt_af_bit.append(bit)
-            alt_af_val.append(_af_number(afs[k]) if k < len(afs) else 0.0)
+            alt_af_val.append(_rank_af(line, k))
     snp_mask[pos] = mask
     if mask == 15:
         # all four bases: N would be written, which the search reads as a gap, not as
@@ -231,10 +240,10 @@ def resolveFourBasePositions():
     assembly gap: buildTST discards every target with an N in its guide region and the
     PAM scan matches nothing at an N. Writing it would remove every target through the
     position from the index -- the reference one included. So such a position keeps the
-    reference base and the ALTs with the highest AF, leaving out the rarest ALT (a tie
-    leaves out the later of A, C, G, T; an ALT seen on several records counts with its
-    highest AF). The SNP dict still lists every ALT. On chr22 of HGDP + 1000 Genomes,
-    2,448 positions carry three SNP ALTs; the rarest of them has AC >= 41 at 3.
+    reference base and its most frequent ALTs, leaving out the rarest ALT by _rank_af
+    (a tie leaves out the later of A, C, G, T; an ALT seen on several records counts
+    with its highest value). The SNP dict still lists every ALT. On chr22 of HGDP + 1000
+    Genomes, 2,448 positions carry three SNP ALTs; the rarest of them has AC >= 41 at 3.
     """
     if not four_base_positions:
         return
@@ -251,7 +260,8 @@ def resolveFourBasePositions():
         genomeList[pos] = _IUPAC_BY_MASK[15 & ~drop]
     print("NOTE: %d position(s) of %s carry all four bases between the reference and "
           "the SNP ALTs; N would read as a gap, so each is coded without its rarest ALT "
-          "(lowest AF, ties to the later of A, C, G, T)" % (len(four_base_positions), currentChr))
+          "(lowest INFO AF or AF_*, ties to the later of A, C, G, T)"
+          % (len(four_base_positions), currentChr))
 
 
 # def SNPsProcess(line):
@@ -570,7 +580,7 @@ for line in inAltFile:
         #print(sys.argv[4])
         add_to_dict_snps(line, pos_AF)
         id_indel, start_fake_pos = indel_to_fasta(line, id_indel, pos_AF, start_fake_pos)
-    SNPsProcess(line, pos_AF)
+    SNPsProcess(line)
 
 
 resolveFourBasePositions()

@@ -228,8 +228,8 @@ static std::string genomeList;
 // Kept beside genomeList because a letter there cannot tell a code written here from
 // an ambiguity code the reference FASTA already holds.
 static std::vector<unsigned char> snpMask;
-// Every single-base A/C/G/T ALT seen, with its AF, for the positions that end up
-// holding all four bases (resolveFourBasePositions). enricher.py's alt_af_* arrays.
+// Every single-base A/C/G/T ALT seen, with its frequency (rankAf), for the positions
+// that end up holding all four bases (resolveFourBasePositions). enricher.py's alt_af_*.
 static std::vector<long> altAfPos;
 static std::vector<unsigned char> altAfBit;
 static std::vector<double> altAfVal;
@@ -298,16 +298,16 @@ static std::vector<std::vector<std::string>> log_indels;  // 7 cols each
 static bool doYes = false;
 
 // ---------------------------------------------------------------------------
-// afNumber(s): a plain decimal number, else 0.0 -- enricher.py's _af_number. The
-// grammar [+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)? is checked before
-// strtod, which on its own would also take "nan", "inf", hex and leading spaces,
-// where Python's float() takes other spellings ("1_000", trailing spaces): the
-// check is what makes both ports read every AF string alike.
+// isPlainNumber(s): enricher.py's _AF_NUMBER, the grammar
+// [+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?, checked before strtod, which
+// on its own would also take "nan", "inf", hex and leading spaces, where Python's
+// float() takes other spellings ("1_000", trailing spaces): the check is what makes
+// both ports read every AF string alike.
 // ---------------------------------------------------------------------------
 
 static inline bool isDigitC(char c) { return c >= '0' && c <= '9'; }
 
-static double afNumber(const std::string &s) {
+static bool isPlainNumber(const std::string &s) {
     size_t i = 0, n = s.size();
     if (i < n && (s[i] == '+' || s[i] == '-')) ++i;
     size_t intDigits = 0, fracDigits = 0;
@@ -316,25 +316,46 @@ static double afNumber(const std::string &s) {
         ++i;
         while (i < n && isDigitC(s[i])) { ++i; ++fracDigits; }
     }
-    if (intDigits == 0 && fracDigits == 0) return 0.0;
+    if (intDigits == 0 && fracDigits == 0) return false;
     if (i < n && (s[i] == 'e' || s[i] == 'E')) {
         size_t j = i + 1, expDigits = 0;
         if (j < n && (s[j] == '+' || s[j] == '-')) ++j;
         while (j < n && isDigitC(s[j])) { ++j; ++expDigits; }
-        if (expDigits == 0) return 0.0;
+        if (expDigits == 0) return false;
         i = j;
     }
-    if (i != n) return 0.0;
-    return strtod(s.c_str(), NULL);
+    return i == n;
 }
 
-static std::string afValue(const std::vector<std::string> &line, int pos_AF);
+// rankAf(line, k): how frequent ALT k of this record is, to rank the ALTs of a
+// four-base position -- enricher.py's _rank_af: the highest of its INFO/AF and every
+// INFO/AF_<x> value, 0 when there is none (a sites-only merge such as CRISPRme's mega
+// carries only AF_<x> and AF_max). Ranking only: the dict's AF field is INFO/AF.
+static double rankAf(const std::vector<std::string> &line, size_t k) {
+    bool found = false;
+    double best = 0.0;
+    std::vector<std::string> entries = splitStr(line[7], ';');
+    for (size_t e = 0; e < entries.size(); ++e) {
+        size_t eq = entries[e].find('=');
+        if (eq == std::string::npos) continue;
+        std::string key = entries[e].substr(0, eq);
+        if (key != "AF" && key.compare(0, 3, "AF_") != 0) continue;
+        std::vector<std::string> v = splitStr(entries[e].substr(eq + 1), ',');
+        if (k >= v.size() || !isPlainNumber(v[k])) continue;
+        double x = strtod(v[k].c_str(), NULL);
+        if (!found || x > best) {
+            best = x;
+            found = true;
+        }
+    }
+    return best;
+}
 
 // ---------------------------------------------------------------------------
-// SNPsProcess(line, pos_AF): mutates genomeList and line[1] -> 0-based.
+// SNPsProcess(line): mutates genomeList and line[1] -> 0-based.
 // ---------------------------------------------------------------------------
 
-static void SNPsProcess(std::vector<std::string> &line, int pos_AF) {
+static void SNPsProcess(std::vector<std::string> &line) {
     if (line[3].size() > 1) return;  // not a SNP
     long pos0 = strtol(line[1].c_str(), NULL, 10) - 1;
     line[1] = std::to_string(pos0);  // python sets line[1] to 1-based-1
@@ -354,20 +375,14 @@ static void SNPsProcess(std::vector<std::string> &line, int pos_AF) {
     // enricher.py's SNPsProcess.
     int mask = snpMask[pos0] ? snpMask[pos0] : baseBit(genomeStr[pos0]);
     std::vector<std::string> altAlleles = splitStr(pyStrip(line[4]), ',');
-    std::vector<std::string> afs;
-    bool afsRead = false;
     for (size_t k = 0; k < altAlleles.size(); ++k) {
         if (altAlleles[k].size() > 1) continue;
         int bit = altAlleles[k].empty() ? 0 : baseBit(altAlleles[k][0]);
         if (!bit) continue;
         mask |= bit;
-        if (!afsRead) {
-            afs = splitStr(afValue(line, pos_AF), ',');
-            afsRead = true;
-        }
         altAfPos.push_back(pos0);
         altAfBit.push_back((unsigned char)bit);
-        altAfVal.push_back(k < afs.size() ? afNumber(afs[k]) : 0.0);
+        altAfVal.push_back(rankAf(line, k));
     }
     snpMask[pos0] = (unsigned char)mask;
     if (mask == 15) {
@@ -385,10 +400,10 @@ static void SNPsProcess(std::vector<std::string> &line, int pos_AF) {
 
 // ---------------------------------------------------------------------------
 // resolveFourBasePositions(): code each position whose reference base and SNP ALTs
-// cover all four bases with the reference base and its ALTs of highest AF, leaving
-// out the rarest ALT (a tie leaves out the later of A, C, G, T; an ALT seen on
-// several records counts with its highest AF). Mirrors enricher.py, which says why:
-// N is a gap to buildTST and searchTST, not "any base".
+// cover all four bases with the reference base and its most frequent ALTs, leaving
+// out the rarest ALT by rankAf (a tie leaves out the later of A, C, G, T; an ALT seen
+// on several records counts with its highest value). Mirrors enricher.py, which says
+// why: N is a gap to buildTST and searchTST, not "any base".
 // ---------------------------------------------------------------------------
 
 static void resolveFourBasePositions() {
@@ -422,7 +437,7 @@ static void resolveFourBasePositions() {
     }
     printf("NOTE: %ld position(s) of %s carry all four bases between the reference and "
            "the SNP ALTs; N would read as a gap, so each is coded without its rarest ALT "
-           "(lowest AF, ties to the later of A, C, G, T)\n",
+           "(lowest INFO AF or AF_*, ties to the later of A, C, G, T)\n",
            (long)fourBasePositions.size(), currentChr.c_str());
 }
 
@@ -849,7 +864,7 @@ int main(int argc, char **argv) {
             add_to_dict_snps(line, pos_AF);
             indel_to_fasta(line, id_indel, pos_AF, start_fake_pos);
         }
-        SNPsProcess(line, pos_AF);
+        SNPsProcess(line);
     }
     resolveFourBasePositions();
 

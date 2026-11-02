@@ -15,15 +15,15 @@
 # the chromosome start (window floor) and end, a REF that does not match the
 # FASTA, and same-POS SNP/indel orders beyond case 8. Case 17 covers multiallelic
 # SNP records whose ALTs include a non-A/C/G/T member ('*', 'N', a lowercase base)
-# or whose FASTA base is N. Cases 18-28 cover multi-allelic sites SPLIT into one
+# or whose FASTA base is N. Cases 18-29 cover multi-allelic sites SPLIT into one
 # record per ALT, as `bcftools norm -m -any` writes them: two and three ALTs in
 # every record order, the same sites as one record, the all-four-bases rule, split
 # records that are not adjacent, haploid / unphased / missing genotypes, SNP + indel
 # at one position and inside an indel's window, a split record beside a multi-ALT
-# record, a non-PASS split record, the same ALT twice, AF spellings, a reference
-# IUPAC base and N, '*', and the chromosome edges. Besides the four outputs, the
-# file set and the run log (stdout+stderr, e.g. the skip warnings and the
-# four-base note) must match.
+# record, a non-PASS split record, the same ALT twice, AF spellings and AF_<x>
+# fields, a reference IUPAC base and N, '*', and the chromosome edges. Besides the
+# four outputs, the file set and the run log (stdout+stderr, e.g. the skip warnings
+# and the four-base note) must match.
 #
 # Prints "BYTE-IDENTICAL: PASS" only if every output diff is empty.
 #
@@ -59,7 +59,7 @@ echo "Work dir: $WORK"
 # synthetic chromosome FASTA (2,400 bp, mixed case to exercise upper()). The
 # first 400 bp -- all that cases 1-8 touch -- are the same draws as when the
 # chromosome was 400 bp long, and the first 1,800 -- cases 9-17 -- the same as
-# when it was 1,800 bp long; the rest holds cases 18-28 (case 14 follows the end).
+# when it was 1,800 bp long; the rest holds cases 18-29 (case 14 follows the end).
 # ---------------------------------------------------------------------------
 CHR_FA="$WORK/chrTest.fa"
 python3 - "$CHR_FA" <<'PY'
@@ -310,7 +310,7 @@ lines.append(row(1650, "rs1508", b(1650), b(1650)+"T", "AC=1;AF=0.1", ["0|0","1|
 #     a SNP + a 3-bp deletion (1730); two SNP records -- a split multiallelic SNP --
 #     + an insertion (1760). Up to 2.9.1 both ports kept only the LAST SNP record's
 #     ALT there (each record rebuilt the code from the reference base and overwrote
-#     the dict key); both now code both ALTs and list both in the dict (cases 18-28).
+#     the dict key); both now code both ALTs and list both in the dict (cases 18-29).
 p=1700
 lines.append(row(p, "rs1600", b(p), b(p)+"TG", "AC=2;AF=0.2", ["0|1","1|0","0|0","0|0","0|0"]))
 lines.append(row(p, "rs1601", b(p), other(p), "AC=2;AF=0.2", ["1|0","0|0","0|1","0|0","0|0"]))
@@ -345,7 +345,7 @@ lines.append(row(p, "rs1705", b(p), other(p,0)+","+other(p,1).lower(), "AC=1,1;A
 p=1618
 lines.append(row(p, "rs1706", b(p), "A,C", "AC=1,1;AF=0.1,0.1", ["0|1","0|2","0|0","0|0","0|0"]))
 
-# ---- cases 18-28: multi-allelic sites SPLIT into one record per ALT --------------
+# ---- cases 18-29: multi-allelic sites SPLIT into one record per ALT --------------
 # `bcftools norm -m -any` writes a site with several ALTs as one record per ALT, its
 # genotypes recoded so 1 is that record's ALT. Each record must ADD its ALT to the
 # position's code and dict entry (2.9.1 and earlier rebuilt the code from the
@@ -461,6 +461,17 @@ for j, (alt, af) in enumerate((("T", "0.2"), ("A", "0.4"), ("G", "0.01"), ("C", 
 p=2230
 lines.append(row(p, "rs1920", b(p), other(p,0), "AC=1;AF=0.1", G1))
 lines.append(row(p, "rs1921", b(p), "*", "AC=1;AF=0.2", ["0|0","1|0","0|0","0|0","0|0"]))
+
+# 29) FOUR-BASE sites ranked by AF_<x> fields: records with no AF, only per-dataset
+#     AF_<x> and AF_max as a sites-only merge (CRISPRme's mega) writes them (2260),
+#     and a record whose AF_pop beats every AF at its position (2270).
+p=2260
+for j, info in enumerate(("AF_one=0.01;AF_max=0.01", "AF_two=0.0002;AF_max=0.0002",
+                          "AF_one=0.2;AF_two=0.3;AF_max=0.3")):
+    lines.append(row(p, "rs%d" % (1930 + j), b(p), other(p,j), info, G1))
+p=2270
+for j, info in enumerate(("AC=1;AF=0.001;AF_pop=0.4", "AC=1;AF=0.01", "AC=1;AF=0.002")):
+    lines.append(row(p, "rs%d" % (1933 + j), b(p), other(p,j), info, G1))
 
 # 14) THE CHROMOSOME EDGES (records listed last; the enricher does not need
 #     sorted input): an insertion at POS 1 and a 2-bp deletion at POS 25 have
