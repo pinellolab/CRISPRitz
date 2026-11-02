@@ -122,7 +122,7 @@ jobs:
           OMP_NUM_THREADS: "1"
 
   format1:
-    name: indexes built by 2.9.1 search as before (but index 0, IDX-14)
+    name: index formats (2.9.1 indexes search as before but index 0; format-2 header and refusals)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -139,6 +139,12 @@ jobs:
       # contig's first base on the minus strand, and the builder's index-0 artefact gone.
       - name: Run format-1 compatibility test
         run: bash test/run_format1_test.sh
+
+      # Format 2's header and trailer, crispritz.py index-info, a directory mixing the
+      # two formats, max_bulges taken from the header, and the reader's refusals
+      # (cut-short file, PAM side mismatch, unknown version; buildTST -bMax > 31).
+      - name: Run index-format test
+        run: bash test/run_index_format_test.sh
 
   boundary:
     name: sites at contig ends and N runs == independent brute-force oracle
