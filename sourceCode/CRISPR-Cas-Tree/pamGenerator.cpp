@@ -339,9 +339,18 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 		if (!pam_bit[j].all())
 			pam_unconstrained = false;
 
-	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
+	//nt is where the pam_limit PAM bases start, so the last PAM that fits starts at
+	//length() - pam_limit and ends on the contig's last base: both branches scan up
+	//to and including it. Until 2.9.1 the 3' branch stopped one short, so a PAM on a
+	//contig's last bases was never indexed, and the 5' branch bounded on pam_len,
+	//which also lost every reverse-strand 5' PAM within a guide length of the end. The
+	//window checks on each push keep the window inside the contig; the inner loop
+	//reads at most genome_bit[length() - 1], and the early return above keeps the
+	//unsigned bound from wrapping.
+	const int last_pam_start = (int)(genome_sequence.length() - pam_limit);
+	if (!pam_at_start) //pam al 3' quindi in fondo alla sequenza
 	{
-		for (int nt = 0; nt < genome_sequence.length() - pam_limit; nt++)
+		for (int nt = 0; nt <= last_pam_start; nt++)
 		{
 			bool found_positive = true;
 			bool found_negative = true;
@@ -382,9 +391,9 @@ vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_se
 			}
 		}
 	}
-	else //pam al 3' quindi in cima alla sequenza
+	else //pam al 5' quindi in cima alla sequenza
 	{
-		for (int nt = 0; nt < genome_sequence.length() - pam_len; nt++)
+		for (int nt = 0; nt <= last_pam_start; nt++)
 		{
 			bool found_positive = true;
 			bool found_negative = true;

@@ -560,14 +560,26 @@ void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence,
 		pam_sequence = pam_sequence.substr(0, pam_limit);
 	}
 
+	//a contig shorter than one target holds none, and the scan bounds below are
+	//unsigned (length() - pam_limit), so they would wrap on it and read past the
+	//sequence.
+	if (genome_sequence.length() < (size_t)(pam_len + max_bulges))
+		return;
+
 	vector<bitset<4>> pam_bit = pam_bit_conversion(pam_sequence);
 	vector<bitset<4>> pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
 	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
 
+	//nt is where the pam_limit PAM bases start, so the last PAM that fits starts at
+	//length() - pam_limit and ends on the contig's last base. Both branches scan up to
+	//and including it (until 2.9.1 the 3' branch stopped one short, and the 5' branch
+	//bounded on pam_len, which also lost every reverse-strand 5' PAM within a guide
+	//length of the end). The window checks on each push keep the guide inside the
+	//contig; the inner loop reads at most genome_bit[length() - 1].
 	if (!pam_at_start) //pam al 3' quindi in fondo alla sequenza
-	{	
+	{
 
-		for (int nt = 0; nt < genome_sequence.length() - pam_limit; ++nt)
+		for (int nt = 0; nt <= (int)(genome_sequence.length() - pam_limit); ++nt)
 		{
 			bool found_positive = true;
 			bool found_negative = true;
@@ -609,7 +621,7 @@ void searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence,
 	}
 	else //pam al 5' quindi in cima alla sequenza
 	{
-		for (int nt = 0; nt < genome_sequence.length() - pam_len; ++nt)
+		for (int nt = 0; nt <= (int)(genome_sequence.length() - pam_limit); ++nt)
 		{
 			bool found_positive = true;
 			bool found_negative = true;
