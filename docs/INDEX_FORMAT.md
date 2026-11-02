@@ -498,24 +498,66 @@ in Python, so it must learn format 2 before it can use CRISPRitz 2.9.2 indexes. 
 of `a5379e0`:
 
 1. **`PostProcess/crispritz_bins.py:bin_problem`** reads the first int as
-   `numLeaves` and walks the leaf records by their `'0'`/`'_'` marker. It must branch
-   on the magic: for format 2 skip `header_len`, take `numLeaves` there, read each
-   record as `int32 ws`, the flank bytes, `lflags` and an `int32 next` iff bit 7, and
-   check the trailer. (A format-2 file cut short fails the trailer test on its own.)
+   `numLeaves` and walks the leaf records by their `'0'`/`'_'` marker, so it calls
+   every format-2 `.bin` "not a tree (numLeaves=-28747197)". It must branch on the
+   magic: for format 2 make section 7's checks, take `numLeaves` at `header_len`, read
+   each record as `int32 ws`, the flank bytes, `lflags` and an `int32 next` iff bit 7,
+   and check the trailer. (A format-2 file cut short fails the trailer test on its own.)
 2. **`_leaves`** (used by `missing_bins` to see whether a contig's last part is full)
-   must read `numLeaves` at `header_len` for format 2.
-3. **`holds_target` / `count_targets`** reproduce 2.9.1's site rule (window inside
+   must read `numLeaves` at `header_len` for format 2. As it is, it returns the magic
+   (-28,747,197), never `TARGETS_A_TREE`, so on a format-2 index the full-part check
+   never runs.
+3. **`holds_target` / `count_targets`** implement 2.9.1's site rule (window inside
    the contig, no N outside the PAM, index 0 as minus strand, the short scan bound).
-   For an index built by 2.9.2 they must use section 3's rule instead, or a contig
-   whose only sites lie at a boundary is reported as "holds a target but has no
-   .bin" (B3/B4 add such sites) and a full-part count is off. Choose the rule by the
-   engine version that built the index (`crispritz.py version` >= 2.9.2) or, when a
-   `.bin` exists, by its header.
+   A format-2 index holds more sites (section 3: B2-B4), so `missing_bins` must apply
+   the rule of the format the index was built in:
+   * **Per index, from the header of its `.bin` files** (section 7; `crispritz.py
+     index-info`): format 1, the 2.9.1 rule; format 2, section 3's rule. Not from
+     `crispritz.py version`: that is the installed engine, not the one that built an
+     index already on disk, so with 2.9.2 installed it would apply section 3's rule to
+     every 2.9.1-built index (and a build of this branch says 2.9.1 until the release
+     bumps `VERSION`). `index-genome` removes an index directory before it builds one,
+     so a directory whose `.bin` files differ in format was assembled from two builds:
+     treat it as incomplete and rebuild it.
+   * **A directory with no `.bin`** has no header to read. When CRISPRme's own build
+     has just made it (`build-index-only`; `pool_index_indels.py`'s
+     `_record_no_targets`), use the format of the engine that ran: `INDEX_FORMAT` in
+     the `crispritz.py` on PATH (2 on this branch; read from the file as
+     `generate_report._crispritz_version` reads `VERSION`; CRISPRitz <= 2.9.1 has none
+     and writes format 1), and record it with the index (`index_meta.json`, item 4; the
+     `NO_TARGETS` record). For one built earlier (`pool_search_indels.py`'s
+     `_empty_index`), use that record, else the format of the index's other `.bin`
+     files (its other sub-indexes), else section 3's rule: on a directory 2.9.1 built,
+     its only error is a false "holds a target", which asks for a rebuild, where the
+     2.9.1 rule on one 2.9.2 built would pass a lost `.bin` off as an empty result.
+   * **What the wrong rule does.** Measured with `crispritz_bins` of `a5379e0` on a
+     synthetic boundary genome (885 contigs; NGG `-bMax 2` indexes built by 2.9.1 and
+     by this branch with `crispritz.py index-genome`), and with a section-3 rule
+     written from section 3.1 put in place of `holds_target` (its site count equals
+     the format-2 leaf count on all 885 contigs):
+     - The 2.9.1 rule on a format-2 index raises no false report: format 2 holds every
+       2.9.1 site (on every contig the format-2 leaf count is at least the format-1
+       one, which `count_targets` gives exactly). But it misses lost `.bin` files.
+       With the `.bin` deleted of the two contigs whose only site is a boundary site
+       (both 23 nt, one target long: `exact_p`, a + strand site whose PAM ends on the
+       last base, B2, and whose pad runs off the start, B3; `exact_m`, a - strand site
+       whose pad runs off the end, B3), `missing_bins` returns nothing; with section
+       3's rule it reports `exact_m`, the first it reaches. `count_targets` undercounts a
+       format-2 contig by its boundary sites (467 sites on 361 of the 885 contigs),
+       so a lost last part goes unseen when it would hold no more targets than that;
+       and with `_leaves` as it is (item 2) the full-part check does not run at all.
+     - Section 3's rule on a format-1 index raises false reports: on the complete
+       2.9.1-built index it reports `exact_m` as "holds a target but has no .bin", as
+       it would every contig whose only sites are boundary sites, so a good 2.9.1
+       index fails the check. Its count exceeds the format-1 leaf count on 361 of the
+       885 contigs, so a contig whose last part is full can be taken for one that
+       lacks a part.
 4. **Engine/index pairing.** An index built by 2.9.2 cannot be searched by
-   CRISPRitz <= 2.9.1. Where CRISPRme resolves or downloads an index, read the format
-   of one `.bin` (section 7) and refuse a format-2 index when the pinned engine is
-   older, naming both; record `index_format` in the index's `index_meta.json` and
-   on the published archive's card.
+   CRISPRitz <= 2.9.1. Where CRISPRme resolves or downloads an index, read the formats
+   of its `.bin` files (section 7: `index-info` exits 1 on one that `searchTST` would
+   refuse) and refuse a format-2 index when the pinned engine is older, naming both;
+   record `index_format` in the index's `index_meta.json` and on the published
+   archive's card.
 5. **Boundary rows downstream.** Format 2 returns sites whose pad runs off a contig
    or into an N, and, with `--prune-pam`, sites whose distal flank does. Any step
    that cuts a fixed window around a target (scoring context, variant lookup at
