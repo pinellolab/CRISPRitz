@@ -211,7 +211,10 @@ of the PASS records at a position goes into its IUPAC code, in any record order,
 its SNP dictionary entry (up to 2.9.1 only the last record's ALT did). A position whose
 reference base and ALTs cover all four bases is coded without its rarest ALT (lowest AF),
 because `N` is a gap to `index-genome` and `search`; the dictionary still lists it. Apply an
-allele-frequency filter after splitting, so it acts per ALT. Details:
+allele-frequency filter after splitting, so it acts per ALT. Each dictionary entry keeps its
+own record's genotypes verbatim: split records phased one by one can put two ALTs of a
+position on one haplotype slot (`0|1` under each), and whatever builds haplotypes from the
+dictionary has to resolve that. Details:
 [`docs/MULTIALLELIC_ENRICHMENT.md`](docs/MULTIALLELIC_ENRICHMENT.md).
 
 

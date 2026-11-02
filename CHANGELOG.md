@@ -49,10 +49,10 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   out of bounds.
 
 ### Added
-- `test/test_enricher_multiallelic.py`: 21 unit tests run against both ports (42), with exact
-  expected outputs; 38 of them fail on 2.9.1. In CI with `verify_enricher.sh`, which grows from
-  17 to 29 cases (split multi-allelic sites in every order, genotype shapes, SNP + indel at
-  one position, the four-base rule and its AF/AF_* ranking).
+- `test/test_enricher_multiallelic.py`: 22 unit tests run against both ports (44), with exact
+  expected outputs; 40 of them fail on 2.9.1. In CI with `verify_enricher.sh`, which grows from
+  17 to 30 cases (split multi-allelic sites in every order, genotype shapes, SNP + indel at
+  one position, the four-base rule and its AF/AF_* ranking, two ALTs on one haplotype slot).
 - `docs/MULTIALLELIC_ENRICHMENT.md`: the behaviour, its measurement, what CRISPRme must change
   to use it, and the published indexes and stores to rebuild.
 
@@ -61,6 +61,14 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
   split site; rebuild them**, with their dicts and Tier-0/Tier-1 stores, from one 2.9.2
   enrichment (`docs/MULTIALLELIC_ENRICHMENT.md` §8 lists the published ones). Cost of the fix:
   one byte per base and ~17 bytes per SNP ALT; on chr22, 986 s → 1,004 s and 6.72 → 6.86 GB.
+- **The dict now shows the phase of split records as it was phased, conflicts included.**
+  Each entry keeps its own record's genotypes verbatim, and records phased one by one can
+  put two ALTs of a position on one haplotype slot: 672 sample-positions at 584 positions on
+  HGDP + 1000 Genomes chr22 (e.g. 10,661,629 NA18869: `0|1` under G and `0|1` under T), 0 on
+  HPRC chr22. Up to 2.9.1 the dict held one ALT per position, so no reader met one. CRISPRme's
+  per-sample analysis builds a CONFIRMED haplotype holding both ALTs from it (measured
+  through `complete-search --per-sample` on a 2.9.2 index); CRISPRme must handle these
+  before it uses a 2.9.2 index (`docs/MULTIALLELIC_ENRICHMENT.md` §6.3).
 
 ## [2.9.1] - 2026-10-30
 
