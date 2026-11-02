@@ -15,6 +15,69 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 
 ## [Unreleased]
 
+Planned as 2.9.2, released together with rebuilt indexes: the IDX-13, IDX-4 and IDX-15
+fixes below change what an index holds, so they take effect only on indexes built by this
+version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
+
+### Added
+- **Index format 2** ([docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md)). Every `.bin` built by
+  this version starts with a header -- the magic bytes `CZI\xfe`, the format version, and the
+  build parameters (PAM side, all-N PAM, guide length, PAM length, max bulges, the PAM) -- and
+  ends with the magic, so an index says what it holds and a cut-short file is recognised.
+  The per-leaf `'0'`/`'_'` marker becomes a flags byte (strand shape, flank off the contig,
+  bases of the bulge pad that exist), so leaf records keep their size; the tree is unchanged.
+  `searchTST` reads formats 1 and 2 and refuses an unknown version, a cut-short file, or a
+  PAM width or side that differs from the search's, before searching. `buildTST` checks its
+  writes (a full disk used to leave a cut-short `.bin` behind an exit 0) and refuses `-bMax`
+  above 31.
+- `crispritz.py index-info <index_dir>` prints each `.bin`'s format and build parameters as
+  JSON, reading only its first and last bytes (the reference reader for CRISPRme).
+- `test/run_boundary_test.sh`: sites at every distance from contig ends and `N` runs, both
+  strands, 3' and 5' PAMs, dedicated and PAM-less indexes, with and without `--prune-pam`,
+  through `crispritz.py`; every search must equal `test/boundary/oracle.py`, an independent
+  brute-force aligner over the FASTA, and every 0-bulge search `searchBruteForce` (141 and 32
+  comparisons, 5,889,164 rows; the 2.9.1 binaries fail 142).
+- `test/run_format1_test.sh`: indexes built by the 2.9.1 `buildTST` (committed fixtures)
+  search byte-identically to 2.9.1 away from index 0, and the index-0 rows equal the oracle.
+- `test/run_index_format_test.sh`: the format-2 header and trailer, `index-info`, a
+  directory mixing both formats, `max_bulges` taken from the header, and the reader's
+  refusals (cut-short file, PAM side mismatch, unknown version, `-bMax` above 31).
+
+### Changed
+- **New indexes are format 2, which CRISPRitz 2.9.1 and earlier cannot search** (2.9.1
+  refuses one: `not a valid CRISPRitz index (.bin) file (numLeaves=-28747197)`). Indexes
+  built by earlier versions keep working (see Fixed, IDX-14) but lack the sites B2-B4 add
+  until rebuilt.
+
+### Fixed
+- **A site whose guide lay within `max_bulges` nt of a contig end or an `N` run was not
+  indexed, even a perfect match (IDX-13).** The whole pad + guide + PAM window had to fit with
+  no `N` outside the PAM, though a 0-bulge alignment needs none of the pad, so an index with a
+  larger `-bMax` lost more (a guide's own on-target could vanish from the report). A site is
+  now kept when its guide and PAM fit; pad bases off the contig or on an `N` are recorded as
+  unavailable, and an alignment that would need them is not reported.
+- **`--prune-pam` off a PAM-less index whose flank `K` is wider than the PAM `L` lost PAMs
+  within `K - L` nt of a contig end (IDX-4)**, because the distal flank bases the search never
+  tests had to fit, and a window starting before base 0 could not be stored (the sign of a
+  leaf index was its strand). A PAM-less window may now run off the contig on the flank side
+  (those bases stored as `N`), and format 2 stores a signed window start with the strand in
+  its own bit. With this, `--prune-pam` equals a dedicated index at contig ends too.
+- **A PAM on a contig's last bases was never found (IDX-15)**, in any index or by the
+  brute-force scan: the scan stopped one short on a 3' PAM, and on a 5' PAM bounded on the
+  target length, losing every reverse-strand 5' PAM within a guide length of the end. Fixed in
+  `buildTST` and `searchBruteForce`; the brute-force scan gains the sites at once.
+- **A reverse-strand PAM at a contig's first base was reported on the `+` strand (IDX-14)**:
+  the builder wrote leaf index 0 as minus strand for a 3' PAM, the search read it as plus.
+  The search now reads it as written, so existing indexes report it correctly with no
+  rebuild; a leaf the 2.9.1 builder stored at index 0 from the wrong bases (a `+` window
+  starting at 0), which could surface as a match without a PAM, is dropped. Every other row on
+  a format-1 index is byte-identical to 2.9.1's.
+- `searchBruteForce` segfaulted on a header-only FASTA (exit 139): its unsigned scan bound
+  wrapped. It now returns at once on a contig shorter than one target.
+- `searchBruteForce` wrote and read past its per-guide profile table for a PAM longer than
+  3 nt (TTTV, NNGRRT); a `-t` run printed garbage in the profile's mismatch columns (43,739
+  three-mismatch targets where the targets file has 48). Targets were not affected.
+
 ## [2.9.1] - 2026-10-30
 
 ### Added

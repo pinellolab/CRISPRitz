@@ -43,8 +43,8 @@ measurements; section 11 the tests.
 * Reported coordinates (unchanged by this work): for a PAM-left window the PAM's
   first base, `ws + (K - L)` for a 3' PAM, `ws` for a 5' one; for a PAM-right
   window the leftmost aligned base, `ws + mb - dna + rna` (`dna`/`rna` = bulges
-  used). Cluster Position: `ws` + the same pad for PAM-left windows, the guide start
-  `ws + mb` for PAM-right windows.
+  used). Cluster Position: the same as Position for PAM-left windows, the guide
+  start `ws + mb` for PAM-right windows.
 
 ## 2. Format 1 (CRISPRitz up to 2.9.1)
 
@@ -77,10 +77,11 @@ Defects of format 1 and its builder:
   (`searchOnTST.cpp:718`, `:907`). So for a 3' PAM the leaf at index 0 is written
   as a PAM-left window and read as a PAM-right one: a - strand PAM at base 0 is
   reported as `+` at base `mb` (or `mb - dna + rna`), and with `--prune-pam` a -
-  strand PAM exactly `K-L` from the start lands there too. A PAM-right window that
-  starts at 0 (a 3' + strand site whose guide starts at exactly `mb`, or a 5' +
-  strand PAM at base 0) is built as the other shape, from the wrong bases, and its
-  real site is lost.
+  strand PAM exactly `K-L` from the start lands there too. A window of the other
+  shape that starts at 0 -- for a 3' PAM a PAM-right one (a + strand site whose guide
+  starts at exactly `mb`), for a 5' PAM a PAM-left one (a + strand PAM at base 0) --
+  is built as the shape index 0 is read as, from the wrong bases: its real site is
+  lost, and the stored artefact can surface as a match whose PAM is not there.
 * **The scan stops one short (B2, IDX-15).** `pamGenerator.cpp:344` and
   `pam_searching.cpp:570` scan `nt < len - pam_limit`, so a PAM on the last
   `pam_limit` bases is never found. The 5' branches bound on `- pam_len`
@@ -208,7 +209,8 @@ The search refuses, with an error on stderr and exit 1:
 
 If `max_bulges` on the command line differs from a format-2 header's, the header
 wins for decoding coordinates and a note goes to stdout (stderr is fatal in
-CRISPRme).
+CRISPRme). Before searching, `searchTST` prints the formats it found on stdout, e.g.
+`INDEX FORMAT: 2 x24` or `INDEX FORMAT: 1 (CRISPRitz <= 2.9.1) x501`.
 
 Per leaf the search derives `PAM_LEFT`, `ws`, `pad_valid` and `FLANK_OFF`:
 
@@ -241,8 +243,8 @@ rebuild adds them.
 
 | | format-1 index (built by <= 2.9.1) | format-2 index (built by 2.9.2) |
 |-|------------------------------------|----------------------------------|
-| CRISPRitz <= 2.9.0 | as before | fails loudly: `numLeaves` negative, `std::length_error` |
-| CRISPRitz 2.9.1 | as before | fails loudly: `'...' is not a valid CRISPRitz index (.bin) file (numLeaves=-28747197)`, exit 1 |
+| CRISPRitz <= 2.9.0 | as before | searchTST aborts: `std::length_error` (`vector::_M_default_append`) on stderr, exit 134, empty targets file (tested with the 2.9.0 binary of the CRISPRme 2.8.0 image; its `crispritz.py` does not check exit statuses, CRISPRme fails the stage on the stderr line) |
+| CRISPRitz 2.9.1 | as before | refused: `'...' is not a valid CRISPRitz index (.bin) file (numLeaves=-28747197)`, exit 1 (tested) |
 | CRISPRitz 2.9.2 searchTST | byte-identical to 2.9.1 except index-0 rows (B1) | full B1-B4 semantics |
 | CRISPRitz 2.9.2 searchBruteForce | - (no index) | - ; B2 applies at once |
 
@@ -253,10 +255,11 @@ B2-B4 until rebuilt; B1 corrects their index-0 rows at once.
 
 A format-2 index of a genome holds every site the format-1 index of the same
 genome and parameters holds, with the same string, flank and coordinates, plus the
-boundary sites. A search on it returns a superset of the rows of a search on the
-format-1 index, the extra rows all within `mb` (B3) or `K - L` (B4) nt of a contig
-end or an N run, or on the last PAM bases of a contig (B2), and minus the index-0
-artefacts (B1).
+boundary sites (measured on hg38 chr22 and chr1, section 10). A 2.9.2 search on it
+returns every row a 2.9.2 search on the format-1 index returns, plus rows at sites
+whose guide lies within `mb` nt of a contig end or an N run (B3, including a + strand
+3' site whose guide starts at exactly `mb`), whose PAM lies within `K - L` nt of a
+contig end under `--prune-pam` (B4), or whose PAM ends on a contig's last base (B2).
 
 ## 7. Reading the stamp without loading the tree
 
@@ -333,31 +336,108 @@ it (`currentmissmatch += 100`).
 
 ## 10. Cost (measured)
 
-To be filled in from the hg38 chr1/chr22 runs (section 11.5): build time and
-`.bin` bytes for 2.9.1 vs 2.9.2, dedicated NGG and PAM-less K=8.
+`crispritz.py index-genome <name> <dir with one chromosome> <PAM file> -bMax 2 -th 8`, hg38
+chromosome FASTA (chr22 md5 319cba9f..., chr1 md5 9465e0f0...), CRISPRitz 2.9.1 (the
+shipped binaries, md5-identical to a compile of tag v2.9.1) against this branch, each
+timed by a wrapper that records wall time, user CPU and the child's peak RSS. arm64:
+Docker on Apple Silicon (24 CPUs, g++ 14.2 -O3), two rounds alternating the versions.
+
+| index | engine | wall s (round 1 / 2) | user CPU s | peak RSS GB | .bin bytes | leaves |
+|-------|--------|----------------------|------------|-------------|------------|--------|
+| chr22 NGG, `-bMax 2` | 2.9.1 | 6.1 / 5.6 | 11.1 / 11.1 | 1.45 | 129,640,072 | 5,295,027 |
+| | 2.9.2 | 6.1 / 5.8 | 11.1 / 11.4 | 1.46 / 1.47 | 129,639,385 | 5,295,032 |
+| chr22 PAM-less K=8 | 2.9.1 | 108.4 / 94.9 | 277.4 / 268.0 | 18.51 | 1,864,232,876 | 78,317,538 |
+| | 2.9.2 | 107.0 / 136.2 | 274.5 / 300.1 | 18.88 | 1,864,235,403 | 78,317,730 |
+| chr1 NGG, `-bMax 2` | 2.9.1 | 31.9 / 38.5 | 74.9 / 74.4 | 5.53 / 5.54 | 579,345,896 | 24,957,801 |
+| | 2.9.2 | 28.8 / 32.2 | 71.4 / 70.9 | 5.63 | 579,348,060 | 24,957,823 |
+
+amd64: ml008 (255 cores shared with other users, load average 250-500 during the runs;
+g++ 14.2 -O3, the rc281 image's toolchain), the 2.9.2 build after the 2.9.1 one:
+
+| index | engine | wall s | user CPU s | peak RSS GB | .bin bytes | leaves |
+|-------|--------|--------|------------|-------------|------------|--------|
+| chr1 PAM-less K=8 | 2.9.1 | 1,022.7 | 2,890.0 | 101.01 | 10,468,103,808 | 460,955,944 |
+| | 2.9.2 | 1,093.6 | 2,819.2 | 102.86 | 10,468,113,334 | 460,956,484 |
+
+* Build time is unchanged within the run-to-run noise of a shared host.
+* Peak memory grows by 4 bytes a site during the build (a site is now a window start
+  plus its shape, 8 bytes, instead of a signed int): +0.1 GB on chr1 NGG, +0.37 GB
+  on chr22 K=8, +1.85 GB on chr1 K=8 (about 2% each). searchTST's in-memory leaf
+  stays at 32 bytes.
+* Index size changes by bytes: a leaf record keeps its size, each `.bin` gains 32 + K
+  bytes of header and trailer, and the added sites are few. The sizes are reproducible
+  (identical in both rounds).
+* The added leaves are the boundary sites: chr22 NGG +5, chr1 NGG +22, chr22 K=8
+  +192, chr1 K=8 +540. Read back from the NGG `.bin` files of chr22 and chr1, every
+  format-1 leaf (window start, shape, stored PAM) is present in the format-2 index of
+  the same chromosome, all with the whole pad; each added leaf has `pad_valid < 2`,
+  and the chr1 ones match an independent scan of hg38 for perfect-match sites 0-1 nt
+  from an N run (e.g. chr1 `-` 16799140 d=0, `-` 121782408 d=1, `+` 586008 d=0).
+* Search time is unchanged: see the benchmark in section 11.
 
 ## 11. Tests
 
 1. **Boundary suite** (`test/run_boundary_test.sh`, `test/boundary/`): synthetic
-   contigs with planted perfect and 1-4-mismatch sites at every distance
-   `d = 0..mb+1` from a contig start, a contig end and an N run, on both strands,
-   for a 3' PAM (NGG, NRG) and a 5' PAM (TTTV), with the PAM also planted on the
-   contig's last bases and within `K` of either end; `-bMax` 0-3; searches at
-   0-2 DNA/RNA bulges; `--prune-pam` from PAM-less indexes with `K = L` and
-   `K > L` (NGG, NG and NRG off K=3 and K=8). Every indexed search, driven through
-   `crispritz.py`, must equal an independent brute-force aligner written for the
-   test (it enumerates the windows of section 3 straight from the FASTA and aligns
-   with the engine's alignment rules) as a set of rows, and every 0-bulge search
-   must also equal `crispritz.py search` without bulges (`searchBruteForce`).
-2. **Format-1 compatibility**: indexes built by the 2.9.1 `buildTST`, searched by the
-   2.9.1 and the 2.9.2 `searchTST`: byte-identical except index-0 rows, which must be
-   exactly the B1 corrections.
-3. **Existing tests** (`run_golden_test.sh`, `run_minimal_test.sh`,
-   `run_pam_filter_test.sh`, `run_flank_n_test.sh`, `run_short_contig_test.sh`)
-   unchanged and passing; the golden outputs byte-identical.
-4. **AddressSanitizer** build of all three binaries over the boundary suite.
-5. **Platforms and scale**: arm64 (Docker on Apple Silicon) and amd64 (ml008), and
-   hg38 chr1 and chr22: build time and size, 2.9.1 vs 2.9.2.
+   contigs with planted perfect, 1-4-mismatch and 1-bulge sites at every distance
+   `d = 0..4` from a contig start, a contig end and an N run, on both strands, for a
+   3' PAM (NGG, NRG, NG, NNGRRT) and a 5' PAM (TTTV), with the PAM 0..9 bases from a
+   contig end or an N run; dedicated indexes at `-bMax` 0-3; PAM-less K=3, K=8 and
+   5' K=4 indexes with and without `--prune-pam`; searches at 0-3 DNA/RNA bulges.
+   Every indexed search, run through `crispritz.py`, must equal
+   `test/boundary/oracle.py` -- a brute-force aligner over the FASTA that enumerates
+   the sites of section 3 and aligns with the engine's alignment rules, sharing no
+   code with it -- as a set of rows (141 searches, 5,889,164 rows), and every
+   0-bulge search must equal `crispritz.py search` without bulges, i.e.
+   `searchBruteForce` (32). The 2.9.1 binaries fail 142 of those comparisons; each
+   new mechanism, disabled on its own (pad limit, `FLANK_OFF` skip, brute-force
+   bound, guide-only N rule), fails 10 to 52; so does the oracle without its model of
+   the engine's leaf node.
+2. **Format-1 compatibility** (`test/run_format1_test.sh`): indexes built by the 2.9.1
+   `buildTST` (committed fixtures, byte-reproducible on arm64 and amd64): rows away
+   from index 0 byte-identical to the 2.9.1 `searchTST`'s, in order; index-0 rows equal
+   to the oracle's.
+3. **Index format** (`test/run_index_format_test.sh`): header and trailer, `index-info`,
+   a directory mixing both formats, `max_bulges` from the header, and the refusals.
+4. **Existing tests** (`run_golden_test.sh`, `run_minimal_test.sh`,
+   `run_pam_filter_test.sh`, `run_flank_n_test.sh`, `run_short_contig_test.sh`) pass;
+   the golden outputs are byte-identical (their genome holds no boundary site).
+   `run_short_contig_test.sh` now also requires a contig exactly one target long to
+   be indexed.
+5. **AddressSanitizer**: all three binaries, over every test above, on arm64 and amd64.
+6. **Platforms**: arm64 (Docker on Apple Silicon: g++ 14.2, and `make -f
+   Makefile_conda` in `gcc:12`) and amd64 (ml008, g++ 14.2); every test passes on each.
+7. **hg38**: see section 10 for build cost and leaf-level comparison, and:
+   * the shipped format-1 `NGG_3_hg38` (all 455 contigs, 501 trees, not rebuilt),
+     searched with the guides of the 11 contigs that open with a reverse NGG
+     (`-mm 0 -bDNA 1 -bRNA 1`, 32 threads): 63,095 rows from both engines; the 11
+     contigs' rows move from the + strand at 2-4 to the minus strand at 0 under 2.9.2
+     (same rows otherwise); every other contig's rows are identical (in order for the
+     132 single-tree contigs; the 6 multi-tree chromosomes interleave their trees in
+     thread-completion order, the same rows).
+   * 246 NGG contig-end sites on 171 alt/random/Un contigs, each searched with its own
+     perfect guide: a dedicated format-1 index finds 235 with 2.9.1 (11 come out on the
+     + strand) and 246 with 2.9.2; a format-1 K=8 index with `--prune-pam` finds 0; a
+     format-2 K=8 index with `--prune-pam` finds 246, and its rows equal the format-2
+     dedicated index's (368,586 rows). 2.9.2 on the format-1 dedicated index changes the
+     rows of 12 contigs only: the 11 move to the minus strand at base 0, and 6 rows of
+     the builder's index-0 artefact on chrUn_KI270539v1 (reported on the + strand with
+     the PAM `GGC`) are dropped; the other 159 contigs are byte-identical.
+   * chr22 and chr1, 50 guides (45 whose perfect match lies 0-2 nt from an N run on
+     chr1/chr22, and TRAC, EMX1, VEGFA site 3, HEK4, FANCF), `-mm 4 -bDNA 1 -bRNA 1`:
+     - the format-1 index gives byte-identical output under 2.9.1 and 2.9.2: chr22
+       5,232,494 rows, chr1 14,358,326 rows (each of chr1's 5 trees byte-identical,
+       searched alone; with 16 threads the trees' rows interleave in completion order);
+     - the format-2 index returns every row of the format-1 index and 1,827 (chr22) and
+       5,512 (chr1) more, every one at a site whose pad runs into an N run: the 5 and 22
+       added sites;
+     - the 0-bulge search of the format-2 index equals the brute force (chr22 32,150
+       rows, chr1 81,522); the 2.9.1 index misses 10 and 24 of those rows, including 5
+       and 22 perfect matches;
+     - `--prune-pam` NGG off the format-2 K=8 index equals the format-2 dedicated NGG
+       index on chr22 (5,234,321 rows).
+   * search time, chr22 NGG, the 50 guides, three alternating rounds (wall s): 2.9.1 on
+     the format-1 index 81.5 / 87.4 / 80.7, 2.9.2 on it 70.3 / 82.9 / 78.5 (output
+     byte-identical each round), 2.9.2 on the format-2 index 79.6 / 81.3 / 80.3.
 
 ## 12. Not changed
 
@@ -365,6 +445,12 @@ To be filled in from the hg38 chr1/chr22 runs (section 11.5): build time and
 * A guide-region N still discards the site, even for an alignment with RNA bulges
   that would not reach the N.
 * Coordinates are still 32-bit ints (contigs up to 2^31 - 1 - (mb + K) bases).
+* searchTST still tries no RNA bulge on the last base of a stored string (a leaf node
+  of the tree), so an alignment that would leave the last guide base unpaired after
+  consuming all but one of the `G + mb` stored bases is not reported, and whether such
+  an alignment is reported depends on the index's `-bMax`. This holds for interior
+  sites as much as boundary ones, is part of the golden outputs, and is modelled by
+  the oracle (without that model it predicts 352-1,786 extra rows per bulged search).
 * `main.cpp` (the old single-threaded builder, not built by any recipe) is left as
   is; it does not compile against the current `pamGenerator.cpp` and never did since
   the Aho-Corasick code was commented out.

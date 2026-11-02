@@ -243,8 +243,30 @@ Detailed input:
 `pam/pamNGG.txt/` is a text file containing the PAM sequence.  
 `-bMax 2` is the max number of bulges to allow for following searches when creating the
 database (e.g if -bMax 2, all the following searches with the created index can be performed
-with max 2 RNA bulges and 2 DNA bulges)  
+with max 2 RNA bulges and 2 DNA bulges; at most 31)  
 `-th 4` is the number of threads to use (Optional)
+
+**<a name="Index-Format">3.2.1</a> Index format 2 (CRISPRitz 2.9.2 and later).**  
+An index built by CRISPRitz 2.9.2 or later is in *index format 2*, specified in
+[docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md). It holds every target whose guide and PAM fit
+in the sequence, including targets next to a contig end or a run of `N`: the extra bases a
+DNA bulge needs beyond the guide (`-bMax` of them) no longer have to exist, they are simply
+not available to an alignment that would need them. Up to 2.9.1 such targets were dropped,
+even perfect matches within `-bMax` nt of a contig end or an `N` run, a PAM on a contig's last
+bases was never indexed, and a reverse-strand PAM at a contig's first base was reported on
+the `+` strand. Each `.bin` now starts with a header naming its format and build parameters,
+which `crispritz.py index-info` prints without loading the index:
+
+```
+crispritz.py index-info genome_library/NGG_2_hg19_ref/
+```
+
+Compatibility: CRISPRitz 2.9.2 searches indexes built by earlier versions (format 1) exactly
+as before, except at a contig's first base: a reverse-strand PAM there is reported on the
+correct strand, and a spurious match the old builder could store there is dropped. Such
+indexes keep missing the boundary targets until rebuilt. An index built by 2.9.2 cannot be
+searched by CRISPRitz 2.9.1 or earlier: 2.9.1 refuses it with an error, earlier versions
+abort with one.
 
 
 **<a name="Search">3.3</a> CRISPRitz Search Tool**  
@@ -403,10 +425,15 @@ crispritz.py search hg38_generous8/ pamNGA.txt    guides.txt out_nga    -index -
 crispritz.py search hg38_generous8/ pamNNGRRT.txt guides.txt out_sauri  -index -mm 4 -bDNA 1 -bRNA 1 -th 4 -t --prune-pam
 ```
 
-Properties (all enforced by `test/run_pam_filter_test.sh`):
+Properties (enforced by `test/run_pam_filter_test.sh` and `test/run_boundary_test.sh`):
 - **Equivalent to a dedicated index.** The targets returned for e.g. NGG off the K = 8
   index are the *same set of rows* as a dedicated 3-flank NGG index's, coordinates and
   sequences included: the DNA/crRNA columns carry the L-base PAM a dedicated index reports.
+  This holds at contig ends too for an index in format 2 ([3.2.1](#Index-Format)), whose
+  PAM-less windows may run off the contig on the flank side. An index built by CRISPRitz
+  2.9.1 or earlier (format 1) required the whole K-base flank to fit, so off it a PAM with
+  1 to K - L bases to a contig's end (+ strand) or 0 to K - L - 1 bases from its start
+  (- strand) is missing; K = L is unaffected.
   The profile outputs (`-p`/`-t`) are not comparable between the two: they count the
   engine's duplicate rows, whose number depends on the index tree's shape, and they label
   the guide with the search PAM padded to K.
