@@ -19,13 +19,19 @@ measurements; section 11 the tests.
 
 ## 1. Terms
 
-* `G` guide length (20 for SpCas9), `K` stored PAM/flank width (the build PAM
-  file's declared length), `L` the search PAM's declared length (`L = K` except
-  under `--prune-pam`), `mb` the index's `max_bulges` (`-bMax`).
+* `G` the guide length the index was built for (the N's of the build PAM file
+  before a 3' PAM or after a 5' one: 20 for SpCas9), `K` stored PAM/flank width (the
+  build PAM file's declared length), `L` the search PAM's declared length (`L = K`
+  except under `--prune-pam`), `mb` the index's `max_bulges` (`-bMax`).
+* `Gs` the search guide length (the search PAM file's), and `off = G - Gs` (2.9.1's
+  `offset_guide_len`). The search does not require `Gs = G`; section 5.1 says what a
+  search guide of another length finds. Elsewhere this document takes `Gs = G`
+  (`off = 0`) unless it says otherwise.
 * A **site** is one PAM occurrence on one strand. Its **window** is the stretch of
   the contig the index stores for it: the guide region (`G` bases), the PAM/flank
   (`K` bases) on its PAM side, and a **pad** of `mb` bases on the far (distal) side
-  of the guide, which only DNA-bulge alignments consume.
+  of the guide, which only alignments that consume more than `G` bases reach: DNA
+  bulges, or a search guide longer than `G`.
 * Seen on the + strand, a window is one of two shapes:
 
   | window | layout on the + strand | used for |
@@ -42,9 +48,12 @@ measurements; section 11 the tests.
   nibbles.
 * Reported coordinates (unchanged by this work): for a PAM-left window the PAM's
   first base, `ws + (K - L)` for a 3' PAM, `ws` for a 5' one; for a PAM-right
-  window the leftmost aligned base, `ws + mb - dna + rna` (`dna`/`rna` = bulges
-  used). Cluster Position: the same as Position for PAM-left windows, the guide
-  start `ws + mb` for PAM-right windows.
+  window the leftmost aligned base, `ws + mb + off - dna + rna` (`dna`/`rna` =
+  bulges used). Cluster Position: the same as Position for PAM-left windows, the
+  start of a `Gs`-base guide, `ws + mb + off`, for PAM-right windows.
+* An alignment **consumes** `Gs + dna - rna` stored bases, read from the PAM outward:
+  the `G` of the guide region first, then `Gs + dna - rna - G = dna - rna - off` pad
+  bases when that is positive.
 
 ## 2. Format 1 (CRISPRitz up to 2.9.1)
 
@@ -122,13 +131,26 @@ Let `n` be the contig length. Positions outside `[0, n)` are **off the contig**.
 ### 3.2 The pad
 
 `pad_valid` (0..`mb`) is the number of pad positions, counted from the guide
-outward, before the first one that is off the contig or an N. An alignment that
-consumes `dna - rna > pad_valid` pad bases needs a base that is not there and is not
-reported. Pad positions from `pad_valid` on are stored in the tree as `A`: no
-reported alignment can depend on them (an alignment reaching them is rejected by the
-`pad_valid` test at leaf emission), so any symbol serves, and the 14 nibble values
-of the tree's alphabet stay as they are. For every site of 2.9.1 (window inside the
-contig, no N outside the PAM), `pad_valid = mb` and the stored string is unchanged.
+outward, before the first one that is off the contig or an N. An alignment consumes
+`Gs + dna - rna` stored bases (section 1), of which `Gs + dna - rna - G` (that is
+`dna - rna - off`; `dna - rna` when the search guide has the index's length) are pad
+bases. If that is more than `pad_valid`, the alignment needs a base that is not there
+and is not reported. A search guide longer than the index's (`Gs > G`) reaches into
+the pad without any bulge, so at a site whose pad runs off the contig or into an N
+after fewer than `Gs - G` bases only alignments with enough RNA bulges are found; a
+shorter one (`Gs < G`) needs `G - Gs` DNA bulges more than RNA bulges to reach the
+pad. Pad positions from `pad_valid` on are stored
+in the tree as `A`: no reported alignment can depend on them (an alignment reaching
+them is rejected by the `pad_valid` test at leaf emission), so any symbol serves, and
+the 14 nibble values of the tree's alphabet stay as they are. For every site of 2.9.1
+(window inside the contig, no N outside the PAM), `pad_valid = mb` and the stored
+string is unchanged.
+
+So every base a reported alignment consumes is a base of the contig and not an N:
+the guide region's `G` by the site rule, the pad's by this test. Every reported
+target (its guide part and its PAM) lies inside the contig, at any search guide
+length (the boundary suite checks every row it gets against the contig's bases,
+section 11).
 
 ### 3.3 The flank
 
@@ -155,7 +177,7 @@ header
   8    4     header_len   28 + K: offset of numLeaves
   12   4     flags        bit 0: PAM at the 5' end; bit 1: PAM-less (all-N) build
                           PAM; other bits 0 (reserved, must be 0)
-  16   4     guide_len    G
+  16   4     guide_len    G (the body's len_guide must equal it)
   20   4     pam_len      K
   24   4     max_bulges   mb (0..31)
   28   K     pam          the build PAM region, ASCII upper case ("NGG",
@@ -205,12 +227,30 @@ The search refuses, with an error on stderr and exit 1:
 * a format version it does not know (> 2), or reserved header bits set;
 * a header `pam_len` that differs from the file name's PAM prefix, or a PAM side
   (3'/5') that differs from the search PAM's;
+* a header `guide_len` that differs from the body's `len_guide` (malformed);
 * a format-2 file that does not end in the trailer (cut short).
 
 If `max_bulges` on the command line differs from a format-2 header's, the header
 wins for decoding coordinates and a note goes to stdout (stderr is fatal in
 CRISPRme). Before searching, `searchTST` prints the formats it found on stdout, e.g.
 `INDEX FORMAT: 2 x24` or `INDEX FORMAT: 1 (CRISPRitz <= 2.9.1) x501`.
+
+The guide length the index was built for, `G` (the header's `guide_len`; format 1:
+the body's `len_guide`), is read for each `.bin` and kept per search thread with its
+`off = G - Gs`, as is `mb`. A search guide length `Gs` other than `G` is not refused
+(2.9.1 searched it, and CRISPRme sends such searches, section 8): it is searched with
+`off` in the coordinates (section 1) and in the pad test below, and `searchTST` says on
+stdout, once per `G`, what that changes, e.g.
+
+```
+NOTE: the index was built for 20-nt guides and the search guides are 21 nt; it holds
+22 bases a site, so an alignment is found only if its DNA bulges minus RNA bulges are
+at most 1 (an index built for 21-nt guides with max_bulges 2 allows 2). See
+docs/INDEX_FORMAT.md, section 5.1.
+```
+
+Section 5.1 gives the rules and how the rows differ from those of an index built for
+`Gs`.
 
 Per leaf the search derives `PAM_LEFT`, `ws`, `pad_valid` and `FLANK_OFF`:
 
@@ -224,9 +264,10 @@ Per leaf the search derives `PAM_LEFT`, `ws`, `pad_valid` and `FLANK_OFF`:
 
 At emission a leaf is skipped when `--prune-pam` is on and its flank fails the
 search PAM (unchanged), when the index is PAM-less, `--prune-pam` is off and the
-leaf is `FLANK_OFF`, or when the alignment used `dna - rna > pad_valid` pad bases.
-Coordinates are then computed as in section 1, with `mb` from the header for format
-2 and from the command line for format 1 (as 2.9.1 does).
+leaf is `FLANK_OFF`, or when the alignment used more pad bases than `pad_valid`:
+`dna - rna - off > pad_valid` (section 3.2). Coordinates are then computed as in
+section 1, with `mb` from the header for format 2 and from the command line for
+format 1 (as 2.9.1 does), and `off` from the `.bin` the leaf came from.
 
 The B1 skip: for a 3' PAM, index 0 holds either a real PAM-left window at 0 (its
 flank matches the build PAM, which the scan required) or a PAM-right window at 0
@@ -238,6 +279,79 @@ build PAM every window is real and nothing is skipped. So on a format-1 index B1
 changes only the rows of index-0 leaves: real ones get their strand and coordinate
 right, artefacts are dropped. A format-1 index never holds the lost sites; only a
 rebuild adds them.
+
+### 5.1 A search guide of another length than the index's
+
+`searchTST` takes the guide length from the search PAM file (`Gs`) and the index's from
+the `.bin` (`G`), and searches when they differ, as 2.9.1 did. CRISPRme does this: its
+`21bp-NNGRRT-SaCas9.txt` (21-nt guides) is served under `--prune-pam` by a PAM-less
+index built for 20-nt guides, and `23bp-TTTV-Cas12a.txt` (23-nt) by a 20-nt TTTV or
+NNNN index (section 8). The rules, for both formats:
+
+1. **Sites are the index's**: a `G`-base guide region inside the contig with no N,
+   and the PAM of section 3.1. When `Gs < G`, a target whose `Gs`-base guide fits but
+   whose `G`-base region does not -- its far end within `G - Gs` nt of a contig end or
+   an N run -- is not in the index and is not found.
+2. **An alignment consumes `Gs + dna - rna` of the `G + mb` stored bases**, so it is
+   found only if `dna - rna <= G + mb - Gs`: a longer guide has fewer DNA bulges to
+   spend (with `Gs > G + mb`, none is found without an RNA bulge).
+3. **The pad test** (section 3.2): the `dna - rna - off` pad bases it consumes must
+   all exist. So a longer guide's extra bases are never paired with a base off the
+   contig or on an N, and every reported row lies inside the contig.
+4. **The leaf rule** of section 12 applies where the stored string ends, `G + mb`
+   bases from the PAM.
+5. **Coordinates** carry `off` (section 1).
+
+The rows are therefore exact for what the index holds, and on a format-2 index a
+0-bulge search with a longer guide (`G < Gs <= G + mb`) returns what
+`searchBruteForce` returns (the boundary suite checks both). But they can differ from
+the rows of an index built for `Gs`: not without bulges when `Gs > G`, but with
+bulges, and for a shorter guide at contig ends and N runs. Measured with
+`crispritz.py` on the boundary suite's genome (`test/boundary/make_genome.py`, 346
+contigs a PAM side), rows only in one of the two:
+
+| search guides | the index for `G` | the index for `Gs` | -mm/-bDNA/-bRNA | rows (`G` / `Gs`) | only `G`'s | only `Gs`'s |
+|---|---|---|---|---|---|---|
+| 21-nt NNGRRT | K=8 PAM-less, 20 nt, `-bMax 2`, `--prune-pam` | NNGRRT, 21 nt, `-bMax 2` | 4/0/0 | 290 / 290 | 0 | 0 |
+| | | | 1/1/0 | 274 / 274 | 0 | 0 |
+| | | | 1/0/1 | 324 / 272 | 52 | 0 |
+| | | | 1/2/2 | 222,162 / 246,728 | 3,912 | 28,478 |
+| 23-nt TTTV | TTTV, 20 nt, `-bMax 3` | TTTV, 23 nt, `-bMax 3` | 4/0/0 | 122 / 122 | 0 | 0 |
+| | | | 1/1/0 | 16 / 76 | 0 | 60 |
+| | | | 1/0/1 | 102 / 100 | 26 | 24 |
+| | | | 1/2/2 | 67,280 / 91,196 | 1,920 | 25,836 |
+| 19-nt NGG | NGG, 20 nt, `-bMax 2` | NGG, 19 nt, `-bMax 2` | 4/0/0 | 492 / 508 | 0 | 16 |
+| | | | 1/1/0 | 412 / 416 | 0 | 4 |
+| | | | 1/0/1 | 640 / 684 | 0 | 44 |
+| | | | 1/2/2 | 432,068 / 448,670 | 690 | 17,292 |
+
+Why they differ, row by row:
+
+* only the `G` index's, `Gs > G`: RNA-bulged alignments that stop short of the guide
+  region's far end at a site where it runs off the contig or into an N (the `Gs`
+  index needs its whole `Gs`-base region and does not hold the site). All at boundary
+  sites.
+* only the `Gs` index's, `Gs > G`: alignments with more DNA bulges than rule 2
+  allows (the 60 rows at 1/1/0: no DNA bulge fits 23-nt guides into 20 + 3 stored
+  bases; 166 rows with 2 more DNA than RNA bulges at 1/2/2 for 21-nt guides), and
+  the leaf rule: an alignment that leaves its last guide base unpaired after
+  `G + mb - 1` bases is not tried where the `G` index's string ends, but is by the
+  longer `Gs` index. These occur at interior sites too (1,650 of the 28,478; 1,482
+  of the 25,836).
+* only the `Gs` index's, `Gs < G`: rule 1's sites (16 perfect and mismatched
+  targets at 4/0/0, the suite's guides cut by a contig end or an N run), all at
+  boundary sites.
+* only the `G` index's, `Gs < G`: the leaf rule the other way round (690 rows at
+  1/2/2, 40 of them at interior sites).
+
+What does hold for any `Gs`: a `--prune-pam` search of a PAM-less index returns the
+same rows as a dedicated index **built for the same `G` and `mb`** (rows only in one:
+0 at each of the four settings of the table's 21-nt NNGRRT lines, comparing the K=8
+index with a 20-nt NNGRRT index; the boundary suite checks it for `Gs` = 19, 20, 21
+and 23, section 11).
+
+For the rows of an index built for the search's guide length, search one built for
+it: `index-genome` with the search's PAM file (its N's are the guide length).
 
 ## 6. Compatibility
 
@@ -318,12 +432,36 @@ of `a5379e0`:
    that cuts a fixed window around a target (scoring context, variant lookup at
    `pos + offset`, indel FAKE-contig mapping) must clamp at the contig ends and not
    assume `mb` (or `K`) bases exist beyond the target. The target itself (guide +
-   PAM as reported) always lies inside the contig and holds no N in its guide.
+   PAM as reported) always lies inside the contig and holds no N in its guide, at
+   any search guide length (section 3.2; the boundary suite checks every row).
 6. **Equivalence claims.** With B2-B4, a `--prune-pam` search of a format-2 PAM-less
-   index of flank `K` returns the same rows as a dedicated format-2 index for any
-   3' PAM `L <= K`, contig ends included, and an index with a larger `mb` returns a
-   superset of a smaller one's rows. These claims do not hold for format-1 indexes
-   (the audit's counts for hg38 stand for them).
+   index of flank `K` returns the same rows as a dedicated format-2 index **built for
+   the same guide length `G` and `mb`**, for any 3' PAM `L <= K` and any search guide
+   length, contig ends included; and of two indexes built for the same `G`, the one
+   with the larger `mb` returns a superset of the other's rows. Neither holds across
+   guide lengths: the rows of an index built for 20-nt guides, searched with 21-nt
+   guides, are not those of an index built for 21-nt guides once bulges are searched
+   (section 5.1). Neither holds for format-1 indexes either (the audit's counts for
+   hg38 stand for them).
+7. **Guide-length pairing.** `_resolve_index_dir`
+   (`PostProcess/submit_job_automated_new_multiple_vcfs.sh`) and `_pam_serves`
+   (`crisprme.py`) pick an index by its PAM name and width and `-bMax` only; nothing
+   compares guide lengths, and CRISPRitz searches a guide of any length (section 5.1).
+   So `21bp-NNGRRT-SaCas9.txt` and `21bp-NNNRRT-SaCas9KKH.txt` (21-nt guides) are
+   served under `--prune-pam` by a PAM-less index built for 20-nt guides, such as the
+   K=8 general index, and `23bp-TTTV-Cas12a.txt` (23-nt) by a 20-nt TTTV or NNNN index
+   (`23bp-TTTN-Cas12a.txt` by a 20-nt TTTN or NNNN one). The engine handles the
+   difference (every row is a real
+   target and, for a longer guide without bulges, the rows equal the brute force), but
+   with bulges the rows are those of a 20-nt index, which section 5.1 shows differ
+   from a 21- or 23-nt index's, at interior sites too, and a shorter guide misses
+   targets at contig ends and N runs. CRISPRme must pair the guide length as well:
+   read `guide_len` from one `.bin` (section 7; `crispritz.py index-info`) and prefer
+   an index whose `guide_len` is the PAM file's guide length, building one for that
+   length when none is available, or else use the other knowingly and say in the
+   report which guide length the index was built for. `searchTST`'s stdout `NOTE: the
+   index was built for <G>-nt guides ...` line (section 5) marks a run where it was
+   not.
 
 ## 9. searchBruteForce (B2 only)
 
@@ -391,20 +529,40 @@ compared for both versions; the other sizes agree to the byte).
    `d = 0..4` from a contig start, a contig end and an N run, on both strands, for a
    3' PAM (NGG, NRG, NG, NNGRRT) and a 5' PAM (TTTV), with the PAM 0..9 bases from a
    contig end or an N run; dedicated indexes at `-bMax` 0-3; PAM-less K=3, K=8 and
-   5' K=4 indexes with and without `--prune-pam`; searches at 0-3 DNA/RNA bulges.
+   5' K=4 indexes with and without `--prune-pam`; searches at 0-3 DNA/RNA bulges; and
+   search guides longer and shorter than the index's (section 5.1: 21-nt NNGRRT, as
+   CRISPRme's SaCas9 PAM file, off the K=8 index under `--prune-pam` and off 20- and
+   21-nt NNGRRT indexes; 21- and 19-nt NGG; 23-nt TTTV, as CRISPRme's Cas12a PAM file,
+   off 20-nt TTTV and 5' K=4 indexes; 19-nt TTTV), with sites planted for them (the
+   bases beyond the guide's far end known, 0..4 of them before a contig end or an N
+   run; and guides cut by one or two bases at a contig end or an N run).
    Every indexed search, run through `crispritz.py`, must equal
    `test/boundary/oracle.py` -- a brute-force aligner over the FASTA that enumerates
    the sites of section 3 and aligns with the engine's alignment rules, sharing no
-   code with it -- as a set of rows (141 searches, 5,889,164 rows), and every
-   0-bulge search must equal `crispritz.py search` without bulges, i.e.
-   `searchBruteForce` (32). The 2.9.1 binaries fail 142 of those comparisons; each
-   new mechanism, disabled on its own (pad limit, `FLANK_OFF` skip, brute-force
-   bound, guide-only N rule), fails 10 to 52; so does the oracle without its model of
-   the engine's leaf node.
+   code with it -- as a set of rows (251 searches, 12,400,832 rows); every row must
+   be its contig's own bases at its Position (`test/boundary/check_rows.py`, which
+   reads only the FASTA); every 0-bulge search must equal `crispritz.py search`
+   without bulges, i.e. `searchBruteForce` (58), except that a search guide shorter
+   than the index's must find a subset of it, the brute force then being the oracle's
+   dedicated index for the shorter guide (8 of the 58); and each `--prune-pam` search
+   must give the same rows as the dedicated index built for the same guide length
+   and `-bMax` (90 comparisons, at `Gs` = 19, 20, 21 and 23). The 2.9.1 `buildTST` and
+   `searchTST` fail 530 of those comparisons (run with the fixed `searchBruteForce` as
+   the 0-bulge reference: the 2.9.1 one segfaults on the 5' genome). This branch
+   before the guide-length fix (`546333f`, which counted `dna - rna` pad bases for any
+   guide length) fails 102, all in the 84 searches whose guide length differs from
+   the index's: 54 differ from the oracle (rows paired with bases off the contig or
+   on an N, at Position -1 among others, for a longer guide; DNA-bulged rows lost at
+   boundaries for a shorter one), 40 report rows that are not their contig's bases,
+   and 8 0-bulge searches with a longer guide differ from the brute force. On the
+   first version of the matrix (141 searches), each other mechanism, disabled on its
+   own (pad limit, `FLANK_OFF` skip, brute-force bound, guide-only N rule), failed 10
+   to 52; so did the oracle without its model of the engine's leaf node.
 2. **Format-1 compatibility** (`test/run_format1_test.sh`): indexes built by the 2.9.1
    `buildTST` (committed fixtures, byte-reproducible on arm64 and amd64): rows away
    from index 0 byte-identical to the 2.9.1 `searchTST`'s, in order; index-0 rows equal
-   to the oracle's.
+   to the oracle's. Seven searches, two of them with 21- and 19-nt guides on the 20-nt
+   index (313 and 427 rows byte-identical to 2.9.1's away from index 0).
 3. **Index format** (`test/run_index_format_test.sh`): header and trailer, `index-info`,
    a directory mixing both formats, `max_bulges` from the header, and the refusals.
 4. **Existing tests** (`run_golden_test.sh`, `run_minimal_test.sh`,
@@ -453,11 +611,19 @@ compared for both versions; the other sizes agree to the byte).
 * A 5' PAM shorter than the stored flank is still refused under `--prune-pam`.
 * A guide-region N still discards the site, even for an alignment with RNA bulges
   that would not reach the N.
+* An index still holds the sites of its own guide length `G` only, so a search guide
+  shorter than `G` does not find a target whose far end lies within `G - Gs` nt of a
+  contig end or an N run, and one of another length gets, with bulges, rows that
+  differ from those of an index built for its length (section 5.1). Making an index
+  serve every guide length alike would mean storing every PAM whatever its guide
+  region holds, with a per-leaf count of usable bases wider than `pad_valid`'s 5
+  bits: a format change not made here.
 * Coordinates are still 32-bit ints (contigs up to 2^31 - 1 - (mb + K) bases).
 * searchTST still tries no RNA bulge on the last base of a stored string (a leaf node
   of the tree), so an alignment that would leave the last guide base unpaired after
   consuming all but one of the `G + mb` stored bases is not reported, and whether such
-  an alignment is reported depends on the index's `-bMax`. This holds for interior
+  an alignment is reported depends on the index's `-bMax` (and, for a search guide of
+  another length, on the index's `G`: section 5.1). This holds for interior
   sites as much as boundary ones, is part of the golden outputs, and is modelled by
   the oracle (without that model it predicts 352-1,786 extra rows per bulged search).
 * `main.cpp` (the old single-threaded builder, not built by any recipe) is left as

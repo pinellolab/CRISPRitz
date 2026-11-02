@@ -34,11 +34,17 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   JSON, reading only its first and last bytes (the reference reader for CRISPRme).
 - `test/run_boundary_test.sh`: sites at every distance from contig ends and `N` runs, both
   strands, 3' and 5' PAMs, dedicated and PAM-less indexes, with and without `--prune-pam`,
-  through `crispritz.py`; every search must equal `test/boundary/oracle.py`, an independent
-  brute-force aligner over the FASTA, and every 0-bulge search `searchBruteForce` (141 and 32
-  comparisons, 5,889,164 rows; the 2.9.1 binaries fail 142).
+  search guides of the index's length and longer and shorter ones (21-nt SaCas9 and 23-nt
+  Cas12a guides off 20-nt indexes, as CRISPRme searches them), through `crispritz.py`; every
+  search must equal `test/boundary/oracle.py`, an independent brute-force aligner over the
+  FASTA, every row must be its contig's own bases at its position
+  (`test/boundary/check_rows.py`), every 0-bulge search must equal `searchBruteForce` (a
+  shorter guide: a subset of it), and every `--prune-pam` search the dedicated index built
+  for the same guide length and `-bMax` (251 searches, 12,400,832 rows; 58 brute-force and
+  90 dedicated-index comparisons; the 2.9.1 `buildTST`/`searchTST` fail 530).
 - `test/run_format1_test.sh`: indexes built by the 2.9.1 `buildTST` (committed fixtures)
-  search byte-identically to 2.9.1 away from index 0, and the index-0 rows equal the oracle.
+  search byte-identically to 2.9.1 away from index 0, with the index's guide length and
+  with 21- and 19-nt guides, and the index-0 rows equal the oracle.
 - `test/run_index_format_test.sh`: the format-2 header and trailer, `index-info`, a
   directory mixing both formats, `max_bulges` taken from the header, and the reader's
   refusals (cut-short file, PAM side mismatch, unknown version, `-bMax` above 31).
@@ -48,6 +54,16 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   refuses one: `not a valid CRISPRitz index (.bin) file (numLeaves=-28747197)`). Indexes
   built by earlier versions keep working (see Fixed, IDX-14) but lack the sites B2-B4 add
   until rebuilt.
+- **A search guide of another length than the index was built for** (e.g. CRISPRme's 21-nt
+  SaCas9 or 23-nt Cas12a guides off a 20-nt index) is still searched, now with a `NOTE:` on
+  stdout naming both lengths and what that limits; its rows are exact for what the index
+  holds, and on a format-2 index a longer guide is never paired with a base off the contig
+  or on an `N`, but with bulges they are not the rows of an index built for that length,
+  and a shorter guide misses targets at contig ends and `N` runs
+  ([docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md) section 5.1: build the index with the guide
+  length you search with). The guide-length offset is now kept per index file and search
+  thread (it was one global that every thread wrote), and a format-2 header whose guide
+  length differs from its body's is refused as malformed.
 
 ### Fixed
 - **A site whose guide lay within `max_bulges` nt of a contig end or an `N` run was not
@@ -61,7 +77,9 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   tests had to fit, and a window starting before base 0 could not be stored (the sign of a
   leaf index was its strand). A PAM-less window may now run off the contig on the flank side
   (those bases stored as `N`), and format 2 stores a signed window start with the strand in
-  its own bit. With this, `--prune-pam` equals a dedicated index at contig ends too.
+  its own bit. With this, `--prune-pam` equals a dedicated index built for the same guide
+  length and `-bMax` at contig ends too (not one built for another guide length: section
+  5.1 of docs/INDEX_FORMAT.md).
 - **A PAM on a contig's last bases was never found (IDX-15)**, in any index or by the
   brute-force scan: the scan stopped one short on a 3' PAM, and on a 5' PAM bounded on the
   target length, losing every reverse-strand 5' PAM within a guide length of the end. Fixed in
