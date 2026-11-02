@@ -356,8 +356,17 @@ g++ 14.2 -O3, the rc281 image's toolchain), the 2.9.2 build after the 2.9.1 one:
 
 | index | engine | wall s | user CPU s | peak RSS GB | .bin bytes | leaves |
 |-------|--------|--------|------------|-------------|------------|--------|
+| chr22 NGG, `-bMax 2` | 2.9.1 | 15.4 | 28.1 | 1.44 | 129,640,072 | 5,295,027 |
+| | 2.9.2 | 16.1 | 27.5 | 1.46 | 129,639,385 | 5,295,032 |
+| chr22 PAM-less K=8 | 2.9.1 | 209.0 | 483.9 | 18.51 | 1,864,232,876 | 78,317,538 |
+| | 2.9.2 | 202.9 | 479.0 | 18.88 | 1,864,235,403 | 78,317,730 |
+| chr1 NGG, `-bMax 2` | 2.9.1 | 78.3 | 145.2 | 5.54 | 579,345,896 | 24,957,801 |
+| | 2.9.2 | 71.8 | 139.5 | 5.63 | 579,348,060 | 24,957,823 |
 | chr1 PAM-less K=8 | 2.9.1 | 1,022.7 | 2,890.0 | 101.01 | 10,468,103,808 | 460,955,944 |
 | | 2.9.2 | 1,093.6 | 2,819.2 | 102.86 | 10,468,113,334 | 460,956,484 |
+
+The `.bin` files are byte-identical across the two architectures (chr22 NGG md5s
+compared for both versions; the other sizes agree to the byte).
 
 * Build time is unchanged within the run-to-run noise of a shared host.
 * Peak memory grows by 4 bytes a site during the build (a site is now a window start
