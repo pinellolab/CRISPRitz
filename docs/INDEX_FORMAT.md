@@ -398,8 +398,14 @@ below is the reference implementation; it is `crispritz.py`'s own, and
 index-info` does for every file of its corpus (good files of both formats, and 18 damaged
 in one way each). `crispritz.py index-info <index_dir>` prints its result for every `.bin`
 of a directory as JSON, with `writes_format`, the format this CRISPRitz builds (its
-`INDEX_FORMAT`, section 8), and exits 1 when the directory holds no `.bin` or a `.bin`
-with an `error` entry.
+`INDEX_FORMAT`, section 8), and `pams`, the PAMs the files are named for, and exits 1
+when the directory holds no `.bin`, a `.bin` with an `error` entry, or `.bin` files named
+for more than one PAM. `searchTST` reads every `.bin` of a directory as an index of the PAM
+that names the first one it lists (its width; for format 1, its PAM), so such a directory
+is not one index. A macOS `._` (AppleDouble) file copied along with an index is one: its
+first int, read as a format-1 leaf count, is positive, so the file alone passes, but it is
+named for `.`, and `searchTST` refused such a directory on Linux amd64 and arm64 ("this
+index stores a 1-nt PAM/flank region ('.')").
 
 An `error` entry means `searchTST` refuses the file whatever the search: the function
 makes every check of section 5 that does not depend on the search, in `searchTST`'s order,
@@ -705,7 +711,8 @@ compared for both versions; the other sizes agree to the byte).
    format among them) and, run as a user other than root, an unreadable one: both
    refuse each, for the same reason, and the reader of section 7 returns what
    `index-info` does for the 18 and the good files (36). The `index-info` of the
-   previous commit (`520a69a`) accepts 12 of the 18. The boundary suite runs
+   previous commit (`520a69a`) accepts 12 of the 18. `index-info` also refuses a
+   directory holding a macOS `._` file beside the index's `.bin`. The boundary suite runs
    `index-info` on each index it builds (exit 0, nothing on stderr, the header's
    parameters those of the build).
 4. **Existing tests** (`run_golden_test.sh`, `run_minimal_test.sh`,

@@ -779,8 +779,9 @@ def read_index_header(path):
 def indexInfo():
     """crispritz.py index-info <index_dir>: the format of every .bin of an index, and
     the index format this CRISPRitz writes, as JSON on stdout. Exits 1 when the
-    directory holds no .bin, or a .bin that searchTST refuses whatever the search
-    (read_index_header gives it an "error" entry)."""
+    directory holds no .bin, a .bin that searchTST refuses whatever the search
+    (read_index_header gives it an "error" entry), or .bin files named for more than
+    one PAM."""
     import json
 
     if len(sys.argv) < 3 or "help" in sys.argv[2:]:
@@ -790,8 +791,9 @@ def indexInfo():
             "CRISPRitz <= 2.9.1; 2: built by 2.9.2 or later, see docs/INDEX_FORMAT.md), "
             "for format 2 the parameters it was built with, and, as writes_format, the "
             "format this CRISPRitz builds. Reads only each file's header, the start of its "
-            "body and its last bytes. Exits 1 if the directory holds no .bin, or a .bin "
-            "that searchTST would refuse (its \"error\" entry says why)."
+            "body and its last bytes. Exits 1 if the directory holds no .bin, a .bin "
+            "that searchTST would refuse (its \"error\" entry says why), or .bin files "
+            "named for more than one PAM (pams)."
         )
         sys.exit()
     index_dir = os.path.realpath(sys.argv[2])
@@ -803,18 +805,27 @@ def indexInfo():
         if len(name) > 4 and name.endswith(".bin") and isfile(path):
             files[name] = read_index_header(path)
     formats = sorted({str(i["format"]) for i in files.values()})
+    # searchTST reads every .bin of a directory as an index of the PAM that names the
+    # first one it lists (its width; for format 1, its PAM), so files named for more
+    # than one PAM are not one index: macOS "._" AppleDouble files copied along with
+    # an index, named for ".", make searchTST refuse the search
+    pams = sorted({n.split("_", 1)[0] for n in files})
     bad = [n for n, i in files.items() if "error" in i]
-    print(json.dumps({"index": index_dir, "formats": formats, "writes_format": INDEX_FORMAT,
-                      "files": files}, indent=1))
-    if not files or bad:
-        why = ["%s: %s" % (n, files[n]["error"]) for n in bad[:5]]
-        if len(bad) > 5:
-            why.append("and %d more" % (len(bad) - 5))
-        sys.stderr.write(
-            "ERROR: %s\n"
-            % ("no .bin index files in " + index_dir if not files
-               else "searchTST would refuse " + "; ".join(why))
-        )
+    print(json.dumps({"index": index_dir, "formats": formats, "pams": pams,
+                      "writes_format": INDEX_FORMAT, "files": files}, indent=1))
+    why = []
+    if not files:
+        why.append("no .bin index files in " + index_dir)
+    if bad:
+        why.append("searchTST would refuse " + "; ".join(
+            ["%s: %s" % (n, files[n]["error"]) for n in bad[:5]]
+            + (["and %d more" % (len(bad) - 5)] if len(bad) > 5 else [])))
+    if len(pams) > 1:
+        why.append("the .bin files are named for more than one PAM (%s): searchTST reads "
+                   "them all as an index of the PAM of the first it lists"
+                   % ", ".join("'%s'" % p for p in pams))
+    if why:
+        sys.stderr.write("ERROR: %s\n" % "; ".join(why))
         sys.exit(1)
 
 

@@ -36,7 +36,9 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   `searchTST` would refuse whatever the search, with an `error` entry saying why (an
   unknown or malformed header, reserved flag bits, `max_bulges` above 31, a cut-short file,
   a header guide length other than the body's, a header PAM other than the file name's, a
-  leaf count below 1). Its `writes_format`, and `INDEX_FORMAT` in `crispritz.py`, give the
+  leaf count below 1), and on a directory whose `.bin` files are named for more than one PAM
+  (such as a macOS `._` file copied along with an index, which `searchTST` refuses as a
+  1-nt PAM region `.`). Its `writes_format`, and `INDEX_FORMAT` in `crispritz.py`, give the
   index format this CRISPRitz builds, for a reader that must know the format of an index it
   has just built that holds no `.bin` to read (docs/INDEX_FORMAT.md section 8).
 - `test/run_boundary_test.sh`: sites at every distance from contig ends and `N` runs, both

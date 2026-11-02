@@ -20,9 +20,12 @@
 #                   a note on stdout naming both lengths (docs/INDEX_FORMAT.md 5.1); the
 #                   boundary suite checks its rows.
 #   6. INDEX-INFO : index-info refuses (exit 1, an "error" entry) each of 18 .bin files
-#                   damaged in one way that searchTST refuses, for the same reason, and
-#                   accepts the good ones; the reference reader of docs/INDEX_FORMAT.md
-#                   section 7 returns what index-info does for every file.
+#                   damaged in one way that searchTST refuses, for the same reason (and,
+#                   not as root, an unreadable one), and a directory whose .bin files
+#                   are named for more than one PAM (a macOS "._" file beside the
+#                   index), and accepts the good ones; the reference reader of
+#                   docs/INDEX_FORMAT.md section 7 returns what index-info does for every
+#                   file.
 #
 # Configuration: CXX, CXXFLAGS, BUILDTST, SEARCHTST (prebuilt binaries), PYTHON,
 # KEEP_WORKDIR.
@@ -75,7 +78,7 @@ mkdir -p cli/bin && cp "${REPO_ROOT}/crispritz.py" cli/bin/
 "${PYTHON}" - info2.json info1.json "${REPO_ROOT}/crispritz.py" "${SRC_DIR}/include/indexFormat.h" <<'PY'
 import json, re, sys
 v2, v1 = (json.load(open(p)) for p in sys.argv[1:3])
-assert v2["formats"] == ["2"] and len(v2["files"]) == 6, v2
+assert v2["formats"] == ["2"] and len(v2["files"]) == 6 and v2["pams"] == v1["pams"] == ["NGG"], v2
 for f in v2["files"].values():
     assert f == dict(f, format=2, pam_at_start=False, pamless=False, guide_len=20, pam_len=3,
                      max_bulges=2, pam="NGG", complete=True) and f["num_leaves"] > 0, f
@@ -231,6 +234,24 @@ if [ "$(id -u)" != 0 ]; then
 else
   echo "  (an unreadable .bin: not tested as root)"
 fi
+# .bin files named for more than one PAM: a macOS "._" AppleDouble file copied along with
+# an index (its first int, read as a format-1 leaf count, is positive, so the file alone
+# passes). searchTST reads every .bin as an index of the PAM that names the first one it
+# lists; it refused such a directory ("this index stores a 1-nt PAM/flank region ('.')")
+# on Linux amd64 and arm64. It is not run here: listed the other way round, it would take
+# the 163-byte file's first int, 118,883,584, for a leaf count and allocate as many leaves.
+mkdir -p appledouble && cp v2/NGG_f1_1.bin appledouble/
+"${PYTHON}" -c 'import sys; open(sys.argv[1], "wb").write(b"\x00\x05\x16\x07\x00\x02\x00\x00Mac OS X        " + bytes(139))' \
+  appledouble/._NGG_f1_1.bin
+set +e
+"${PYTHON}" cli/bin/crispritz.py index-info appledouble > ii_ad.json 2> ii_ad.err
+RC=$?
+set -e
+[ "${RC}" = 1 ] && grep -qF "the .bin files are named for more than one PAM ('.', 'NGG')" ii_ad.err \
+  || fail "a ._ AppleDouble file beside the index: index-info: exit ${RC}: $(cat ii_ad.err)"
+"${PYTHON}" -c 'import json, sys; d = json.load(open(sys.argv[1])); assert d["pams"] == [".", "NGG"] and d["files"]["._NGG_f1_1.bin"]["format"] == 1, d' \
+  ii_ad.json || fail "a ._ AppleDouble file beside the index: index-info's JSON"
+echo "  ok: ._NGG_f1_1.bin (AppleDouble) beside NGG_f1_1.bin: index-info refuses the directory (.bin files named for '.' and 'NGG')"
 # what index-info accepts, searchTST searches: the good directories, both formats
 for d in v2 mixed "${FIX}/idx_NGG_2"; do
   "${PYTHON}" cli/bin/crispritz.py index-info "${d}" > /dev/null 2> ii_good.err || fail "index-info refuses ${d}: $(cat ii_good.err)"
