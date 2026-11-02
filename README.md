@@ -205,6 +205,15 @@ Detailed input:
 `hg19_1000genomeproject_vcf/` is the directory containing the vcf files.  
 `hg19_ref/` is the directory containing the fasta files.
 
+Multi-allelic sites: a site may be one VCF record listing several ALTs or one record per
+ALT (as `bcftools norm -m -any` writes it); either way, since 2.9.2, every single-base ALT
+of the PASS records at a position goes into its IUPAC code, in any record order, and into
+its SNP dictionary entry (up to 2.9.1 only the last record's ALT did). A position whose
+reference base and ALTs cover all four bases is coded without its rarest ALT (lowest AF),
+because `N` is a gap to `index-genome` and `search`; the dictionary still lists it. Apply an
+allele-frequency filter after splitting, so it acts per ALT. Details:
+[`docs/MULTIALLELIC_ENRICHMENT.md`](docs/MULTIALLELIC_ENRICHMENT.md).
+
 
 **<a name="Index-Genome">3.2</a> CRISPRitz Index-Genome Tool**  
 This tool is created to generate an index genome (similar to the bwa-index step). This step is
