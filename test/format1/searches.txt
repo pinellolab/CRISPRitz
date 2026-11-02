@@ -1,0 +1,5 @@
+ngg_mm4_b00 idx_NGG_2 guide3.txt pam_NGG.txt 4 0 0 0 f2,f3
+ngg_mm2_b11 idx_NGG_2 guide3.txt pam_NGG.txt 2 1 1 0 f2,f3
+n8_prune_ngg_mm2_b11 idx_N8_2 guide3.txt pam_NGG.txt 2 1 1 1 f5
+n8_own_mm1_b00 idx_N8_2 guide8.txt pam_N8.txt 1 0 0 0 f5
+tttv_mm2_b11 idx_TTTV_2 guide5.txt pam_TTTV.txt 2 1 1 0 -

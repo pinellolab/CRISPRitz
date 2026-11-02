@@ -121,6 +121,25 @@ jobs:
         env:
           OMP_NUM_THREADS: "1"
 
+  format1:
+    name: indexes built by 2.9.1 search as before (but index 0, IDX-14)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+
+      # test/fixtures/format1 holds small indexes built by the 2.9.1 buildTST and the
+      # 2.9.1 searchTST's output on them. Every row away from a contig's index-0 leaf
+      # must stay byte-identical, order included; the index-0 rows must equal the
+      # independent oracle (test/boundary/oracle.py): the reverse-strand PAM at a
+      # contig's first base on the minus strand, and the builder's index-0 artefact gone.
+      - name: Run format-1 compatibility test
+        run: bash test/run_format1_test.sh
+
   asan:
     name: AddressSanitizer (#105 regression guard, WTN + DNA bulge)
     runs-on: ubuntu-latest

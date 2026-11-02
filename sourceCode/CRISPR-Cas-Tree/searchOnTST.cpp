@@ -49,11 +49,17 @@ typedef struct tnode
 
 typedef struct tleaf
 {
-	int guideIndex;
+	int guideIndex; // window start ws, decoded from either format by loadTST
 	char *guideDNA;
 	int next;
 	bitset<4> *guideDNA_bit;
+	unsigned char info; // LEAF_* bits below, decoded by loadTST
 } Tleaf;
+
+// Tleaf.info: the index stores the strand in the sign of the leaf index; loadTST
+// turns it into these, so the emit path reads one form.
+static const unsigned char LEAF_LEFT = 0x1; // window = flank|guide|pad (PAM-left)
+static const unsigned char LEAF_SKIP = 0x4; // an index-0 artefact of the builder (IDX-14)
 
 struct file_stats_struct
 {
@@ -155,6 +161,21 @@ static inline bool pamPrune_reject(const bitset<4> *leafPam)
 	return false;
 }
 // ---- END PROTOTYPE globals ----
+
+// The build PAM region, from the .bin file-name prefix (the only record of it in an
+// index), as bitsets; and whether it constrains any position. Used to recognise the
+// index-0 artefact (see loadTST).
+vector<bitset<4>> buildPamBit;
+bool buildPamConstrained = false;
+
+// Whether the emit path must skip this leaf: an index-0 artefact (LEAF_SKIP), or,
+// under --prune-pam, a flank incompatible with the search PAM (as before).
+static inline bool leafSkipped(const Tleaf &leaf)
+{
+	if (leaf.info & LEAF_SKIP)
+		return true;
+	return PAM_PRUNE && pamPrune_reject(leaf.guideDNA_bit);
+}
 
 //Create matrix for profiling //num_thr = number of layers of the matrix. Each thr update his own layer
 vector<vector<vector<int>>> profiling;
@@ -553,16 +574,36 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 		// std::string str(targetOnDNA[thr][i].guideDNA);
 		// cout << "pam rna read " << str << endl;
 
+		Tleaf &leaf = targetOnDNA[thr][i];
 		fileTree.get(in); // read index of next PAM with same guide
-
 		if (in == '0')
-		{
-			targetOnDNA[thr][i].next = 0;
-		}
+			leaf.next = 0;
 		else
-		{
-			fileTree.read((char *)&targetOnDNA[thr][i].next, sizeof(int));
-		}
+			fileTree.read((char *)&leaf.next, sizeof(int));
+
+		// The sign of a leaf index is the strand: < 0 is a PAM-left window (3' PAM
+		// minus strand, 5' PAM plus strand) at -index, > 0 a PAM-right one. Index 0 is
+		// ambiguous: the builder makes it PAM-left for a 3' PAM and PAM-right for a 5'
+		// one, so read it the same way (IDX-14; 2.9.1 read index 0 as PAM-right for
+		// both, so a reverse-strand PAM at a contig's first base came out on the +
+		// strand).
+		int gi = leaf.guideIndex;
+		leaf.guideIndex = gi < 0 ? -gi : gi;
+		leaf.info = (gi < 0 || (gi == 0 && !pam_at_start)) ? LEAF_LEFT : 0;
+		// The builder also took a window of the OTHER shape that starts at 0 (a 3'
+		// PAM-right window whose guide starts at max_bulges, a 5' PAM-left one whose PAM
+		// is at base 0) for index 0, and stored it from the wrong bases. Its flank then
+		// matches the build PAM only where those bases hold a real PAM of the shape
+		// index 0 is read as -- and then it is that real window, which the scan found
+		// too. So an index-0 flank that fails the build PAM is such an artefact: drop
+		// it. (An all-N build PAM: every window is real, nothing to drop.)
+		if (gi == 0 && buildPamConstrained)
+			for (size_t j = 0; j < buildPamBit.size() && j < pamRNA.size(); j++)
+				if ((leaf.guideDNA_bit[j] & buildPamBit[j]).none())
+				{
+					leaf.info |= LEAF_SKIP;
+					break;
+				}
 	}
 
 	fileTree.read((char *)&numNodes, sizeof(int)); // read number of nodes
@@ -655,7 +696,8 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 			// the index is PAM-less so the descent still visits every node; we only
 			// avoid writing the excluded-PAM entries. Advancing `index` to the next
 			// entry then `continue` mirrors the normal end-of-loop advance below.
-			if (PAM_PRUNE && pamPrune_reject(targetOnDNA[thr][index].guideDNA_bit))
+			// leafSkipped also drops the index-0 artefact of the builder.
+			if (leafSkipped(targetOnDNA[thr][index]))
 			{
 				index = (targetOnDNA[thr][index].next + 1) * -1;
 				continue;
@@ -715,10 +757,10 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 
 					bulgeSize[thr].emplace_back((bulRNA - bR) + (bulDNA - bD));
 				}
-				if (targetOnDNA[thr][index].guideIndex < 0)
-				{ // negative strand
-					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1 + (pam_at_start ? 0 : prune_pad));
-					cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1 + (pam_at_start ? 0 : prune_pad));
+				if (targetOnDNA[thr][index].info & LEAF_LEFT)
+				{ // PAM-left window (3' PAM: minus strand; 5' PAM: plus strand)
+					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + (pam_at_start ? 0 : prune_pad));
+					cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + (pam_at_start ? 0 : prune_pad));
 					if (pam_at_start)
 					{
 						directions[thr].emplace_back('+');
@@ -729,7 +771,7 @@ void saveIndices(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDNA
 					}
 				}
 				else
-				{ // strand positive
+				{ // PAM-right window (3' PAM: plus strand; 5' PAM: minus strand)
 					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
 					if (bulTypeRNA == 0 && bulTypeDNA == 0)
 					{ // X case
@@ -849,7 +891,8 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 			// On-the-fly PAM filter (bulge path): skip this leaf entry BEFORE
 			// emitting if its stored concrete flank PAM is incompatible with the
 			// search PAM. Same semantics as saveIndices; advance to the next entry.
-			if (PAM_PRUNE && pamPrune_reject(targetOnDNA[thr][index].guideDNA_bit))
+			// leafSkipped also drops the index-0 artefact of the builder.
+			if (leafSkipped(targetOnDNA[thr][index]))
 			{
 				index = (targetOnDNA[thr][index].next + 1) * -1;
 				continue;
@@ -904,10 +947,10 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 					bulgeSize[thr].emplace_back((bulRNA - bR) + (bulDNA - bD));
 				}
 
-				if (targetOnDNA[thr][index].guideIndex < 0)
-				{ // negative strand
-					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1 + (pam_at_start ? 0 : prune_pad));
-					cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex * -1 + (pam_at_start ? 0 : prune_pad));
+				if (targetOnDNA[thr][index].info & LEAF_LEFT)
+				{ // PAM-left window (3' PAM: minus strand; 5' PAM: plus strand)
+					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + (pam_at_start ? 0 : prune_pad));
+					cluster_position[thr].emplace_back(targetOnDNA[thr][index].guideIndex + (pam_at_start ? 0 : prune_pad));
 					if (pam_at_start)
 					{
 						directions[thr].emplace_back('+');
@@ -918,7 +961,7 @@ void saveIndices2(Tnode *p, int d, int bD, int bR, int bulTypeRNA, int bulTypeDN
 					}
 				}
 				else
-				{ // strand positive
+				{ // PAM-right window (3' PAM: plus strand; 5' PAM: minus strand)
 					indices[thr].emplace_back(targetOnDNA[thr][index].guideIndex + max_bulges - (bulDNA - bD) + (bulRNA - bR) + offset_guide_len);
 					if (bulTypeRNA == 0 && bulTypeDNA == 0)
 					{ // X case
@@ -1401,6 +1444,12 @@ int main(int argc, char **argv)
 			 << searchPamBit.size() << " nt)" << endl;
 	}
 	// ---- END PAM filter length guard + N-padding ----
+
+	// The build PAM, for recognising the index-0 artefact in loadTST.
+	buildPamBit = pamPrune_bit_conversion(index_pam_prefix);
+	for (size_t j = 0; j < buildPamBit.size(); j++)
+		if (!buildPamBit[j].all())
+			buildPamConstrained = true;
 
 	sort(file_stats_vec.begin(), file_stats_vec.end(), compareBySize);
 
