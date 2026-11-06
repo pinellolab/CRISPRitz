@@ -243,8 +243,32 @@ Detailed input:
 `pam/pamNGG.txt/` is a text file containing the PAM sequence.  
 `-bMax 2` is the max number of bulges to allow for following searches when creating the
 database (e.g if -bMax 2, all the following searches with the created index can be performed
-with max 2 RNA bulges and 2 DNA bulges)  
+with max 2 RNA bulges and 2 DNA bulges; at most 31)  
 `-th 4` is the number of threads to use (Optional)
+
+**<a name="Index-Format">3.2.1</a> Index format 2 (CRISPRitz 2.9.2 and later).**  
+An index built by CRISPRitz 2.9.2 or later is in *index format 2*, specified in
+[docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md). It holds every target whose guide (of the
+length the index was built for) and PAM fit in the sequence, including targets next to a
+contig end or a run of `N`: the extra bases a DNA bulge, or a longer search guide, needs
+beyond the guide (`-bMax` of them) no longer have to exist, they are simply not available
+to an alignment that would need them. Up to 2.9.1 such targets were dropped,
+even perfect matches within `-bMax` nt of a contig end or an `N` run, a PAM on a contig's last
+bases was never indexed, and a reverse-strand PAM at a contig's first base was reported on
+the `+` strand. Each `.bin` now starts with a header naming its format and build parameters,
+which `crispritz.py index-info` prints without loading the index (it exits 1, naming the
+file and the reason, if a `.bin` is one the search would refuse):
+
+```
+crispritz.py index-info genome_library/NGG_2_hg19_ref/
+```
+
+Compatibility: CRISPRitz 2.9.2 searches indexes built by earlier versions (format 1) exactly
+as before, except at a contig's first base: a reverse-strand PAM there is reported on the
+correct strand, and a spurious match the old builder could store there is dropped. Such
+indexes keep missing the boundary targets until rebuilt. An index built by 2.9.2 cannot be
+searched by CRISPRitz 2.9.1 or earlier: 2.9.1 refuses it with an error, earlier versions
+abort with one.
 
 
 **<a name="Search">3.3</a> CRISPRitz Search Tool**  
@@ -360,8 +384,9 @@ NNGRRT, TTTV, …) is wasteful: the costly part of an index is the protospacer t
 not the PAM. CRISPRitz can instead build **one PAM-less index with a generous all-N
 flank of width K**, then serve **any 3′ PAM of length L ≤ K** on the fly by N-padding the
 search PAM up to K and filtering candidates at leaf-emit time. The targets are identical
-(the same rows, coordinates and sequences) to a dedicated per-PAM index's; a 5′ PAM needs
-an index of exactly its width — see §[3.3.3.2](#Search_prune_pam_search).
+(the same rows, coordinates and sequences) to those of a dedicated per-PAM index built for
+the same guide length and `-bMax`; a 5′ PAM needs an index of exactly its width — see
+§[3.3.3.2](#Search_prune_pam_search).
 
 **<a name="Search_prune_pam_build">3.3.3.1</a> Build the generous-flank index.**  
 The stored flank width **K is exactly the PAM length declared in the PAM file**
@@ -380,6 +405,14 @@ NNNNNNNNNNNNNNNNNNNNNNNNNNNN 8
 crispritz.py index-genome hg38_generous8 hg38_dir/ pam_generous8.txt -bMax 2
 ```
 
+The index is built for the guide length of its PAM file (20 here). A search PAM file may
+declare another guide length (e.g. 21 N's before `NNGRRT` for SaCas9): the search runs,
+and says so on stdout, but its rows are those of an index built for 20-nt guides, which
+with bulges differ from those of an index built for the search's guide length (and a
+shorter guide misses targets at contig ends and `N` runs) — see
+[docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md) section 5.1. Build the generous index with
+the guide length you search with.
+
 A 5′ (Cas12a-style) PAM is served only by a PAM-less index of exactly its width, declared
 with a negative number (e.g. `NNNNNNNNNNNNNNNNNNNNNNNN -4` for TTTV): a shorter 5′ PAM off a
 wider flank is refused, because the reported sequence would carry the pad N's in its PAM.
@@ -397,16 +430,26 @@ PAM **before it is written or scored**:
 crispritz.py search hg38_generous8/ pamNGG.txt guides.txt out_ngg \
     -index -mm 4 -bDNA 1 -bRNA 1 -th 4 -t --prune-pam
 
-# NGA, NNGRRT … all served off the SAME index, just swap the PAM file. Keep -bDNA/-bRNA:
+# NGA, NNGRRT … all served off the SAME index, just swap the PAM file (each with the
+# index's 20 N's, e.g. NNNNNNNNNNNNNNNNNNNNNNGRRT 6). Keep -bDNA/-bRNA:
 # without them crispritz.py dispatches to the brute-force search, which does not read an index.
 crispritz.py search hg38_generous8/ pamNGA.txt    guides.txt out_nga    -index -mm 4 -bDNA 1 -bRNA 1 -th 4 -t --prune-pam
 crispritz.py search hg38_generous8/ pamNNGRRT.txt guides.txt out_sauri  -index -mm 4 -bDNA 1 -bRNA 1 -th 4 -t --prune-pam
 ```
 
-Properties (all enforced by `test/run_pam_filter_test.sh`):
-- **Equivalent to a dedicated index.** The targets returned for e.g. NGG off the K = 8
-  index are the *same set of rows* as a dedicated 3-flank NGG index's, coordinates and
+Properties (enforced by `test/run_pam_filter_test.sh` and `test/run_boundary_test.sh`):
+- **Equivalent to a dedicated index of the same guide length and `-bMax`.** The targets
+  returned for e.g. NGG off the K = 8 index are the *same set of rows* as a dedicated
+  3-flank NGG index's built for the same guide length and `-bMax`, coordinates and
   sequences included: the DNA/crRNA columns carry the L-base PAM a dedicated index reports.
+  This holds at contig ends too for an index in format 2 ([3.2.1](#Index-Format)), whose
+  PAM-less windows may run off the contig on the flank side, and for a search guide of
+  any length. It does not hold against a dedicated index built for another guide length:
+  21-nt NNGRRT guides off a 20-nt K = 8 index give, with bulges, other rows than a 21-nt
+  NNGRRT index (docs/INDEX_FORMAT.md section 5.1). An index built by CRISPRitz
+  2.9.1 or earlier (format 1) required the whole K-base flank to fit, so off it a PAM with
+  1 to K - L bases to a contig's end (+ strand) or 0 to K - L - 1 bases from its start
+  (- strand) is missing; K = L is unaffected.
   The profile outputs (`-p`/`-t`) are not comparable between the two: they count the
   engine's duplicate rows, whose number depends on the index tree's shape, and they label
   the guide with the search PAM padded to K.

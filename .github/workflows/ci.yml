@@ -121,6 +121,56 @@ jobs:
         env:
           OMP_NUM_THREADS: "1"
 
+  format1:
+    name: index formats (2.9.1 indexes search as before but index 0; format-2 header and refusals)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+
+      # test/fixtures/format1 holds small indexes built by the 2.9.1 buildTST and the
+      # 2.9.1 searchTST's output on them. Every row away from a contig's index-0 leaf
+      # must stay byte-identical, order included; the index-0 rows must equal the
+      # independent oracle (test/boundary/oracle.py): the reverse-strand PAM at a
+      # contig's first base on the minus strand, and the builder's index-0 artefact gone.
+      - name: Run format-1 compatibility test
+        run: bash test/run_format1_test.sh
+
+      # Format 2's header and trailer, crispritz.py index-info, a directory mixing the
+      # two formats, max_bulges taken from the header, and the reader's refusals
+      # (cut-short file, PAM side mismatch, unknown version; buildTST -bMax > 31);
+      # index-info must refuse each of 18 damaged files searchTST refuses, for the
+      # same reason, and docs/INDEX_FORMAT.md section 7's reader must agree with it.
+      - name: Run index-format test
+        run: bash test/run_index_format_test.sh
+
+  boundary:
+    name: sites at contig ends and N runs == independent brute-force oracle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+
+      # Perfect, 1-4-mismatch and 1-bulge sites at every distance 0..4 from a contig
+      # start, a contig end and an N run, both strands, 3' and 5' PAMs, the PAM 0..9
+      # bases from an end; dedicated indexes at -bMax 0-3 and PAM-less K=3/K=8 (and
+      # 5' K=4) indexes with and without --prune-pam; search guides longer and shorter
+      # than the index's (CRISPRme's 21-nt SaCas9 and 23-nt Cas12a guides off 20-nt
+      # indexes). Every indexed search, run through crispritz.py, must equal
+      # test/boundary/oracle.py (a brute-force aligner over the FASTA) as a set of
+      # rows, every row its contig's own bases, every 0-bulge one searchBruteForce too,
+      # and every --prune-pam one the dedicated index of the same guide length.
+      - name: Run boundary test (full matrix)
+        run: bash test/run_boundary_test.sh
+
   asan:
     name: AddressSanitizer (#105 regression guard, WTN + DNA bulge)
     runs-on: ubuntu-latest
@@ -146,6 +196,18 @@ jobs:
           CXXFLAGS: "-fsanitize=address -g -O1"
           # No leak detection: we only guard against memory-safety errors
           # (heap-buffer-overflow / invalid free), and abort on any ASan error.
+          ASAN_OPTIONS: "detect_leaks=0:abort_on_error=1"
+
+      # The boundary suite under ASan: all three binaries (buildTST, searchTST,
+      # searchBruteForce) instrumented, over index format 2's boundary sites (pad
+      # and flank off the contig, signed window starts) and the format-1 reader.
+      - name: Run ASan boundary + format-1 tests
+        run: |
+          QUICK=1 bash test/run_boundary_test.sh
+          bash test/run_format1_test.sh
+        env:
+          OMP_NUM_THREADS: "1"
+          CXXFLAGS: "-fsanitize=address -g -O1"
           ASAN_OPTIONS: "detect_leaks=0:abort_on_error=1"
 
   arm64-build:

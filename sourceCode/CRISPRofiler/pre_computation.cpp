@@ -270,7 +270,12 @@ void profilersetting() //alloco spazio per matrici dei profili
 
 	for (int i = 0; i < totalguides; i++)
 	{
-		guideprofiling[i].resize(guidelen - pamlimit + 3 + inputmissmatch + 1);
+		//per-base mismatch counts [0, guide), then on-target, off-target and total
+		//mismatches, then one column per mismatch count -- which missmatching() and
+		//profiler() index from guidelen (guide + PAM), not from guide + 3. Sized for
+		//the larger of the two, or a PAM longer than 3 nt (TTTV, NNGRRT) wrote and read
+		//past the end of the vector.
+		guideprofiling[i].resize(MAX(guidelen - pamlimit + 3, guidelen) + inputmissmatch + 1);
 		matrixprofiling[i].resize(inputmissmatch + 1);
 
 		for (int kk = 0; kk <= inputmissmatch; kk++)
