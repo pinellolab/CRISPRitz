@@ -100,6 +100,23 @@ four-base rule left out an ALT at each (AC = 1 at 1,193 of them, AC ≥ 41 at 3)
 them all. Its cost is the density of windows over such positions (an all-`Q` position
 matches any guide base): CRISPRme's ambiguity budget has to count it as four bases.
 
+Measured with 2.10.0 on that chromosome, through `crispritz.py` in the CRISPRme 2.8.1
+SIF on ml008 (amd64), the new engine first on `PATH`: `add-variants` (compiled port, dict
+mode) on hg38 chr22 and the published `hgdp1kgp.chr22.norm.vcf.gz` (1,998,332 records)
+took 979 s and 7.16 GB, wrote nothing to stderr, and coded 2,448 positions `Q`; the
+enriched genome holds 11,658,691 `N`, at exactly the reference's positions, and its
+sequence is byte-identical to the fifth-symbol prototype's. `index-genome` with NRG and
+`-bMax 1` (18 s) stored 18,314 targets holding `Q` and flagged all 3 of its files. Five
+guides (CTAACAGTTGCTTTTATCAC, ACTGAAATCTGTAAGCAGGC, CTCTCAGCTGGTACACGGCA,
+GAGTCCGAGCAGAAGAAGAA, GGTGAGTGAGTGTGTGCGTG) at 4 mismatches without bulges gave 9,311 rows,
+equal to `searchBruteForce`'s on the enriched FASTA, none holding an `N`, every row the
+chromosome's bases: 8,954 of them hold `Q`, and 8,951 of those lie in IGL (chr22:22-23 Mb),
+where a guide window can hold up to 20 `Q` (276 rows are perfect matches through `Q`).
+With one DNA and one RNA bulge: 4,372,248 rows, 4,208,718 through `Q` (326 s). Outside
+IGL, `Q` adds 3 rows. These windows are the density the plan's IG guard and ambiguity
+budget must bound in CRISPRme (a `Q` is two bits of ambiguity, as many as two IUPAC
+letters of two bases).
+
 ### 2.3 The SNP dictionary (`my_dict_<chr>.json`)
 
 The value of `"<chr>,<pos>"` lists **every ALT** of the position: one entry per ALT joined
