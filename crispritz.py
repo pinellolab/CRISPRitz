@@ -17,7 +17,7 @@ origin_path = os.path.dirname(os.path.realpath(__file__))
 # conda path
 conda_path = "opt/crispritz/"
 
-VERSION = "2.9.1"
+VERSION = "2.10.0"
 # The index format this CRISPRitz's buildTST writes: CZI_FORMAT_VERSION in
 # sourceCode/CRISPR-Cas-Tree/include/indexFormat.h (test/run_index_format_test.sh
 # checks they agree). An index's own format is read from its .bin files

@@ -15,11 +15,27 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 
 ## [Unreleased]
 
-Planned as 2.9.2, released together with rebuilt indexes: the IDX-13, IDX-4 and IDX-15
-fixes below change what an index holds, so they take effect only on indexes built by this
-version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
+## [2.10.0] - unreleased
+
+Not yet tagged: the date is set when it is. Released together with rebuilt indexes and the
+CRISPRme release that pins it (CRISPRme 2.9.0): the IDX-13, IDX-4 and IDX-15 fixes below
+change what an index holds, and every allele of a split multi-allelic site, the
+four-allele symbol `Q` and the merged carriers change what an enrichment holds, so they
+take effect only on genomes enriched and indexes built by this version (the brute-force
+scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
 
 ### Added
+- **`Q`, the four-allele symbol.** A position whose reference base and SNP ALTs cover A, C,
+  G and T is written `Q` in the enriched genome, and `buildTST`, `searchTST` and
+  `searchBruteForce` read it as any base (`1111`): it matches every guide base and every
+  PAM letter. `N` stays a gap that matches nothing ([docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md)
+  section 4.1, [docs/MULTIALLELIC_ENRICHMENT.md](docs/MULTIALLELIC_ENRICHMENT.md) section
+  2.2). In the tree `Q` takes the value its slot never uses (`1111` in a root, lo or hi slot,
+  `0000` in an eq slot, where `1111` ends a string) and in a flank `1111`; an index file
+  holding it is flagged in its header (bit 2, `FOUR_ALLELE`), so an engine that cannot read
+  it refuses it, and a file without it is written byte for byte as before. `buildTST` and
+  `searchTST` say on stdout how many targets and files hold `Q`, and `index-info` reports
+  `four_allele` per file. On HGDP + 1000 Genomes chr22, 2,448 positions carry three SNP ALTs.
 - **Index format 2** ([docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md)). Every `.bin` built by
   this version starts with a header -- the magic bytes `CZI\xfe`, the format version, and the
   build parameters (PAM side, all-N PAM, guide length, PAM length, max bulges, the PAM) -- and
@@ -29,16 +45,17 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   `searchTST` reads formats 1 and 2 and refuses an unknown version, a cut-short file, or a
   PAM width or side that differs from the search's, before searching. `buildTST` checks its
   writes (a full disk used to leave a cut-short `.bin` behind an exit 0) and refuses `-bMax`
-  above 31.
+  above 31. The header flags are bit 0 (PAM at the 5' end), bit 1 (all-N build PAM) and bit
+  2 (holds `Q`); a reader refuses any other.
 - `crispritz.py index-info <index_dir>` prints each `.bin`'s format and build parameters as
   JSON, reading only its header, the start of its body and its last bytes (the reference
   reader for CRISPRme, docs/INDEX_FORMAT.md section 7), and exits 1 on a `.bin` that
   `searchTST` would refuse whatever the search, with an `error` entry saying why (an
   unknown or malformed header, reserved flag bits, `max_bulges` above 31, a cut-short file,
   a header guide length other than the body's, a header PAM other than the file name's, a
-  leaf count below 1), and on a directory whose `.bin` files are named for more than one PAM
-  (such as a macOS `._` file copied along with an index, which `searchTST` refuses as a
-  1-nt PAM region `.`). Its `writes_format`, and `INDEX_FORMAT` in `crispritz.py`, give the
+  leaf count below 1 or one the file cannot hold), and on a directory whose `.bin` files are
+  named for more than one PAM (such as a macOS `._` file copied along with an index, which
+  `searchTST` refuses too). Its `writes_format`, and `INDEX_FORMAT` in `crispritz.py`, give the
   index format this CRISPRitz builds, for a reader that must know the format of an index it
   has just built that holds no `.bin` to read (docs/INDEX_FORMAT.md section 8).
 - `test/run_boundary_test.sh`: sites at every distance from contig ends and `N` runs, both
@@ -58,15 +75,27 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   directory mixing both formats, `max_bulges` taken from the header, the reader's
   refusals (cut-short file, PAM side mismatch, unknown version, a header guide length
   other than the body's, `-bMax` above 31), the stdout note for a search guide
-  longer or shorter than the index's, and `index-info` against `searchTST` on 18 files
+  longer or shorter than the index's, and `index-info` against `searchTST` on 20 files
   damaged in one way each: both refuse every one, for the same reason, and the reader in
   docs/INDEX_FORMAT.md section 7 returns what `index-info` does.
-- `test/test_enricher_multiallelic.py`: 22 unit tests run against both ports (44), with exact
-  expected outputs; 40 of them fail on 2.9.1. In CI with `verify_enricher.sh`, which grows from
-  17 to 30 cases (split multi-allelic sites in every order, genotype shapes, SNP + indel at
-  one position, the four-base rule and its AF/AF_* ranking, two ALTs on one haplotype slot).
+- `test/run_four_allele_test.sh`: `Q` end to end through `crispritz.py` -- `add-variants`
+  with both enricher ports on 44 synthetic contigs whose split and multi-ALT records put `Q`
+  in guides, in PAMs that exist only through it, in the bulge pad, beside `N` runs and on
+  contig ends, then 3' and 5', dedicated and PAM-less indexes, and 23 searches with and
+  without bulges and `--prune-pam`: every search equals the independent oracle, every
+  0-bulge one `searchBruteForce` (every target the brute force finds, the index finds), no
+  row holds an `N`, a `.bin` is flagged exactly when it holds `Q`, and the brute force at
+  `-mm 120` reports no window with an `N` in its guide. The engine before `Q` fails it.
+- `test/test_enricher_multiallelic.py`: 24 unit tests run against both ports (48), with exact
+  expected outputs (every ALT, `Q`, the N-count invariant, merged carriers, each record's AF,
+  a reference holding `Q`); 44 of them fail on 2.9.1. In CI with `verify_enricher.sh`, which
+  grows from 17 to 33 cases (split multi-allelic sites in every order, genotype shapes, SNP +
+  indel at one position, four bases, two ALTs on one haplotype slot, AF by key, one allele on
+  two records, ALTs on a reference `N`) and now also checks the outputs against what they
+  must be: the enriched genome against an independent reconstruction (with the N-count
+  invariant), the dict and indel log at the new cases, and a reference holding `Q` refused.
 - `docs/MULTIALLELIC_ENRICHMENT.md`: the behaviour, its measurement, what CRISPRme must change
-  to use it, and the published indexes and stores to rebuild.
+  to use it, the owner's decisions, and the published indexes and stores to rebuild.
 
 ### Changed
 - **New indexes are format 2, which CRISPRitz 2.9.1 and earlier cannot search** (2.9.1
@@ -84,17 +113,32 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   thread (it was one global that every thread wrote), and a format-2 header whose guide
   length differs from its body's is refused as malformed.
 - **Indexes built with 2.9.1 or earlier from a normalised panel lack the earlier ALTs of every
-  split site; rebuild them**, with their dicts and Tier-0/Tier-1 stores, from one 2.9.2
+  split site; rebuild them**, with their dicts and Tier-0/Tier-1 stores, from one 2.10.0
   enrichment (`docs/MULTIALLELIC_ENRICHMENT.md` §8 lists the published ones). Cost of the fix:
-  one byte per base and ~17 bytes per SNP ALT; on chr22, 986 s → 1,004 s and 6.72 → 6.86 GB.
+  one byte per base; on chr22, 986 s → 1,004 s and 6.72 → 6.86 GB (measured with the
+  four-base rule `Q` replaced, which kept ~17 bytes more per SNP ALT).
+- **One allele on two records (the same `REF>ALT` twice) is one dict entry with the
+  carriers of both**, where the later record's entry replaced the earlier one: a sample
+  listed by both, phased alike, carries the ALT on every slot where either record puts it
+  (`0|1` and `1|0` give `1|1`), otherwise the genotype with more copies of it; the rsID and
+  AF are the more frequent record's, and a merged entry's genotypes use `1` for its ALT (a
+  record listing several ALTs is renumbered so). 362 such alleles genome-wide in the
+  published panels; on HPRC chr22 the merge puts two ALTs on one haplotype slot for 37
+  sample-positions, which CRISPRme takes as PUTATIVE.
+- **A reference `N` stays `N`**: the enriched genome holds an `N` exactly where the
+  reference does. Two or three ALTs at a reference `N` (`N>A,C`, or split records) were coded
+  over it (`M`), making a gap searchable. The dict still lists such records.
+- `add-variants` refuses a reference FASTA holding `Q` (in a chromosome it enriches, in both
+  enricher ports, and in one it copies), with `ERROR: <chr> holds 'Q' at <pos>: ...` and exit
+  status 1: the search would read it as a four-allele position.
 - **The dict now shows the phase of split records as it was phased, conflicts included.**
   Each entry keeps its own record's genotypes verbatim, and records phased one by one can
   put two ALTs of a position on one haplotype slot: 672 sample-positions at 584 positions on
   HGDP + 1000 Genomes chr22 (e.g. 10,661,629 NA18869: `0|1` under G and `0|1` under T), 0 on
   HPRC chr22. Up to 2.9.1 the dict held one ALT per position, so no reader met one. CRISPRme's
   per-sample analysis builds a CONFIRMED haplotype holding both ALTs from it (measured
-  through `complete-search --per-sample` on a 2.9.2 index); CRISPRme must handle these
-  before it uses a 2.9.2 index (`docs/MULTIALLELIC_ENRICHMENT.md` §6.3).
+  through `complete-search --per-sample` on a 2.10.0 index); CRISPRme must handle these
+  before it uses a 2.10.0 index (`docs/MULTIALLELIC_ENRICHMENT.md` §6.3).
 
 ### Fixed
 - **A site whose guide lay within `max_bulges` nt of a contig end or an `N` run was not
@@ -134,8 +178,8 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   and Tier-1 stores). Now each record adds its ALTs to what earlier records coded — the code
   is that of the site written as one record, in any record order — and the dict value lists
   every ALT, one `$`-joined entry each with its own record's carriers, genotypes, rsID and
-  AF (the form a record listing several ALTs always had; a repeated ALT replaces its own
-  entry). Both ports, byte-identical. Measured on chr22 of HGDP + 1000 Genomes through
+  AF (the form a record listing several ALTs always had; a repeated allele merges into its
+  own entry, see Changed). Both ports, byte-identical. Measured on chr22 of HGDP + 1000 Genomes through
   `add-variants`: 43,389 positions carry two or three SNP records; 45,837 SNP records (2.6 %,
   5,104 with AC ≥ 41) were not the last and reached neither output; after the fix exactly
   those 43,389 bases and 43,389 dict values change, each equal to an independent bcftools
@@ -148,11 +192,27 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   assembly gap: every target through the position, the reference one included, left the
   index (shown through the CLI: 0 targets found, against 1 with the fix). Merging split
   records would have made it common (2,448 chr22 positions). A position whose reference base
-  and ALTs cover all four bases now keeps the reference and its two most frequent ALTs —
-  ranked by the highest of `INFO/AF` and every `INFO/AF_<x>`, so a sites-only merge carrying
-  only per-dataset AFs (CRISPRme's mega: `AF_max`) ranks too; a tie leaves out the later of A,
-  C, G, T. The dict lists all three, and one stdout line counts such positions. On HGDP +
-  1000 Genomes chr22 the rarest ALT there has AC ≥ 41 at 3 of the 2,448.
+  and ALTs cover all four bases is now `Q` (see Added): no ALT is left out, the dict lists all
+  three, and one stdout line counts such positions.
+- **`add-variants` read each record's `INFO/AF` at the place it had in the file's first
+  record**, so every record listing its INFO fields in another order or number got no AF, in
+  the dict and the indel log: the retired 1000G2021_HGDP index (a merged VCF) lost the AF of
+  224,981 of 232,384 chr22 indels, and HPRC chrY 91,950 of its 102,665 indel AFs. Each
+  record's AF is now found by its key (exactly `AF`), in both ports.
+- **`searchBruteForce` reported a window with an `N` in its guide region when the mismatch
+  budget exceeded 100**: an `N` counted as 101 mismatches. Such a window is now dropped
+  whatever the budget, as an index never holds one.
+- **`searchTST` read a stray `.bin` as part of the index when the directory listed it after
+  the index's own files**: a macOS `._` (AppleDouble) file copied along with an index was
+  then read as a tree of 118,883,584 leaves, failing after 22.5 s (listed first, it was
+  refused). A directory whose `.bin` files are named for more than one PAM is now refused
+  before any file is read, whatever the order.
+- **A `.bin` whose leaf count the file cannot hold** (damaged; a format-1 file has no end
+  marker) made `searchTST` allocate that many leaves and fail in `std::bad_alloc`; it is now
+  refused before the search, as by `index-info`.
+- `buildTST` and `searchBruteForce` skipped a genome byte other than A/C/G/T, N and the IUPAC
+  codes when they scanned for PAMs, so every later PAM position of the contig was read one
+  base off and a site after it lost; such a byte is now a gap (`0000`).
 - **A SNP outside the chromosome** (POS 0 or past the end, e.g. a VCF of another assembly)
   now fails with an error naming the position, in both ports: `enricher.py` raised an
   `IndexError` past the end and coded the last base for POS 0, `enricher.cpp` read and wrote
@@ -585,6 +645,7 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
 - Support for longer PAMs and mismatches within PAMs (beta).
 
 [Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.9.1...HEAD
+[2.10.0]: https://github.com/pinellolab/CRISPRitz/compare/v2.9.1...HEAD
 [2.9.1]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.9.1
 [2.9.0]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.9.0
 [2.8.4]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.4
