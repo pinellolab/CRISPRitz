@@ -293,7 +293,7 @@ one):
 | four-base positions | 2,448 (the stdout note says so; 2.10.0 codes each `Q`). At 1,244 the rarest ALT is the last record, which 2.9.1 coded and the branch left out for the two others (AC = 1: 626, 2-9: 571, 10-40: 46, ≥ 41: 1); at 1,204 it is an earlier record (AC = 1: 567, 2-9: 574, 10-40: 61, ≥ 41: 2) |
 | SNP dict | same 1,711,938 keys in the same order; **43,389 values change, exactly the multi-SNP positions**; each equals the bcftools reconstruction — after: every record's entry in file order (43,389/43,389), before: the last record's entry (43,389/43,389); 45,837 entries added |
 | indel log, fake-indel FASTA, `change_version.txt` | byte-identical (md5 `4197a2d0…`, `34ed6062…`, `a824c4b2…`) |
-| CRISPRme overlay (`overlay_indel_snps.overlay_fake_chromosome`, a5379e0) | same length (13,693,118), 686,631 flank bases coded in each; **50,253 differ**, every one at a multi-SNP position and equal to its new code |
+| CRISPRme overlay (`overlay_indel_snps.overlay_fake_chromosome`, a5379e0) | same length (13,693,118), 686,631 flank bases coded in each; **50,253 differ**, every one at a multi-SNP position and equal to its new code; on the 2.10.0 enrichment this overlay codes 15,471 fewer, those at the four-allele positions, until it learns `Q` (6.4) |
 | cost, compiled port | 986 s → 1,004 s wall; peak RSS 6.72 → 6.86 GB |
 
 **The two ports at full scale:** `enricher.py` through the same CLI (1,789 s, peak RSS
