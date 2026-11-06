@@ -434,11 +434,24 @@ def read_index_header(path):
         info["error"] = why
         return info
 
+    def damaged(info, header_len, width, size):
+        # a leaf record takes at least 4 + ceil(K/2) + 1 bytes (window start, flank
+        # nibbles, marker or flags byte), so a leaf count the file cannot hold is damage
+        need = header_len + 12 + info["num_leaves"] * (4 + (width + 1) // 2 + 1)
+        if need > size:
+            return refused(info, "damaged: its %d leaves need at least %d bytes, the file holds %d"
+                           % (info["num_leaves"], need, size))
+        return info
+
+    # the PAM the file is named for, <PAM>_<contig>_<part>.bin: searchTST reads every
+    # .bin of a directory at the width of that PAM
+    named = os.fsencode(os.path.basename(path)).split(b"_", 1)[0]
     try:
         fh = open(path, "rb")
     except OSError as exc:
         return refused({"format": None}, "cannot be opened (%s)" % exc.strerror)
     with fh:
+        size = os.fstat(fh.fileno()).st_size
         head = fh.read(28)
         if head[:4] != CZI_MAGIC:
             # format 1 (CRISPRitz <= 2.9.1): no header, the file opens with numLeaves
@@ -449,7 +462,7 @@ def read_index_header(path):
             info = {"format": 1, "num_leaves": leaves, "guide_len": guide}
             if leaves <= 0:
                 return refused(info, "not a valid CRISPRitz index (.bin) file (numLeaves=%d)" % leaves)
-            return info
+            return damaged(info, 0, len(named), size)
         if len(head) < 28:
             return refused({"format": None}, "cut-short index header")
         version, header_len, flags, guide, pam_len, mb = struct.unpack("=6i", head[4:28])
@@ -490,13 +503,12 @@ def read_index_header(path):
         return refused(info, "malformed index: its header gives guide length %d, its body %d"
                        % (guide, body_guide))
     # searchTST reads a format-2 file only if its header PAM is its name's prefix
-    named = os.fsencode(os.path.basename(path)).split(b"_", 1)[0]
     if pam != named:
         return refused(info, "holds the PAM/flank region '%s' but is named for '%s'"
                        % (info["pam"], os.fsdecode(named)))
     if leaves <= 0:
         return refused(info, "not a valid CRISPRitz index (.bin) file (numLeaves=%d)" % leaves)
-    return info
+    return damaged(info, header_len, pam_len, size)
 ```
 
 ## 8. CRISPRme changes needed

@@ -1612,6 +1612,31 @@ int main(int argc, char **argv)
 			}
 		}
 	}
+	// So every .bin must be named for one PAM. Files named for another are not part of
+	// the index: a macOS "._" (AppleDouble) file copied along with an index is one, and
+	// listed after the index's own files it used to be read as a tree (its first int as
+	// a leaf count of 118,883,584). Refused whatever order the directory lists them in,
+	// as crispritz.py index-info refuses such a directory.
+	{
+		vector<string> pams;
+		for (size_t f = 0; f < file_stats_vec.size(); ++f)
+		{
+			const string &fn = file_stats_vec[f].file_name;
+			string named = fn.substr(0, fn.find('_'));
+			if (find(pams.begin(), pams.end(), named) == pams.end())
+				pams.push_back(named);
+		}
+		if (pams.size() > 1)
+		{
+			sort(pams.begin(), pams.end());
+			cerr << "ERROR: the .bin files in '" << genome_dir << "' are named for more than one PAM (";
+			for (size_t k = 0; k < pams.size(); ++k)
+				cerr << (k ? ", '" : "'") << pams[k] << "'";
+			cerr << "): an index directory holds the .bin files of one index only (a macOS \"._\" "
+				 << "file copied along with an index is not one of them); remove the others." << endl;
+			return 1;
+		}
+	}
 	if (!PAM_PRUNE && !index_pam_prefix.empty()
 		&& index_pam_prefix.size() != pamRNA.size())
 	{
@@ -1721,8 +1746,10 @@ int main(int argc, char **argv)
 			// the body opens with numLeaves and the guide length the index was built
 			// for (a file too short for them is refused by loadTST, as in 2.9.1)
 			int body[2];
+			bool haveBody = false;
 			if (hf.read((char *)body, sizeof(body)))
 			{
+				haveBody = true;
 				if (h.format == 2 && body[1] != h.guideLen)
 				{
 					cerr << "ERROR: '" << path << "' has a malformed index: its header gives guide length "
@@ -1748,29 +1775,48 @@ int main(int argc, char **argv)
 					cout << " See docs/INDEX_FORMAT.md, section 5.1." << endl;
 				}
 			}
-			if (h.format != 2)
-				continue;
 			string prefix = fn.substr(0, fn.find('_'));
-			if (h.pam != prefix || (size_t)h.pamLen != pamRNA.size())
+			if (h.format == 2)
 			{
-				cerr << "ERROR: '" << path << "' holds a " << h.pamLen << "-nt PAM/flank region ('"
-					 << h.pam << "') but is named for '" << prefix << "' and searched at "
-					 << pamRNA.size() << " nt; refusing to read it." << endl;
-				return 1;
+				if (h.pam != prefix || (size_t)h.pamLen != pamRNA.size())
+				{
+					cerr << "ERROR: '" << path << "' holds a " << h.pamLen << "-nt PAM/flank region ('"
+						 << h.pam << "') but is named for '" << prefix << "' and searched at "
+						 << pamRNA.size() << " nt; refusing to read it." << endl;
+					return 1;
+				}
+				if (((h.flags & CZI_FLAG_PAM_AT_START) != 0) != pam_at_start)
+				{
+					cerr << "ERROR: '" << path << "' was built for a PAM at the "
+						 << ((h.flags & CZI_FLAG_PAM_AT_START) ? "5'" : "3'") << " end, but the search PAM is at the "
+						 << (pam_at_start ? "5'" : "3'") << " end (the sign of the PAM file's length)." << endl;
+					return 1;
+				}
+				if (h.mb != max_bulges && !mbNoted)
+				{
+					// stdout, not stderr: CRISPRme treats any stderr output as a failure
+					cout << "NOTE: the index was built with max_bulges=" << h.mb << " (command line: "
+						 << max_bulges << "); its coordinates are decoded with " << h.mb << "." << endl;
+					mbNoted = true;
+				}
 			}
-			if (((h.flags & CZI_FLAG_PAM_AT_START) != 0) != pam_at_start)
+			// A leaf record takes at least 4 + ceil(K/2) + 1 bytes (the window start, the
+			// flank nibbles, the marker or flags byte), so a leaf count the file cannot
+			// hold is damage (a format-1 file has no end marker to show it): refused here,
+			// where loadTST would allocate that many leaves and fail in std::bad_alloc.
+			if (haveBody && body[0] > 0)
 			{
-				cerr << "ERROR: '" << path << "' was built for a PAM at the "
-					 << ((h.flags & CZI_FLAG_PAM_AT_START) ? "5'" : "3'") << " end, but the search PAM is at the "
-					 << (pam_at_start ? "5'" : "3'") << " end (the sign of the PAM file's length)." << endl;
-				return 1;
-			}
-			if (h.mb != max_bulges && !mbNoted)
-			{
-				// stdout, not stderr: CRISPRme treats any stderr output as a failure
-				cout << "NOTE: the index was built with max_bulges=" << h.mb << " (command line: "
-					 << max_bulges << "); its coordinates are decoded with " << h.mb << "." << endl;
-				mbNoted = true;
+				long long width = h.format == 2 ? h.pamLen : (long long)prefix.size();
+				long long need = (h.format == 2 ? h.headerLen : 0) + 12 + (long long)body[0] * (4 + (width + 1) / 2 + 1);
+				hf.clear();
+				hf.seekg(0, ios::end);
+				long long size = (long long)hf.tellg();
+				if (need > size)
+				{
+					cerr << "ERROR: '" << path << "' is damaged: its " << body[0] << " leaves need at least "
+						 << need << " bytes, the file holds " << size << "." << endl;
+					return 1;
+				}
 			}
 		}
 		cout << "INDEX FORMAT:";

@@ -19,13 +19,13 @@
 #   5. GUIDE LENGTH : a search guide longer or shorter than the index's is searched, with
 #                   a note on stdout naming both lengths (docs/INDEX_FORMAT.md 5.1); the
 #                   boundary suite checks its rows.
-#   6. INDEX-INFO : index-info refuses (exit 1, an "error" entry) each of 18 .bin files
+#   6. INDEX-INFO : index-info refuses (exit 1, an "error" entry) each of 20 .bin files
 #                   damaged in one way that searchTST refuses, for the same reason (and,
-#                   not as root, an unreadable one), and a directory whose .bin files
-#                   are named for more than one PAM (a macOS "._" file beside the
-#                   index), and accepts the good ones; the reference reader of
-#                   docs/INDEX_FORMAT.md section 7 returns what index-info does for every
-#                   file.
+#                   not as root, an unreadable one), and so do both a directory whose
+#                   .bin files are named for more than one PAM (a macOS "._" file beside
+#                   the index, in whatever order the directory lists them); index-info
+#                   accepts the good ones; the reference reader of docs/INDEX_FORMAT.md
+#                   section 7 returns what index-info does for every file.
 #
 # Configuration: CXX, CXXFLAGS, BUILDTST, SEARCHTST (prebuilt binaries), PYTHON,
 # KEEP_WORKDIR.
@@ -179,6 +179,8 @@ put("pam_NAG", d)                    # header PAM other than the file name's
 put("leaves_0", at(31, 0))           # numLeaves, at header_len
 put("tiny", data[:2])
 put("format1_leaves_0", at(0, 0, open(fmt1, "rb").read()))
+put("leaves_2000000", at(31, 2000000))  # more leaves than the file can hold
+put("format1_leaves_2000000", at(0, 2000000, open(fmt1, "rb").read()))
 PY
 n_ref=0
 while IFS='|' read -r case engine info; do
@@ -215,8 +217,10 @@ pam_NAG|holds a 3-nt PAM/flank region ('NAG') but is named for 'NGG'|holds the P
 leaves_0|is not a valid CRISPRitz index (.bin) file (numLeaves=0)|not a valid CRISPRitz index (.bin) file (numLeaves=0)
 tiny|is too short to be a CRISPRitz index (.bin) file|too short to be a CRISPRitz index (.bin) file
 format1_leaves_0|is not a valid CRISPRitz index (.bin) file (numLeaves=0)|not a valid CRISPRitz index (.bin) file (numLeaves=0)
+leaves_2000000|is damaged: its 2000000 leaves need at least 14000043 bytes, the file holds|damaged: its 2000000 leaves need at least 14000043 bytes, the file holds
+format1_leaves_2000000|is damaged: its 2000000 leaves need at least 14000012 bytes, the file holds 966.|damaged: its 2000000 leaves need at least 14000012 bytes, the file holds 966
 EOF
-[ "${n_ref}" = 18 ] || fail "${n_ref} damaged files tested, expected 18"
+[ "${n_ref}" = 20 ] || fail "${n_ref} damaged files tested, expected 20"
 # a .bin that cannot be opened (root reads any file, so not as root)
 if [ "$(id -u)" != 0 ]; then
   mkdir -p unreadable && cp v2/NGG_f1_1.bin unreadable/ && chmod 000 unreadable/NGG_f1_1.bin
@@ -235,11 +239,11 @@ else
   echo "  (an unreadable .bin: not tested as root)"
 fi
 # .bin files named for more than one PAM: a macOS "._" AppleDouble file copied along with
-# an index (its first int, read as a format-1 leaf count, is positive, so the file alone
-# passes). searchTST reads every .bin as an index of the PAM that names the first one it
-# lists; it refused such a directory ("this index stores a 1-nt PAM/flank region ('.')")
-# on Linux amd64 and arm64. It is not run here: listed the other way round, it would take
-# the 163-byte file's first int, 118,883,584, for a leaf count and allocate as many leaves.
+# an index (its first int, read as a format-1 leaf count, is positive). searchTST reads
+# every .bin as an index of the PAM that names the first one it lists, so it refuses any
+# directory whose .bin files are named for two PAMs before it reads one: listed after the
+# index's own files, the 163-byte file's first int, 118,883,584, used to be taken for a
+# leaf count and as many leaves allocated. index-info also finds that leaf count damage.
 mkdir -p appledouble && cp v2/NGG_f1_1.bin appledouble/
 "${PYTHON}" -c 'import sys; open(sys.argv[1], "wb").write(b"\x00\x05\x16\x07\x00\x02\x00\x00Mac OS X        " + bytes(139))' \
   appledouble/._NGG_f1_1.bin
@@ -249,9 +253,12 @@ RC=$?
 set -e
 [ "${RC}" = 1 ] && grep -qF "the .bin files are named for more than one PAM ('.', 'NGG')" ii_ad.err \
   || fail "a ._ AppleDouble file beside the index: index-info: exit ${RC}: $(cat ii_ad.err)"
-"${PYTHON}" -c 'import json, sys; d = json.load(open(sys.argv[1])); assert d["pams"] == [".", "NGG"] and d["files"]["._NGG_f1_1.bin"]["format"] == 1, d' \
+"${PYTHON}" -c 'import json, sys; d = json.load(open(sys.argv[1])); f = d["files"]["._NGG_f1_1.bin"]; assert d["pams"] == [".", "NGG"] and f["format"] == 1 and f["error"].startswith("damaged: its 118883584 leaves"), d' \
   ii_ad.json || fail "a ._ AppleDouble file beside the index: index-info's JSON"
-echo "  ok: ._NGG_f1_1.bin (AppleDouble) beside NGG_f1_1.bin: index-info refuses the directory (.bin files named for '.' and 'NGG')"
+search appledouble "${FIX}/pam_NGG.txt" 2 s_ad
+[ "${RC}" = 1 ] && grep -qF "are named for more than one PAM ('.', 'NGG')" s_ad.err \
+  || fail "a ._ AppleDouble file beside the index: searchTST: expected exit 1, got exit ${RC}: $(cat s_ad.err)"
+echo "  ok: ._NGG_f1_1.bin (AppleDouble) beside NGG_f1_1.bin: searchTST and index-info refuse the directory (.bin files named for '.' and 'NGG')"
 # what index-info accepts, searchTST searches: the good directories, both formats
 for d in v2 mixed "${FIX}/idx_NGG_2"; do
   "${PYTHON}" cli/bin/crispritz.py index-info "${d}" > /dev/null 2> ii_good.err || fail "index-info refuses ${d}: $(cat ii_good.err)"
@@ -276,7 +283,7 @@ for d in dirs:
 print(n)
 PY
 )" || fail "docs/INDEX_FORMAT.md section 7's reader differs from index-info"
-[ "${n_doc}" = 36 ] || fail "the section 7 reader was compared on ${n_doc} files, expected 36"
+[ "${n_doc}" = 38 ] || fail "the section 7 reader was compared on ${n_doc} files, expected 38"
 echo "  ok: ${n_ref} damaged files refused by both, for the same reason; the good directories accepted; docs/INDEX_FORMAT.md section 7's reader == index-info on ${n_doc} files"
 
 echo "index-format test: PASSED"
