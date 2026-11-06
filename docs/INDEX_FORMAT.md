@@ -1,13 +1,15 @@
-# CRISPRitz index format and target windows (format 2, CRISPRitz 2.9.2)
+# CRISPRitz index format and target windows (format 2, CRISPRitz 2.10.0)
 
 This document specifies what a CRISPRitz TST index holds, how it is laid out on
-disk, and how the search reads it. It covers the boundary/window fixes planned for
-CRISPRitz 2.9.2 (audit ids IDX-13, IDX-14, IDX-15 and IDX-4) and the index-format
-version stamp (B5) that those fixes need, because two of them change what an index
-holds.
+disk, and how the search reads it. It covers the boundary/window fixes of CRISPRitz
+2.10.0 (audit ids IDX-13, IDX-14, IDX-15 and IDX-4), the index-format version stamp
+(B5) that those fixes need, because two of them change what an index holds, and Q,
+the fifth symbol of a SNP position whose reference base and ALTs cover all four bases
+(section 4.1).
 
-Status: design, implemented on branch `feat/engine-boundaries`. Section 10 holds the
-measurements; section 11 the tests.
+Status: implemented (branches `feat/engine-boundaries` and `feat/multiallelic-enrich`,
+merged into CRISPRitz 2.10.0, which adds Q). Section 10 holds the measurements;
+section 11 the tests.
 
 | id | audit | what goes wrong in 2.9.1 | fix | needs a rebuild |
 |----|-------|--------------------------|-----|-----------------|
@@ -128,6 +130,14 @@ Let `n` be the contig length. Positions outside `[0, n)` are **off the contig**.
 * In both cases a window whose **guide region** holds an N is discarded, as in
   2.9.1: the tree has no symbol for N and the core is unusable.
 
+**N is a gap.** A genomic `N`, like a position off the contig, matches nothing: no
+guide base, no PAM letter (not even the search PAM's `N`), and it ends the pad. It is
+never "any base" and the enricher never writes one for a variant (it keeps the
+reference's `N` exactly, even where a VCF lists ALTs at one). The base that matches
+everything is `Q` (section 4.1), the symbol of a position where the reference base and
+the SNP ALTs cover A, C, G and T: it counts as a base everywhere above (in the guide
+region, the pad and the flank), and a site, its pad and its PAM may hold it.
+
 ### 3.2 The pad
 
 `pad_valid` (0..`mb`) is the number of pad positions, counted from the guide
@@ -176,7 +186,9 @@ header
   4    4     version      2
   8    4     header_len   28 + K: offset of numLeaves
   12   4     flags        bit 0: PAM at the 5' end; bit 1: PAM-less (all-N) build
-                          PAM; other bits 0 (reserved, must be 0)
+                          PAM; bit 2: FOUR_ALLELE, the file holds Q (section 4.1);
+                          other bits 0 (reserved, must be 0: a reader refuses a
+                          file with a bit it does not know)
   16   4     guide_len    G (the body's len_guide must equal it)
   20   4     pam_len      K
   24   4     max_bulges   mb (0..31)
@@ -215,6 +227,43 @@ Notes:
 * `buildTST` checks every write and the final close, and exits 1 naming the file
   if one fails (a full disk used to leave a cut-short `.bin` behind an exit 0).
 
+### 4.1 Q, the four-allele symbol
+
+`add-variants` writes `Q` where a position's reference base (A, C, G or T) and its SNP
+ALTs cover all four bases (docs/MULTIALLELIC_ENRICHMENT.md, section 2.2). Its IUPAC
+letter would be `N`, which section 3 reads as a gap, so up to the four-base rule of the
+multi-allelic work such a position removed every target through it from the index.
+`buildTST`, `searchTST` and `searchBruteForce` read `Q` as the mask `1111`: it matches
+every guide base and every PAM letter, so it is never a mismatch.
+
+Every 4-bit slot of the tree already uses 15 of its 16 values: a root, lo or hi slot
+holds `0` (no kid) or one of the 14 IUPAC letters (1..14, the letter's A|C|G|T mask),
+and an eq slot holds one of the 14 letters or `15`, the end of a string (followed by the
+int32 leaf index). So `Q` takes the value its slot never uses:
+
+| where | `Q` is written as |
+|-------|-------------------|
+| a root, lo or hi slot of the tree | `15` (`1111`, its mask) |
+| an eq slot of the tree | `0` |
+| a flank nibble (a leaf's stored PAM/flank) | `15` |
+
+Only a file whose header has the `FOUR_ALLELE` flag (bit 2) holds these values; the
+builder sets it on a `.bin` when one of its leaves stores `Q` in its guide region, its
+pad or its flank, and a `.bin` without `Q` is written byte for byte as without the fifth
+symbol. A reader that knows bit 2 decodes the tree slot by slot (in such a file a `1111`
+high nibble is not always an end of string, and its byte's low nibble is not always
+padding); a reader that does not refuses the file by section 5's rule on reserved bits
+(the format-2 reader of `feat/engine-boundaries`, before `Q`, prints `has a malformed
+index header (version 2, flags 4, ...)`), and CRISPRitz 2.9.1 and earlier refuse every
+format-2 file. `buildTST` prints on stdout how many targets hold `Q` and how many files it
+flagged (`FOUR-ALLELE (Q): ...`), `searchTST` how many of the files it reads are flagged
+(`INDEX FORMAT: 2 x42 (40 holding Q, the four-allele symbol)`), and `crispritz.py
+index-info` reports `four_allele` for each file (section 7).
+
+A reference FASTA must not hold `Q`: `add-variants` refuses one, in a chromosome it
+enriches and in one it copies (`ERROR: <chr> holds 'Q' at <pos>: ...`). `buildTST` cannot
+tell a reference from an enriched genome and indexes a `Q` wherever it finds one.
+
 ## 5. How the search reads an index
 
 `loadTST` reads the first 4 bytes of each `.bin`. If they are the magic it parses
@@ -227,13 +276,25 @@ count: as it loads the file):
 
 * a file it cannot open, or too short to hold the magic (fewer than 4 bytes);
 * a format version it does not know (> 2);
-* a malformed header: the magic followed by a version other than 2, reserved flag bits
-  set, `pam_len` outside 1..1000, `header_len` other than `28 + pam_len`, `guide_len`
-  below 1, or `max_bulges` outside 0..31;
+* a malformed header: the magic followed by a version other than 2, a flag bit other
+  than bits 0-2 set, `pam_len` outside 1..1000, `header_len` other than
+  `28 + pam_len`, `guide_len` below 1, or `max_bulges` outside 0..31;
 * a format-2 file cut short: inside its header, or not ending in the trailer;
 * a header `guide_len` that differs from the body's `len_guide` (malformed);
 * a header PAM other than the file name's PAM prefix;
 * a leaf count below 1, in either format (2.9.1 refuses that too);
+* a leaf count the file cannot hold: a leaf record takes at least `4 + ceil(K/2) + 1`
+  bytes, so a file shorter than `header_len + 12 + numLeaves x (4 + ceil(K/2) + 1)`
+  (format 1: `header_len` 0, `K` the length of the PAM it is named for) is damaged; the
+  search used to allocate that many leaves and fail in `std::bad_alloc`, or read past
+  the file's end;
+* a directory whose `.bin` files are named for more than one PAM (the prefix of
+  `<PAM>_<contig>_<part>.bin`): the search reads every file of a directory as an index
+  of the PAM that names the first it lists, so such a directory is not one index. A
+  macOS `._` (AppleDouble) file copied along with an index is one; whatever order the
+  directory lists them in, the search refuses it before reading a file (until the fix,
+  only when the `._` file came first: listed after the index's own files, it was read as
+  a tree of 118,883,584 leaves and the search failed after 22.5 s);
 * and, depending on the search: a search PAM that does not fit the stored PAM width
   (the file name's PAM prefix; for format 2 also `pam_len`): it must be as wide, or
   under `--prune-pam` a narrower 3' PAM, N-padded to it (section 12); or a PAM side
@@ -247,7 +308,8 @@ or past the leaves, which `index-info` does not read.
 If `max_bulges` on the command line differs from a format-2 header's, the header
 wins for decoding coordinates and a note goes to stdout (stderr is fatal in
 CRISPRme). Before searching, `searchTST` prints the formats it found on stdout, e.g.
-`INDEX FORMAT: 2 x24` or `INDEX FORMAT: 1 (CRISPRitz <= 2.9.1) x501`.
+`INDEX FORMAT: 2 x24`, `INDEX FORMAT: 1 (CRISPRitz <= 2.9.1) x501`, or, with files
+flagged `FOUR_ALLELE`, `INDEX FORMAT: 2 x24 (3 holding Q, the four-allele symbol)`.
 
 The guide length the index was built for, `G` (the header's `guide_len`; format 1:
 the body's `len_guide`), is read for each `.bin` and kept per search thread with its
@@ -272,7 +334,7 @@ Per leaf the search derives `PAM_LEFT`, `ws`, `pad_valid` and `FLANK_OFF`:
 |-|----------|----------|
 | `PAM_LEFT` | `guideIndex < 0`, or `guideIndex == 0` and the PAM is 3' (B1) | `lflags` bit 6 |
 | `ws` | `abs(guideIndex)` | `ws` |
-| `pad_valid` | `mb` (2.9.1 kept only whole windows) | `lflags` bits 0-4 |
+| `pad_valid` | no limit (255: 2.9.1 kept only whole windows, and an alignment cannot consume more than the stored string) | `lflags` bits 0-4 |
 | `FLANK_OFF` | 0 | `lflags` bit 5 |
 | skip | an index-0 leaf whose flank does not match the build PAM (B1) | - |
 
@@ -369,12 +431,12 @@ it: `index-genome` with the search's PAM file (its N's are the guide length).
 
 ## 6. Compatibility
 
-| | format-1 index (built by <= 2.9.1) | format-2 index (built by 2.9.2) |
+| | format-1 index (built by <= 2.9.1) | format-2 index (built by 2.10.0) |
 |-|------------------------------------|----------------------------------|
 | CRISPRitz <= 2.9.0 | as before | searchTST aborts: `std::length_error` (`vector::_M_default_append`) on stderr, exit 134, empty targets file (tested with the 2.9.0 binary of the CRISPRme 2.8.0 image; its `crispritz.py` does not check exit statuses, CRISPRme fails the stage on the stderr line) |
 | CRISPRitz 2.9.1 | as before | refused: `'...' is not a valid CRISPRitz index (.bin) file (numLeaves=-28747197)`, exit 1 (tested) |
-| CRISPRitz 2.9.2 searchTST | byte-identical to 2.9.1 except index-0 rows (B1) | full B1-B4 semantics |
-| CRISPRitz 2.9.2 searchBruteForce | - (no index) | - ; B2 applies at once |
+| CRISPRitz 2.10.0 searchTST | byte-identical to 2.9.1 except index-0 rows (B1) | full B1-B4 semantics, and `Q` (section 4.1) |
+| CRISPRitz 2.10.0 searchBruteForce | - (no index) | - ; B2 applies at once |
 
 Byte-identical means the same `.targets.txt` bytes, row order included; tested on
 the repo's fixtures and on indexes built by the 2.9.1 binary (section 11).
@@ -383,8 +445,8 @@ B2-B4 until rebuilt; B1 corrects their index-0 rows at once.
 
 A format-2 index of a genome holds every site the format-1 index of the same
 genome and parameters holds, with the same string, flank and coordinates, plus the
-boundary sites (measured on hg38 chr22 and chr1, section 10). A 2.9.2 search on it
-returns every row a 2.9.2 search on the format-1 index returns, plus rows at sites
+boundary sites (measured on hg38 chr22 and chr1, section 10). A 2.10.0 search on it
+returns every row a 2.10.0 search on the format-1 index returns, plus rows at sites
 whose guide lies within `mb` nt of a contig end or an N run (B3, including a + strand
 3' site whose guide starts at exactly `mb`), whose PAM lies within `K - L` nt of a
 contig end under `--prune-pam` (B4), or whose PAM ends on a contig's last base (B2).
@@ -395,26 +457,24 @@ Any reader (CRISPRme, scripts) can classify an index from the first bytes of its
 files, and must refuse what `searchTST` refuses before it relies on them. The function
 below is the reference implementation; it is `crispritz.py`'s own, and
 `test/run_index_format_test.sh` checks that this copy returns what `crispritz.py
-index-info` does for every file of its corpus (good files of both formats, and 18 damaged
+index-info` does for every file of its corpus (good files of both formats, and 20 damaged
 in one way each). `crispritz.py index-info <index_dir>` prints its result for every `.bin`
-of a directory as JSON, with `writes_format`, the format this CRISPRitz builds (its
-`INDEX_FORMAT`, section 8), and `pams`, the PAMs the files are named for, and exits 1
-when the directory holds no `.bin`, a `.bin` with an `error` entry, or `.bin` files named
-for more than one PAM. `searchTST` reads every `.bin` of a directory as an index of the PAM
-that names the first one it lists (its width; for format 1, its PAM), so such a directory
-is not one index. A macOS `._` (AppleDouble) file copied along with an index is one: its
-first int, read as a format-1 leaf count, is positive, so the file alone passes, but it is
-named for `.`, and `searchTST` refused such a directory on Linux amd64 and arm64 ("this
-index stores a 1-nt PAM/flank region ('.')").
+of a directory as JSON (`four_allele`: the file holds `Q`, section 4.1), with
+`writes_format`, the format this CRISPRitz builds (its `INDEX_FORMAT`, section 8), and
+`pams`, the PAMs the files are named for, and exits 1 when the directory holds no `.bin`,
+a `.bin` with an `error` entry, or `.bin` files named for more than one PAM, which
+`searchTST` refuses too (section 5). A macOS `._` (AppleDouble) file copied along with an
+index is one: its first int, read as a format-1 leaf count, is positive, but it is named
+for `.`, and its 118,883,584 leaves cannot fit in its 163 bytes.
 
 An `error` entry means `searchTST` refuses the file whatever the search: the function
 makes every check of section 5 that does not depend on the search, in `searchTST`'s order,
-reading the header, the two ints that open the body and the last 4 bytes. (A format-1 file
-of 4 to 7 bytes, which it calls too short, `searchTST` refuses when it reads the node
-count.) A format-1 file has no end marker, so one cut short after its first 8 bytes is not
-seen; nor is damage inside the leaves or the tree of either format, which `searchTST`
-finds only as it loads them, if at all (CRISPRme's `bin_problem` walks the leaves,
-section 8).
+reading the header, the two ints that open the body, the last 4 bytes and the file's
+size. (A format-1 file of 4 to 7 bytes, which it calls too short, `searchTST` refuses when
+it reads the node count.) A format-1 file has no end marker, so one cut short after its
+first 8 bytes is not seen unless its leaf count cannot fit; nor is damage inside the
+leaves or the tree of either format, which `searchTST` finds only as it loads them, if at
+all (CRISPRme's `bin_problem` walks the leaves, section 8).
 
 ```python
 CZI_MAGIC = b"CZI\xfe"
@@ -514,7 +574,7 @@ def read_index_header(path):
 ## 8. CRISPRme changes needed
 
 CRISPRme (crisprme-plus) parses `.bin` files itself and mirrors `buildTST`'s rules
-in Python, so it must learn format 2 before it can use CRISPRitz 2.9.2 indexes. As
+in Python, so it must learn format 2 before it can use CRISPRitz 2.10.0 indexes. As
 of `a5379e0`:
 
 1. **`PostProcess/crispritz_bins.py:bin_problem`** reads the first int as
@@ -534,22 +594,22 @@ of `a5379e0`:
    * **Per index, from the header of its `.bin` files** (section 7; `crispritz.py
      index-info`): format 1, the 2.9.1 rule; format 2, section 3's rule. Not from
      `crispritz.py version`: that is the installed engine, not the one that built an
-     index already on disk, so with 2.9.2 installed it would apply section 3's rule to
-     every 2.9.1-built index (and a build of this branch says 2.9.1 until the release
-     bumps `VERSION`). `index-genome` removes an index directory before it builds one,
+     index already on disk, so with 2.10.0 installed it would apply section 3's rule to
+     every 2.9.1-built index (and a build of the branch before the release bumped
+     `VERSION` said 2.9.1). `index-genome` removes an index directory before it builds one,
      so a directory whose `.bin` files differ in format was assembled from two builds:
      treat it as incomplete and rebuild it.
    * **A directory with no `.bin`** has no header to read. When CRISPRme's own build
      has just made it (`build-index-only`; `pool_index_indels.py`'s
      `_record_no_targets`), use the format of the engine that ran: `INDEX_FORMAT` in
-     the `crispritz.py` on PATH (2 on this branch; read from the file as
+     the `crispritz.py` on PATH (2 from 2.10.0; read from the file as
      `generate_report._crispritz_version` reads `VERSION`; CRISPRitz <= 2.9.1 has none
      and writes format 1), and record it with the index (`index_meta.json`, item 4; the
      `NO_TARGETS` record). For one built earlier (`pool_search_indels.py`'s
      `_empty_index`), use that record, else the format of the index's other `.bin`
      files (its other sub-indexes), else section 3's rule: on a directory 2.9.1 built,
      its only error is a false "holds a target", which asks for a rebuild, where the
-     2.9.1 rule on one 2.9.2 built would pass a lost `.bin` off as an empty result.
+     2.9.1 rule on one 2.10.0 built would pass a lost `.bin` off as an empty result.
    * **What the wrong rule does.** Measured with `crispritz_bins` of `a5379e0` on a
      synthetic boundary genome (885 contigs; NGG `-bMax 2` indexes built by 2.9.1 and
      by this branch with `crispritz.py index-genome`), and with a section-3 rule
@@ -572,7 +632,7 @@ of `a5379e0`:
        index fails the check. Its count exceeds the format-1 leaf count on 361 of the
        885 contigs, so a contig whose last part is full can be taken for one that
        lacks a part.
-4. **Engine/index pairing.** An index built by 2.9.2 cannot be searched by
+4. **Engine/index pairing.** An index built by 2.10.0 cannot be searched by
    CRISPRitz <= 2.9.1. Where CRISPRme resolves or downloads an index, read the formats
    of its `.bin` files (section 7: `index-info` exits 1 on one that `searchTST` would
    refuse) and refuse a format-2 index when the pinned engine is older, naming both;
@@ -613,17 +673,35 @@ of `a5379e0`:
    report which guide length the index was built for. `searchTST`'s stdout `NOTE: the
    index was built for <G>-nt guides ...` line (section 5) marks a run where it was
    not.
+8. **The four-allele symbol Q** (section 4.1). A genome enriched by CRISPRitz 2.10.0
+   holds `Q` where a SNP position's reference base and ALTs cover all four bases, and so
+   do the targets a search reports there (in the DNA column, and in a PAM). Every reader
+   of an enriched genome, a fake-indel genome overlaid from it, or a target must read `Q`
+   as any base, `{A, C, G, T}`, and never as `N` (a gap, which matches nothing): the
+   IUPAC tables of CRISPRme 2.8.1 have no `Q` (`pam_filter._IUPAC`/`_TARGET_IUPAC`,
+   `overlay_indel_snps._IUPAC_AMBIG`, `new_simple_analysis.iupac_code`,
+   `analisi_indels_NNN.iupac_code`, `twopass_find.IUPAC_TO_SET`, among the ~20 modules
+   that decode IUPAC letters), and `crispritz_bins`' site rule must count `Q` as a base,
+   which matches every PAM letter. A header flag says which `.bin` files hold `Q`
+   (`FOUR_ALLELE`, bit 2; `index-info`'s `four_allele`), and a format-2 reader must
+   accept that bit. The dictionaries list every ALT of such a position, each in its own
+   entry (docs/MULTIALLELIC_ENRICHMENT.md, section 2.3).
 
-## 9. searchBruteForce (B2 only)
+## 9. searchBruteForce
 
 The no-bulge scan has no index; it gets the scan bound of B2 on both PAM sides (a
 3' PAM ending on the last base; every reverse-strand 5' PAM whose window ends at the
 contig end) and returns early on a contig shorter than one target, where the
-unsigned bound used to wrap. Its other rules are already those of section 3.1 for
-`mb = 0`: the window must lie inside the contig and an N in the guide region drops
-it (`currentmissmatch += 100`).
+unsigned bound used to wrap. Its other rules are those of section 3.1 for `mb = 0`:
+the window must lie inside the contig, and an N in the guide region drops it whatever
+the mismatch budget (until 2.10.0 an N counted 101 mismatches, so a search allowing
+more than 100 reported windows holding one), and it reads `Q` as any base.
 
 ## 10. Cost (measured)
+
+Measured with the build of `feat/engine-boundaries` (`c286bf8`), before `Q`: 2.10.0 writes
+the same bytes for a genome without `Q` (section 4.1), so the reference-genome numbers
+stand for it.
 
 `crispritz.py index-genome <name> <dir with one chromosome> <PAM file> -bMax 2 -th 8`, hg38
 chromosome FASTA (chr22 md5 319cba9f..., chr1 md5 9465e0f0...), CRISPRitz 2.9.1 (the
@@ -634,25 +712,25 @@ Docker on Apple Silicon (24 CPUs, g++ 14.2 -O3), two rounds alternating the vers
 | index | engine | wall s (round 1 / 2) | user CPU s | peak RSS GB | .bin bytes | leaves |
 |-------|--------|----------------------|------------|-------------|------------|--------|
 | chr22 NGG, `-bMax 2` | 2.9.1 | 6.1 / 5.6 | 11.1 / 11.1 | 1.45 | 129,640,072 | 5,295,027 |
-| | 2.9.2 | 6.1 / 5.8 | 11.1 / 11.4 | 1.46 / 1.47 | 129,639,385 | 5,295,032 |
+| | 2.10.0 | 6.1 / 5.8 | 11.1 / 11.4 | 1.46 / 1.47 | 129,639,385 | 5,295,032 |
 | chr22 PAM-less K=8 | 2.9.1 | 108.4 / 94.9 | 277.4 / 268.0 | 18.51 | 1,864,232,876 | 78,317,538 |
-| | 2.9.2 | 107.0 / 136.2 | 274.5 / 300.1 | 18.88 | 1,864,235,403 | 78,317,730 |
+| | 2.10.0 | 107.0 / 136.2 | 274.5 / 300.1 | 18.88 | 1,864,235,403 | 78,317,730 |
 | chr1 NGG, `-bMax 2` | 2.9.1 | 31.9 / 38.5 | 74.9 / 74.4 | 5.53 / 5.54 | 579,345,896 | 24,957,801 |
-| | 2.9.2 | 28.8 / 32.2 | 71.4 / 70.9 | 5.63 | 579,348,060 | 24,957,823 |
+| | 2.10.0 | 28.8 / 32.2 | 71.4 / 70.9 | 5.63 | 579,348,060 | 24,957,823 |
 
 amd64: ml008 (255 cores shared with other users, load average 250-500 during the runs;
-g++ 14.2 -O3, the rc281 image's toolchain), the 2.9.2 build after the 2.9.1 one:
+g++ 14.2 -O3, the rc281 image's toolchain), the 2.10.0 build after the 2.9.1 one:
 
 | index | engine | wall s | user CPU s | peak RSS GB | .bin bytes | leaves |
 |-------|--------|--------|------------|-------------|------------|--------|
 | chr22 NGG, `-bMax 2` | 2.9.1 | 15.4 | 28.1 | 1.44 | 129,640,072 | 5,295,027 |
-| | 2.9.2 | 16.1 | 27.5 | 1.46 | 129,639,385 | 5,295,032 |
+| | 2.10.0 | 16.1 | 27.5 | 1.46 | 129,639,385 | 5,295,032 |
 | chr22 PAM-less K=8 | 2.9.1 | 209.0 | 483.9 | 18.51 | 1,864,232,876 | 78,317,538 |
-| | 2.9.2 | 202.9 | 479.0 | 18.88 | 1,864,235,403 | 78,317,730 |
+| | 2.10.0 | 202.9 | 479.0 | 18.88 | 1,864,235,403 | 78,317,730 |
 | chr1 NGG, `-bMax 2` | 2.9.1 | 78.3 | 145.2 | 5.54 | 579,345,896 | 24,957,801 |
-| | 2.9.2 | 71.8 | 139.5 | 5.63 | 579,348,060 | 24,957,823 |
+| | 2.10.0 | 71.8 | 139.5 | 5.63 | 579,348,060 | 24,957,823 |
 | chr1 PAM-less K=8 | 2.9.1 | 1,022.7 | 2,890.0 | 101.01 | 10,468,103,808 | 460,955,944 |
-| | 2.9.2 | 1,093.6 | 2,819.2 | 102.86 | 10,468,113,334 | 460,956,484 |
+| | 2.10.0 | 1,093.6 | 2,819.2 | 102.86 | 10,468,113,334 | 460,956,484 |
 
 The `.bin` files are byte-identical across the two architectures (chr22 NGG md5s
 compared for both versions; the other sizes agree to the byte).
@@ -719,45 +797,63 @@ compared for both versions; the other sizes agree to the byte).
    directory mixing both formats, `max_bulges` from the header, the refusals (a
    header guide length other than the body's among them), the stdout note for a
    21- and a 19-nt search guide on a 20-nt index (none for a 20-nt one), and
-   `index-info` against `searchTST` on 18 files damaged in one way each (every check
-   of section 5 that does not depend on the search, a reserved flag bit, `max_bulges`
-   32 and -1, a header PAM other than the file name's, a leaf count of 0 in either
-   format among them) and, run as a user other than root, an unreadable one: both
-   refuse each, for the same reason, and the reader of section 7 returns what
-   `index-info` does for the 18 and the good files (36). The `index-info` of the
-   previous commit (`520a69a`) accepts 12 of the 18. `index-info` also refuses a
-   directory holding a macOS `._` file beside the index's `.bin`. The boundary suite runs
-   `index-info` on each index it builds (exit 0, nothing on stderr, the header's
-   parameters those of the build).
-4. **Existing tests** (`run_golden_test.sh`, `run_minimal_test.sh`,
+   `index-info` against `searchTST` on 20 files damaged in one way each (every check
+   of section 5 that does not depend on the search, a reserved flag bit (bit 3),
+   `max_bulges` 32 and -1, a header PAM other than the file name's, a leaf count of 0
+   and one of 2,000,000 the file cannot hold in either format among them) and, run as
+   a user other than root, an unreadable one: both refuse each, for the same reason,
+   and the reader of section 7 returns what `index-info` does for the 20 and the good
+   files (38). The `index-info` of `520a69a` accepts 12 of the first 18. `searchTST`
+   and `index-info` also refuse a directory holding a macOS `._` file beside the
+   index's `.bin`. The boundary suite runs `index-info` on each index it builds (exit 0,
+   nothing on stderr, the header's parameters those of the build).
+4. **The four-allele symbol** (`test/run_four_allele_test.sh`, `test/four_allele/`):
+   44 synthetic contigs (each case on both strands) whose split and multi-ALT SNP
+   records put `Q` in guide regions (where it turns a reference mismatch into a
+   match, up to six in one guide), in PAMs that exist only through it (NGG's GG, one
+   G or its N; TTTV's T or V), beyond a guide's far end, next to N runs and on contig
+   ends, a run of 30, ALTs on reference `N` (which stay `N`), and a 20-kb background
+   with 3% `Q`, IUPAC codes and N runs, through `crispritz.py`: `add-variants` with
+   both enricher ports (identical; `Q` exactly at the four-base positions, `N` exactly
+   the reference's), `index-genome` for NGG (`-bMax` 0, 2), NRG, a PAM-less K=8 flank,
+   5' TTTV and a 5' PAM-less K=4 flank (a `.bin` flagged `four_allele` exactly when
+   one of its leaves stores `Q`), and 23 searches, with and without bulges and
+   `--prune-pam`, each equal to the oracle (Q as any base; 9,328,182 rows, 9,128,468
+   through `Q`), the 11 without bulges equal to `searchBruteForce`, no row holding an
+   `N`, every row its contig's bases, the 38 planted perfect sites found, and
+   `--prune-pam` equal to the dedicated index; and `searchBruteForce` at `-mm 120`
+   reports no window with an N in its guide. The pre-`Q` engine (`d75c603`) fails it:
+   its `buildTST` writes to stderr on `Q`, its `searchBruteForce` reads `Q` as a gap
+   (109 rows only the index finds), and its enricher writes no `Q`.
+5. **Existing tests** (`run_golden_test.sh`, `run_minimal_test.sh`,
    `run_pam_filter_test.sh`, `run_flank_n_test.sh`, `run_short_contig_test.sh`) pass;
    the golden outputs are byte-identical (their genome holds no boundary site).
    `run_short_contig_test.sh` now also requires a contig exactly one target long to
    be indexed.
-5. **AddressSanitizer**: all three binaries, over every test above, on arm64 and amd64
+6. **AddressSanitizer**: all three binaries, over every test above, on arm64 and amd64
    (the short-contig test without its `ulimit -v` cap, under which ASan cannot reserve
    its shadow memory).
-6. **Platforms**: arm64 (Docker on Apple Silicon: g++ 14.2, and `make -f
+7. **Platforms**: arm64 (Docker on Apple Silicon: g++ 14.2, and `make -f
    Makefile_conda` in `gcc:12`) and amd64 (ml008, g++ 14.2); every test passes on each.
-7. **hg38**: see section 10 for build cost and leaf-level comparison, and:
+8. **hg38**: see section 10 for build cost and leaf-level comparison, and:
    * the shipped format-1 `NGG_3_hg38` (all 455 contigs, 501 trees, not rebuilt),
      searched with the guides of the 11 contigs that open with a reverse NGG
      (`-mm 0 -bDNA 1 -bRNA 1`, 32 threads): 63,095 rows from both engines; the 11
-     contigs' rows move from the + strand at 2-4 to the minus strand at 0 under 2.9.2
+     contigs' rows move from the + strand at 2-4 to the minus strand at 0 under 2.10.0
      (same rows otherwise); every other contig's rows are identical (in order for the
      132 single-tree contigs; the 6 multi-tree chromosomes interleave their trees in
      thread-completion order, the same rows).
    * 246 NGG contig-end sites on 171 alt/random/Un contigs, each searched with its own
      perfect guide: a dedicated format-1 index finds 235 with 2.9.1 (11 come out on the
-     + strand) and 246 with 2.9.2; a format-1 K=8 index with `--prune-pam` finds 0; a
+     + strand) and 246 with 2.10.0; a format-1 K=8 index with `--prune-pam` finds 0; a
      format-2 K=8 index with `--prune-pam` finds 246, and its rows equal the format-2
-     dedicated index's (368,586 rows). 2.9.2 on the format-1 dedicated index changes the
+     dedicated index's (368,586 rows). 2.10.0 on the format-1 dedicated index changes the
      rows of 12 contigs only: the 11 move to the minus strand at base 0, and 6 rows of
      the builder's index-0 artefact on chrUn_KI270539v1 (reported on the + strand with
      the PAM `GGC`) are dropped; the other 159 contigs are byte-identical.
    * chr22 and chr1, 50 guides (45 whose perfect match lies 0-2 nt from an N run on
      chr1/chr22, and TRAC, EMX1, VEGFA site 3, HEK4, FANCF), `-mm 4 -bDNA 1 -bRNA 1`:
-     - the format-1 index gives byte-identical output under 2.9.1 and 2.9.2: chr22
+     - the format-1 index gives byte-identical output under 2.9.1 and 2.10.0: chr22
        5,232,494 rows, chr1 14,358,326 rows (each of chr1's 5 trees byte-identical,
        searched alone; with 16 threads the trees' rows interleave in completion order);
      - the format-2 index returns every row of the format-1 index and 1,827 (chr22) and
@@ -769,8 +865,8 @@ compared for both versions; the other sizes agree to the byte).
      - `--prune-pam` NGG off the format-2 K=8 index equals the format-2 dedicated NGG
        index on chr22 (5,234,321 rows).
    * search time, chr22 NGG, the 50 guides, three alternating rounds (wall s): 2.9.1 on
-     the format-1 index 81.5 / 87.4 / 80.7, 2.9.2 on it 70.3 / 82.9 / 78.5 (output
-     byte-identical each round), 2.9.2 on the format-2 index 79.6 / 81.3 / 80.3.
+     the format-1 index 81.5 / 87.4 / 80.7, 2.10.0 on it 70.3 / 82.9 / 78.5 (output
+     byte-identical each round), 2.10.0 on the format-2 index 79.6 / 81.3 / 80.3.
    * guide length (section 5.1), chr22, the format-2 NGG `-bMax 2` index (20-nt), the
      same 50 guides, `-mm 4 -bDNA 1 -bRNA 1`, amd64, this branch against its state
      before the guide-length fix (`546333f`; the two `buildTST`s build byte-identical

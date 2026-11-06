@@ -206,15 +206,19 @@ Detailed input:
 `hg19_ref/` is the directory containing the fasta files.
 
 Multi-allelic sites: a site may be one VCF record listing several ALTs or one record per
-ALT (as `bcftools norm -m -any` writes it); either way, since 2.9.2, every single-base ALT
+ALT (as `bcftools norm -m -any` writes it); either way, since 2.10.0, every single-base ALT
 of the PASS records at a position goes into its IUPAC code, in any record order, and into
 its SNP dictionary entry (up to 2.9.1 only the last record's ALT did). A position whose
-reference base and ALTs cover all four bases is coded without its rarest ALT (lowest AF),
-because `N` is a gap to `index-genome` and `search`; the dictionary still lists it. Apply an
-allele-frequency filter after splitting, so it acts per ALT. Each dictionary entry keeps its
-own record's genotypes verbatim: split records phased one by one can put two ALTs of a
-position on one haplotype slot (`0|1` under each), and whatever builds haplotypes from the
-dictionary has to resolve that. Details:
+reference base and ALTs cover all four bases is coded `Q`, a fifth symbol `index-genome` and
+`search` read as any base: its IUPAC letter, `N`, is a gap to them, which matches nothing
+(an index file holding `Q` is flagged so that an engine without it refuses it; a reference
+FASTA must not hold `Q`, and `add-variants` refuses one). A reference `N` stays `N`, whatever
+the VCF lists there. Apply an allele-frequency filter after splitting, so it acts per ALT.
+Each record's `INFO/AF` is read by its key (up to 2.9.1 its place came from the file's
+first record). Each dictionary entry keeps its own record's genotypes verbatim, and one
+allele on two records is one entry with the carriers of both: split records phased one by
+one can put two ALTs of a position on one haplotype slot (`0|1` under each), and whatever
+builds haplotypes from the dictionary has to resolve that. Details:
 [`docs/MULTIALLELIC_ENRICHMENT.md`](docs/MULTIALLELIC_ENRICHMENT.md).
 
 
@@ -258,8 +262,8 @@ database (e.g if -bMax 2, all the following searches with the created index can 
 with max 2 RNA bulges and 2 DNA bulges; at most 31)  
 `-th 4` is the number of threads to use (Optional)
 
-**<a name="Index-Format">3.2.1</a> Index format 2 (CRISPRitz 2.9.2 and later).**  
-An index built by CRISPRitz 2.9.2 or later is in *index format 2*, specified in
+**<a name="Index-Format">3.2.1</a> Index format 2 (CRISPRitz 2.10.0 and later).**  
+An index built by CRISPRitz 2.10.0 or later is in *index format 2*, specified in
 [docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md). It holds every target whose guide (of the
 length the index was built for) and PAM fit in the sequence, including targets next to a
 contig end or a run of `N`: the extra bases a DNA bulge, or a longer search guide, needs
@@ -275,12 +279,13 @@ file and the reason, if a `.bin` is one the search would refuse):
 crispritz.py index-info genome_library/NGG_2_hg19_ref/
 ```
 
-Compatibility: CRISPRitz 2.9.2 searches indexes built by earlier versions (format 1) exactly
+Compatibility: CRISPRitz 2.10.0 searches indexes built by earlier versions (format 1) exactly
 as before, except at a contig's first base: a reverse-strand PAM there is reported on the
 correct strand, and a spurious match the old builder could store there is dropped. Such
-indexes keep missing the boundary targets until rebuilt. An index built by 2.9.2 cannot be
+indexes keep missing the boundary targets until rebuilt. An index built by 2.10.0 cannot be
 searched by CRISPRitz 2.9.1 or earlier: 2.9.1 refuses it with an error, earlier versions
-abort with one.
+abort with one. An index of an enriched genome may hold `Q`, the four-allele symbol; the
+files that do are flagged in their header (`index-info` reports `four_allele`).
 
 
 **<a name="Search">3.3</a> CRISPRitz Search Tool**  
