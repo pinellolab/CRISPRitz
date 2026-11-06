@@ -569,13 +569,16 @@ def genomeEnrichment():
             if "chr" in x:
                 chr_with_vcf.add(x)
     # the chromosome FASTA files: any other file beside them (a README, a .DS_Store, a
-    # .fai) is no chromosome. Taken for one, a README was copied as one ('cp: cannot
-    # stat' on stderr), and any of them listed first gave its extension to the
-    # chromosomes copied below, none of which was
+    # .fai, the AppleDouble ._<name>.fa of macOS tar) is no chromosome. Taken for one, a
+    # README was copied as one ('cp: cannot stat' on stderr), a ._<name>.fa into the
+    # enriched genome, and a README, .DS_Store or .fai listed first gave its extension
+    # to the chromosomes copied below, none of which was
     list_file_ends = [
         f
         for f in listdir(dirGenome)
-        if isfile(join(dirGenome, f)) and f.endswith((".fa", ".fasta"))
+        if isfile(join(dirGenome, f))
+        and f.endswith((".fa", ".fasta"))
+        and not f.startswith(".")
     ]
     if not list_file_ends:
         sys.stderr.write("ERROR: %s holds no .fa or .fasta file\n" % dirGenome)

@@ -78,7 +78,8 @@ jobs:
       # their exit status, so a crashed or killed enricher left it at exit 0 with
       # that chromosome missing. A stub enricher on PATH makes each outcome exact.
       # With the shipped enricher: a chromosome it copies (no VCF) holding Q is
-      # refused, and a README, .DS_Store or .fai beside the chromosomes is ignored.
+      # refused, and a README, .DS_Store, .fai or macOS ._<name>.fa beside the
+      # chromosomes is ignored.
       - name: add-variants fails when an enricher fails
         run: bash test/run_add_variants_status_test.sh
 

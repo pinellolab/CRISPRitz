@@ -217,9 +217,11 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   refused before the search, as by `index-info`.
 - **`add-variants` took every file of the genome folder for a chromosome**: a README or
   `.DS_Store` beside the FASTA files was copied as one, failing with `cp: cannot stat` on
-  stderr (which fails a CRISPRme search), and such a file, or a `.fai`, listed first gave its
-  extension to every chromosome without a VCF, none of which was then copied (exit 0). Only
-  the `.fa` and `.fasta` files are chromosomes now, and a folder holding none is refused.
+  stderr (which fails a CRISPRme search), a macOS `._<name>.fa` (the AppleDouble file macOS
+  tar writes for a file's extended attributes) was copied into the enriched genome, and a
+  README, `.DS_Store` or `.fai` listed first gave its extension to every chromosome without
+  a VCF, none of which was then copied (exit 0). Only the `.fa` and `.fasta` files not
+  hidden are chromosomes now, and a folder holding none is refused.
 - `buildTST` and `searchBruteForce` skipped a genome byte other than A/C/G/T, N and the IUPAC
   codes when they scanned for PAMs, so every later PAM position of the contig was read one
   base off and a site after it lost; such a byte is now a gap (`0000`).

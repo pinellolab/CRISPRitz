@@ -23,11 +23,11 @@
 #   5. one of them holds a 'q'           -> exit 1 before any enrichment, ERROR names
 #                                           it and the position (Q is the four-allele
 #                                           symbol, which the search reads as any base)
-#   6. a README, a .DS_Store and a .fai  -> exit 0, nothing on stderr, every chromosome
-#      beside the chromosomes               enriched or copied, the stray files ignored
-#                                           (2.9.1 wrote 'cp: cannot stat' on stderr or,
-#                                           with a stray file listed first, copied no
-#                                           chromosome)
+#   6. a README, a .DS_Store, a .fai and -> exit 0, nothing on stderr, every chromosome
+#      a macOS ._chrC.fa (AppleDouble)      enriched or copied, the stray files ignored
+#      beside the chromosomes               (2.9.1 wrote 'cp: cannot stat' on stderr,
+#                                           copied ._chrC.fa as a chromosome or, with a
+#                                           stray file listed first, copied none)
 #   7. a genome folder with no FASTA     -> exit 1, ERROR names the folder
 #
 # Each run is under a timeout: a worker that exits instead of returning its status
@@ -148,6 +148,9 @@ sed 's/q/A/' "$WORK/genome_q/chrC.fa" > "$WORK/genome_stray/chrC.fa"
 echo "chrA..chrC, one FASTA each" > "$WORK/genome_stray/README"
 printf '\0\0\0\1Bud1' > "$WORK/genome_stray/.DS_Store"
 printf 'chrA\t300\t6\t300\t301\n' > "$WORK/genome_stray/chrA.fa.fai"
+# what macOS tar puts beside chrC.fa for its extended attributes, a quarantine one here
+python3 -c 'import sys; open(sys.argv[1], "wb").write(b"\x00\x05\x16\x07\x00\x02\x00\x00Mac OS X"
+    b"        \x00\x02ATTR\x00\x00com.apple.quarantine\x000083;00000000;Safari;")' "$WORK/genome_stray/._chrC.fa"
 run stray "$SHIPPED" "$WORK/genome_stray"
 hung && fail "add-variants hung on a genome folder with stray files (timeout)"
 [ "$RC" = 0 ] || fail "stray files in the genome folder: add-variants exited $RC: $ERR"
@@ -159,7 +162,7 @@ cmp -s "$out/chrC.enriched.fa" "$WORK/genome_stray/chrC.fa" || fail "chrC (no VC
 for c in chrA chrB; do
     ! cmp -s "$out/$c.enriched.fa" "$WORK/genome_stray/$c.fa" || fail "$c was not enriched"
 done
-echo "  ok  a README, a .DS_Store and a .fai beside the chromosomes -> exit 0, nothing on stderr, ignored"
+echo "  ok  a README, a .DS_Store, a .fai and a ._chrC.fa beside the chromosomes -> exit 0, nothing on stderr, ignored"
 
 mkdir -p "$WORK/genome_none"
 cp "$WORK/genome_stray/README" "$WORK/genome_stray/chrA.fa.fai" "$WORK/genome_none/"
