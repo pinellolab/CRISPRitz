@@ -8,6 +8,7 @@ import os
 import json
 import pandas as pd
 import gzip
+from array import array
 
 start_time = time.time()
 
@@ -36,6 +37,20 @@ genomeStr = genomeStr.upper()
 
 #genome str is listed to be modified faster and easier
 genomeList = list(genomeStr)
+
+# The A/C/G/T bases coded so far at each position, as a 4-bit mask (0 = no SNP record
+# here yet). A multi-allelic site normalised with `bcftools norm -m -any` arrives as one
+# record per ALT, so each record must add its ALT to what the earlier ones coded instead
+# of rebuilding the code from the reference base. The mask is kept beside genomeList
+# because a letter there cannot tell a code this script wrote from an ambiguity code the
+# reference FASTA already holds.
+snp_mask = bytearray(len(genomeStr))
+# Every single-base A/C/G/T ALT seen, with its frequency (_rank_af), for the positions
+# that end up holding all four bases (see resolveFourBasePositions). ~17 bytes per ALT.
+alt_af_pos = array('q')
+alt_af_bit = array('B')
+alt_af_val = array('d')
+four_base_positions = set()
 
 iupac_code = {}
 
@@ -151,25 +166,102 @@ _IUPAC_BY_MASK = {sum(_BASE_BIT[c] for c in spellings[0]): letter
                   for letter, spellings in iupac_code.items()}
 
 
+# A plain decimal number (what an AF value is). Spelled out rather than left to float(),
+# which also takes 'nan', 'inf', '1_000' and surrounding spaces, so that enricher.cpp
+# (strtod behind the same check) reads every AF string the same way.
+_AF_NUMBER = re.compile(r'[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\Z')
+
+
+def _rank_af(line, k):
+    """How frequent ALT k of this record is, to rank the ALTs of a four-base position:
+    the highest of its INFO/AF and every INFO/AF_<x> value (0 when there is none). A
+    genotyped panel carries AF; a sites-only merge such as CRISPRme's mega carries only
+    per-dataset AF_<x> and AF_max, where AF alone would rank every ALT 0 and leave the
+    choice to base order. Ranking only: the dict's AF field is still INFO/AF."""
+    vals = []
+    for entry in line[7].split(";"):
+        key, sep, value = entry.partition("=")
+        if sep and (key == "AF" or key.startswith("AF_")):
+            v = value.split(",")
+            if k < len(v) and _AF_NUMBER.match(v[k]):
+                vals.append(float(v[k]))
+    return max(vals) if vals else 0.0
+
+
 def SNPsProcess(line):
     if len(line[3]) > 1: #se len ref > 1 significa che non è snp
         return
     line[1] = str(int(line[1])-1)  # taaac per corregere conta posizione da zero/uno
+    pos = int(line[1])
+    if not 0 <= pos < len(genomeStr):
+        # A POS past the end raised IndexError here; POS 0 read and coded the LAST base
+        # (index -1), and enricher.cpp read and wrote out of bounds. Fail, both ports alike.
+        sys.stderr.write("ERROR: %s:%d is outside the chromosome (%d bp): is the VCF on "
+                         "another assembly?\n" % (currentChr, pos + 1, len(genomeStr)))
+        sys.exit(1)
     altAlleles = line[4].strip().split(',') #list di tutti gli alleli alternative
-    referenceNucleotide = genomeStr[int(line[1])] #nucleotide reference preso dalla stringa del fasta
+    referenceNucleotide = genomeStr[pos] #nucleotide reference preso dalla stringa del fasta
     # The reference base and every single-character ALT, as A/C/G/T bits. A member
     # that is not A/C/G/T -- the '*' of a spanning deletion, an 'N', a lowercase
     # base, an IUPAC reference base -- adds nothing, so the real SNP alleles beside
     # it are still coded. Building the code from the whole set instead left the base
     # unchanged whenever such a member was present, dropping a real SNP at every
     # multiallelic '*' site. This is enricher.cpp's rule (baseBit/iupacFromMask).
-    mask = _BASE_BIT.get(referenceNucleotide, 0)
-    for alt in altAlleles:
-        if len(alt) == 1:
-            mask |= _BASE_BIT.get(alt, 0)
+    #
+    # The set starts from what earlier records coded HERE, not from the reference base
+    # alone. A normalised VCF (`bcftools norm -m -any`, how every CRISPRme panel is
+    # built) splits a multi-allelic site into one record per ALT, and rebuilding the
+    # code from the reference on each record kept only the LAST record's ALT in the
+    # file: the others reached neither the enriched genome nor the search. Now the
+    # code is that of the site written as one record with every ALT, in any order.
+    mask = snp_mask[pos] or _BASE_BIT.get(referenceNucleotide, 0)
+    for k, alt in enumerate(altAlleles):
+        bit = _BASE_BIT.get(alt, 0) if len(alt) == 1 else 0
+        if bit:
+            mask |= bit
+            alt_af_pos.append(pos)
+            alt_af_bit.append(bit)
+            alt_af_val.append(_rank_af(line, k))
+    snp_mask[pos] = mask
+    if mask == 15:
+        # all four bases: N would be written, which the search reads as a gap, not as
+        # "any base". Resolved once every record is read (resolveFourBasePositions).
+        four_base_positions.add(pos)
+        return
     letter = _IUPAC_BY_MASK.get(mask)
     if letter is not None:
-        genomeList[int(line[1])] = letter #inserisco il IUPAC nt nel genoma enriched
+        genomeList[pos] = letter #inserisco il IUPAC nt nel genoma enriched
+
+
+def resolveFourBasePositions():
+    """Code the positions whose reference base and SNP ALTs cover all four bases.
+
+    The IUPAC letter for A/C/G/T is N, and N is what buildTST and searchTST treat as an
+    assembly gap: buildTST discards every target with an N in its guide region and the
+    PAM scan matches nothing at an N. Writing it would remove every target through the
+    position from the index -- the reference one included. So such a position keeps the
+    reference base and its most frequent ALTs, leaving out the rarest ALT by _rank_af
+    (a tie leaves out the later of A, C, G, T; an ALT seen on several records counts
+    with its highest value). The SNP dict still lists every ALT. On chr22 of HGDP + 1000
+    Genomes, 2,448 positions carry three SNP ALTs; the rarest of them has AC >= 41 at 3.
+    """
+    if not four_base_positions:
+        return
+    best = {}
+    for p, b, v in zip(alt_af_pos, alt_af_bit, alt_af_val):
+        if p in four_base_positions:
+            key = (p, b)
+            if key not in best or v > best[key]:
+                best[key] = v
+    for pos in sorted(four_base_positions):
+        ref_bit = _BASE_BIT.get(genomeStr[pos], 0)
+        alts = [b for b in (1, 2, 4, 8) if b != ref_bit]
+        drop = min(alts, key=lambda b: (best.get((pos, b), 0.0), -b))
+        genomeList[pos] = _IUPAC_BY_MASK[15 & ~drop]
+    print("NOTE: %d position(s) of %s carry all four bases between the reference and "
+          "the SNP ALTs; N would read as a gap, so each is coded without its rarest ALT "
+          "(lowest INFO AF or AF_*, ties to the later of A, C, G, T)"
+          % (len(four_base_positions), currentChr))
 
 
 # def SNPsProcess(line):
@@ -257,6 +349,40 @@ def _af_value(line, pos_AF):
     return value if key == "AF" else ""
 
 
+def _entry_alt(entry):
+    """The ALT of one dict entry "<samples>;<REF>,<ALT>;<rsID>;<AF>", read from the
+    right, so a ';' in a sample name cannot move it (the rsID's ';' is already ',')."""
+    return entry.rsplit(';', 3)[1].split(',', 1)[1]
+
+
+def _dict_put(key, entries):
+    """Store one record's per-ALT entries under "chr,pos", MERGED with what earlier
+    records stored there.
+
+    A position's value is its ALTs' entries joined by '$', the form a record listing
+    several ALTs has always produced, so every reader of multi-ALT values reads it. Each
+    entry keeps its own record's carriers, genotypes, rsID and AF: the genotypes of a
+    split record use 1 for its ALT, as tier0_registry's default alt_index expects.
+    Assigning instead let a later record at the position overwrite the earlier ones, so
+    a split multi-allelic site kept only its last ALT. An ALT already listed here (the
+    same allele on two records) has its entry replaced by the later record's, as the
+    whole value used to be; any other ALT is appended, in file order."""
+    old = chr_dict_snps.get(key)
+    if old is None:
+        chr_dict_snps[key] = '$'.join(entries)
+        return
+    merged = old.split('$')
+    alts = [_entry_alt(e) for e in merged]
+    for e in entries:
+        a = _entry_alt(e)
+        if a in alts:
+            merged[alts.index(a)] = e
+        else:
+            merged.append(e)
+            alts.append(a)
+    chr_dict_snps[key] = '$'.join(merged)
+
+
 def add_to_dict_snps(line, pos_AF):
     list_samples = []
     list_chars = []
@@ -275,9 +401,9 @@ def add_to_dict_snps(line, pos_AF):
         list_chars.append(line[4])
         af = _af_value(line, pos_AF)
         if len(list_samples) > 0:
-            chr_dict_snps[chr_pos_string] = ','.join(sorted(list_samples)) + ';' + ','.join(list_chars) + ";" + rsID + ";" + af
+            _dict_put(chr_pos_string, [','.join(sorted(list_samples)) + ';' + ','.join(list_chars) + ";" + rsID + ";" + af])
         else:
-            chr_dict_snps[chr_pos_string] = ';' + ','.join(list_chars) + ";" + rsID + ";" + af #None
+            _dict_put(chr_pos_string, [';' + ','.join(list_chars) + ";" + rsID + ";" + af]) #None
         # print(chr_dict_snps[chr_pos_string])
     elif len(line[3]) == 1:
         variants = line[4].split(",")
@@ -312,7 +438,7 @@ def add_to_dict_snps(line, pos_AF):
                     final_entry.append(','.join(sorted(dict_of_lists_samples[snp])) + ';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af_val)
                 else:
                     final_entry.append(';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af_val)
-            chr_dict_snps[chr_pos_string] = '$'.join(final_entry)
+            _dict_put(chr_pos_string, final_entry)
 
 def dictSave():
     #os.chdir("./SNPs_genome/")
@@ -455,8 +581,9 @@ for line in inAltFile:
         add_to_dict_snps(line, pos_AF)
         id_indel, start_fake_pos = indel_to_fasta(line, id_indel, pos_AF, start_fake_pos)
     SNPsProcess(line)
-    
 
+
+resolveFourBasePositions()
 #saving chr after enrichment with snps
 chromosomeSave()
 if sys.argv[4] == 'yes':

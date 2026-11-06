@@ -15,8 +15,16 @@
 # the chromosome start (window floor) and end, a REF that does not match the
 # FASTA, and same-POS SNP/indel orders beyond case 8. Case 17 covers multiallelic
 # SNP records whose ALTs include a non-A/C/G/T member ('*', 'N', a lowercase base)
-# or whose FASTA base is N. Besides the four outputs, the file set and the run log
-# (stdout+stderr, e.g. the skip warnings) must match.
+# or whose FASTA base is N. Cases 18-30 cover multi-allelic sites SPLIT into one
+# record per ALT, as `bcftools norm -m -any` writes them: two and three ALTs in
+# every record order, the same sites as one record, the all-four-bases rule, split
+# records that are not adjacent, haploid / unphased / missing genotypes, SNP + indel
+# at one position and inside an indel's window, a split record beside a multi-ALT
+# record, a non-PASS split record, the same ALT twice, AF spellings and AF_<x>
+# fields, a reference IUPAC base and N, '*', the chromosome edges, and split records
+# phased so that one haplotype slot holds two ALTs. Besides the
+# four outputs, the file set and the run log (stdout+stderr, e.g. the skip warnings
+# and the four-base note) must match.
 #
 # Prints "BYTE-IDENTICAL: PASS" only if every output diff is empty.
 #
@@ -49,19 +57,22 @@ trap 'rm -rf "$WORK"' EXIT
 echo "Work dir: $WORK"
 
 # ---------------------------------------------------------------------------
-# synthetic chromosome FASTA (1,800 bp, mixed case to exercise upper()). The
+# synthetic chromosome FASTA (2,400 bp, mixed case to exercise upper()). The
 # first 400 bp -- all that cases 1-8 touch -- are the same draws as when the
-# chromosome was 400 bp long; the rest holds cases 9-16.
+# chromosome was 400 bp long, and the first 1,800 -- cases 9-17 -- the same as
+# when it was 1,800 bp long; the rest holds cases 18-30 (case 14 follows the end).
 # ---------------------------------------------------------------------------
 CHR_FA="$WORK/chrTest.fa"
 python3 - "$CHR_FA" <<'PY'
 import sys, random
 random.seed(1234)
-seq = [random.choice('ACGTacgt') for _ in range(1800)]
+seq = [random.choice('ACGTacgt') for _ in range(2400)]
 # case 15: a hard-masked N run and an IUPAC base in the reference itself
 for i in range(1610, 1621):
     seq[i - 1] = 'N'
 seq[1650 - 1] = 'R'
+# case 26: another reference IUPAC base, for split records
+seq[2200 - 1] = 'Y'
 seq = ''.join(seq)
 with open(sys.argv[1], 'w') as f:
     f.write(">chrTest\n")
@@ -298,10 +309,9 @@ lines.append(row(1650, "rs1508", b(1650), b(1650)+"T", "AC=1;AF=0.1", ["0|0","1|
 
 # 16) SAME-POS SNP and indel records beyond case 8: the indel record FIRST (1700);
 #     a SNP + a 3-bp deletion (1730); two SNP records -- a split multiallelic SNP --
-#     + an insertion (1760). For the latter BOTH ports keep only the LAST SNP
-#     record's ALT in the enriched genome and the dict (each record rebuilds the
-#     code from the reference base and overwrites the dict key); that is
-#     enricher.py's long-standing behaviour, pinned here only for port agreement.
+#     + an insertion (1760). Up to 2.9.1 both ports kept only the LAST SNP record's
+#     ALT there (each record rebuilt the code from the reference base and overwrote
+#     the dict key); both now code both ALTs and list both in the dict (cases 18-30).
 p=1700
 lines.append(row(p, "rs1600", b(p), b(p)+"TG", "AC=2;AF=0.2", ["0|1","1|0","0|0","0|0","0|0"]))
 lines.append(row(p, "rs1601", b(p), other(p), "AC=2;AF=0.2", ["1|0","0|0","0|1","0|0","0|0"]))
@@ -336,13 +346,155 @@ lines.append(row(p, "rs1705", b(p), other(p,0)+","+other(p,1).lower(), "AC=1,1;A
 p=1618
 lines.append(row(p, "rs1706", b(p), "A,C", "AC=1,1;AF=0.1,0.1", ["0|1","0|2","0|0","0|0","0|0"]))
 
+# ---- cases 18-30: multi-allelic sites SPLIT into one record per ALT --------------
+# `bcftools norm -m -any` writes a site with several ALTs as one record per ALT, its
+# genotypes recoded so 1 is that record's ALT. Each record must ADD its ALT to the
+# position's code and dict entry (2.9.1 and earlier rebuilt the code from the
+# reference base and overwrote the entry, so the last record won). A position whose
+# reference and ALTs cover all four bases keeps the reference and its most frequent
+# ALTs: N, the four-base letter, is a gap to buildTST and searchTST.
+import itertools
+G1 = ["0|1","0|0","0|0","0|0","0|0"]
+
+# 18) Two ALTs in both orders (1830, 1834); three ALTs -- all four bases -- in all six
+#     orders (1840..1865), the middle ALT the rarest; the same sites as ONE record
+#     (1870: two ALTs, 1875: three), whose codes the split sites equal; three ALTs
+#     whose AFs tie (1880: the later of A/C/G/T is left out).
+p=1830
+lines.append(row(p, "rs1800", b(p), other(p,0), "AC=1;AF=0.1", G1))
+lines.append(row(p, "rs1801", b(p), other(p,1), "AC=2;AF=0.2", ["0|0","1|0","0|1","0|0","0|0"]))
+p=1834
+lines.append(row(p, "rs1802", b(p), other(p,1), "AC=2;AF=0.2", ["0|0","1|0","0|1","0|0","0|0"]))
+lines.append(row(p, "rs1803", b(p), other(p,0), "AC=1;AF=0.1", G1))
+afs3 = ["0.3", "0.002", "0.05"]
+gts3 = [["0|1","0|0","1|0","0|0","0|0"], ["0|0","1|0","0|0","0|0","0|0"], ["0|0","0|0","0|1","1|1","0|0"]]
+for k, perm in enumerate(itertools.permutations(range(3))):
+    p = 1840 + 5*k
+    for j in perm:
+        lines.append(row(p, "rs%d" % (1810 + 3*k + j), b(p), other(p,j), "AC=1;AF=" + afs3[j], gts3[j]))
+p=1870
+lines.append(row(p, "rs1830", b(p), other(p,0)+","+other(p,1), "AC=1,2;AF=0.1,0.2",
+                 ["0|1","2|0","0|2","0|0","0|0"]))
+p=1875
+lines.append(row(p, "rs1831", b(p), ",".join(other(p,j) for j in range(3)), "AC=1,1,3;AF=0.3,0.002,0.05",
+                 ["0|1","2|0","1|3","3|3","0|0"]))
+p=1880
+for j in (2, 0, 1):
+    lines.append(row(p, "rs%d" % (1832 + j), b(p), other(p,j), "AC=1;AF=0.01", G1))
+
+# 19) SPLIT RECORDS NOT ADJACENT: interleaved with another position's records and with
+#     an insertion at the same POS (1900, 1905).
+lines.append(row(1900, "rs1840", b(1900), other(1900,0), "AC=1;AF=0.1", G1))
+lines.append(row(1905, "rs1841", b(1905), other(1905,0), "AC=1;AF=0.1", ["1|0","0|0","0|0","0|0","0|0"]))
+lines.append(row(1900, "rs1842", b(1900), b(1900)+"TT", "AC=1;AF=0.1", ["0|0","0|0","1|0","0|0","0|0"]))
+lines.append(row(1905, "rs1843", b(1905), other(1905,2), "AC=1;AF=0.1", ["0|0","0|1","0|0","0|0","0|0"]))
+lines.append(row(1900, "rs1844", b(1900), other(1900,1), "AC=1;AF=0.2", ["0|0","1|0","0|0","0|0","0|0"]))
+
+# 20) GENOTYPE SHAPES on split records: haploid, unphased, missing, partially missing
+#     (1930: two ALTs), and GT:DP on three ALTs (1935).
+lines.append(row(1930, "rs1850", b(1930), other(1930,0), "AC=2;AF=0.2", ["0/1","./.",".|1","1","0"]))
+lines.append(row(1930, "rs1851", b(1930), other(1930,1), "AC=2;AF=0.2", ["1/0","1|.","0|0",".","1"]))
+for j, gts in enumerate((["0|1:9","./.:0","1/1:30",".:5","1:7"], ["1|0:3","0|0:2","./1:4","0:6","0:1"],
+                         ["0|0:1",".|1:2","0|0:3","1:8","0/1:5"])):
+    lines.append(row(1935, "rs%d" % (1852 + j), b(1935), other(1935,j), "AC=2;AF=0.%d" % (j + 1), gts,
+                     fmt="GT:DP"))
+
+# 21) SNP + INDEL AT ONE POSITION with split SNPs: three SNP ALTs, an insertion and a
+#     4-bp deletion at 1980; split SNP sites inside those indels' windows (1990: two
+#     ALTs, 2005: three). The contigs are cut from the reference, so they stay those
+#     of the indels alone.
+p=1980
+lines.append(row(p, "rs1860", b(p), other(p,0), "AC=1;AF=0.1", G1))
+lines.append(row(p, "rs1861", b(p), b(p)+"GA", "AC=2;AF=0.2", ["1|0","0|1","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1862", b(p), other(p,1), "AC=1;AF=0.3", ["0|0","1|0","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1863", ref[p-1:p+3], b(p), "AC=1;AF=0.2", ["0|0","0|0","1|0","0|0","0|0"]))
+lines.append(row(p, "rs1864", b(p), other(p,2), "AC=1;AF=0.05", ["0|0","0|0","0|1","0|0","0|0"]))
+for j in (1, 0):
+    lines.append(row(1990, "rs%d" % (1865 + j), b(1990), other(1990,j), "AC=1;AF=0.1",
+                     [["1|0","0|0","0|0","0|0","0|0"], ["0|0","0|1","0|0","0|0","0|0"]][j]))
+for j in (0, 2, 1):
+    lines.append(row(2005, "rs%d" % (1867 + j), b(2005), other(2005,j), "AC=1;AF=0.%d" % (j + 1),
+                     [["1|0","0|0","0|0","0|0","0|0"], ["0|0","1|0","0|0","0|0","0|0"],
+                      ["0|0","0|0","1|1","0|0","0|0"]][j]))
+
+# 22) A RECORD LISTING SEVERAL ALTS and a split record at ONE position, both orders
+#     (2050: the multi-ALT record first; 2055: the split record first).
+p=2050
+lines.append(row(p, "rs1870", b(p), other(p,0)+","+other(p,1), "AC=1,1;AF=0.1,0.2", ["0|1","2|0","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1871", b(p), other(p,2), "AC=1;AF=0.05", ["0|0","0|0","1|0","0|0","0|0"]))
+p=2055
+lines.append(row(p, "rs1872", b(p), other(p,2), "AC=1;AF=0.3", ["0|0","0|0","1|0","0|0","0|0"]))
+lines.append(row(p, "rs1873", b(p), other(p,0)+","+other(p,1), "AC=1,1;AF=0.1,0.002", ["0|1","2|0","0|0","0|0","0|0"]))
+
+# 23) A NON-PASS split record at a multi-allelic position adds nothing (2100).
+p=2100
+lines.append(row(p, "rs1880", b(p), other(p,0), "AC=1;AF=0.1", G1))
+lines.append(row(p, "rs1881", b(p), other(p,1), "AC=5;AF=0.5", ["1|1","1|1","1|0","0|0","0|0"], filt="LowQual"))
+lines.append(row(p, "rs1882", b(p), other(p,2), "AC=1;AF=0.2", ["0|0","0|1","0|0","0|0","0|0"]))
+
+# 24) THE SAME ALT ON TWO RECORDS: the later record's entry replaces the earlier (2130).
+p=2130
+lines.append(row(p, "rs1890", b(p), other(p,0), "AC=1;AF=0.1", G1))
+lines.append(row(p, "rs1891", b(p), other(p,1), "AC=1;AF=0.2", ["0|0","0|1","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1892", b(p), other(p,0), "AC=1;AF=0.3", ["0|0","0|0","1|0","0|0","0|0"]))
+
+# 25) AF SPELLINGS on four-base sites: an exponent, '.', no AF value (2160); an ALT on
+#     two records counting with its higher AF (2170).
+p=2160
+lines.append(row(p, "rs1900", b(p), other(p,0), "AC=1;AF=2e-1", G1))
+lines.append(row(p, "rs1901", b(p), other(p,1), "AC=1;AF=.", ["0|0","0|1","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1902", b(p), other(p,2), "AC=1", ["0|0","0|0","0|1","0|0","0|0"]))
+p=2170
+lines.append(row(p, "rs1903", b(p), other(p,0), "AC=1;AF=0.001", G1))
+lines.append(row(p, "rs1904", b(p), other(p,1), "AC=1;AF=0.01", ["0|0","0|1","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1905", b(p), other(p,2), "AC=1;AF=0.1", ["0|0","0|0","0|1","0|0","0|0"]))
+lines.append(row(p, "rs1906", b(p), other(p,0), "AC=1;AF=0.5", ["0|0","0|0","0|0","0|1","0|0"]))
+
+# 26) A REFERENCE IUPAC base with two split ALTs (2200, planted 'Y'): it adds no base
+#     of its own, as for one record; a reference N with four split ALTs (1614, in the
+#     planted N run): the rarest of the four is left out.
+lines.append(row(2200, "rs1910", "Y", "A", "AC=1;AF=0.1", G1))
+lines.append(row(2200, "rs1911", "Y", "G", "AC=1;AF=0.2", ["0|0","0|1","0|0","0|0","0|0"]))
+for j, (alt, af) in enumerate((("T", "0.2"), ("A", "0.4"), ("G", "0.01"), ("C", "0.3"))):
+    lines.append(row(1614, "rs%d" % (1912 + j), "N", alt, "AC=1;AF=" + af, G1))
+
+# 27) A '*' split record after a SNP record (2230): listed in the dict, not coded.
+p=2230
+lines.append(row(p, "rs1920", b(p), other(p,0), "AC=1;AF=0.1", G1))
+lines.append(row(p, "rs1921", b(p), "*", "AC=1;AF=0.2", ["0|0","1|0","0|0","0|0","0|0"]))
+
+# 29) FOUR-BASE sites ranked by AF_<x> fields: records with no AF, only per-dataset
+#     AF_<x> and AF_max as a sites-only merge (CRISPRme's mega) writes them (2260),
+#     and a record whose AF_pop beats every AF at its position (2270).
+p=2260
+for j, info in enumerate(("AF_one=0.01;AF_max=0.01", "AF_two=0.0002;AF_max=0.0002",
+                          "AF_one=0.2;AF_two=0.3;AF_max=0.3")):
+    lines.append(row(p, "rs%d" % (1930 + j), b(p), other(p,j), info, G1))
+p=2270
+for j, info in enumerate(("AC=1;AF=0.001;AF_pop=0.4", "AC=1;AF=0.01", "AC=1;AF=0.002")):
+    lines.append(row(p, "rs%d" % (1933 + j), b(p), other(p,j), info, G1))
+
+# 30) SPLIT RECORDS PHASED INDEPENDENTLY, as HGDP + 1000 Genomes is: one haplotype slot
+#     holds two ALTs of one position -- S1 0|1 and 0|1 (chr22:10661629, NA18869), S2 1|0
+#     and 1|0, S3 more ALT copies than slots (1|1 and 0|1), S4 one ALT per slot (2300);
+#     three ALTs on one slot at a four-base position (2305). Every entry keeps its own
+#     record's genotypes verbatim, in both ports: resolving the conflict is CRISPRme's
+#     (docs/MULTIALLELIC_ENRICHMENT.md, section 6.3).
+p=2300
+lines.append(row(p, "rs1940", b(p), other(p,0), "AC=5;AF=0.5", ["0|1","1|0","1|1","1|0","0|0"]))
+lines.append(row(p, "rs1941", b(p), other(p,1), "AC=4;AF=0.4", ["0|1","1|0","0|1","0|1","0|0"]))
+p=2305
+for j, af in enumerate(("0.3", "0.001", "0.2")):
+    lines.append(row(p, "rs%d" % (1942 + j), b(p), other(p,j), "AC=1;AF=" + af, G1))
+
 # 14) THE CHROMOSOME EDGES (records listed last; the enricher does not need
 #     sorted input): an insertion at POS 1 and a 2-bp deletion at POS 25 have
 #     POS-26 < 0, so BOTH ports must skip them with the same stdout warning; an
 #     insertion at POS 26 (window start exactly 0) with SNPs at 26 and at 1; at
 #     the END, a deletion whose REF runs past the last base (cannot match), a
 #     deletion of the last two bases, and a SNP + an insertion on the last base
-#     (windows truncated by the chromosome end).
+#     (windows truncated by the chromosome end). 28) A second SNP record at POS 1
+#     and at the last base makes each a split multi-allelic site.
 L=len(ref)
 lines.append(row(1, "rs1400", b(1), other(1), "AC=1;AF=0.1", ["0|1","0|0","0|0","0|0","0|0"]))
 lines.append(row(1, "rs1401", b(1), b(1)+"A", "AC=2;AF=0.2", ["1|0","0|1","0|0","0|0","0|0"]))
@@ -353,6 +505,8 @@ lines.append(row(L-2, "rs1405", ref[L-3:L]+"AA", b(L-2), "AC=1;AF=0.1", ["0|0","
 lines.append(row(L-1, "rs1406", ref[L-2:L], b(L-1), "AC=1;AF=0.1", ["0|0","0|0","0|0","0|0","1|0"]))
 lines.append(row(L, "rs1407", b(L), other(L), "AC=1;AF=0.1", ["0|0","0|0","1|0","0|0","0|0"]))
 lines.append(row(L, "rs1408", b(L), b(L)+"GGG", "AC=2;AF=0.2", ["0|0","0|0","0|0","1|1","0|0"]))
+lines.append(row(1, "rs1409", b(1), other(1,1), "AC=1;AF=0.3", ["0|0","1|0","0|0","0|0","0|0"]))
+lines.append(row(L, "rs1410", b(L), other(L,1), "AC=1;AF=0.3", ["0|0","0|0","0|1","0|0","0|0"]))
 
 open(out,"w").write("\n".join(lines)+"\n")
 PY

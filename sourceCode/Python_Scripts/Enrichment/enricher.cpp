@@ -174,7 +174,8 @@ static char iupacFromMask(int mask) {
         case (1 | 4 | 8): return 'D';  // A,G,T
         case (1 | 2 | 8): return 'H';  // A,C,T
         case (1 | 2 | 4): return 'V';  // A,C,G
-        case (1 | 2 | 4 | 8): return 'N';  // A,C,G,T
+        case (1 | 2 | 4 | 8): return 'N';  // A,C,G,T -- SNPsProcess never writes it
+                                           // (resolveFourBasePositions)
         default: return 0;  // no matching key -> genome unchanged (python: no key hit)
     }
 }
@@ -221,19 +222,73 @@ static std::vector<std::string> VCFheader;
 // enriched genome is edited in place on a copy of genomeStr
 static std::string genomeList;
 
+// The A/C/G/T bases coded so far at each position, as a 4-bit mask (0 = no SNP
+// record here yet) -- enricher.py's snp_mask. A split multi-allelic site arrives as
+// one record per ALT, so each record adds its ALT to what the earlier ones coded.
+// Kept beside genomeList because a letter there cannot tell a code written here from
+// an ambiguity code the reference FASTA already holds.
+static std::vector<unsigned char> snpMask;
+// Every single-base A/C/G/T ALT seen, with its frequency (rankAf), for the positions
+// that end up holding all four bases (resolveFourBasePositions). enricher.py's alt_af_*.
+static std::vector<long> altAfPos;
+static std::vector<unsigned char> altAfBit;
+static std::vector<double> altAfVal;
+static std::set<long> fourBasePositions;
+
 // SNP dict: preserve insertion order (python dict) -> use vector of pairs,
-// with a lookup map for "already present" overwrite semantics.
+// with a lookup map for "already present" merge semantics.
 static std::vector<std::pair<std::string, std::string>> chr_dict_snps;
 static std::map<std::string, size_t> chr_dict_index;
 
-static void dictSet(const std::string &key, const std::string &val) {
-    std::map<std::string, size_t>::iterator it = chr_dict_index.find(key);
-    if (it != chr_dict_index.end()) {
-        chr_dict_snps[it->second].second = val;  // overwrite, keep position
-    } else {
-        chr_dict_index[key] = chr_dict_snps.size();
-        chr_dict_snps.push_back(std::make_pair(key, val));
+static std::string joinStr(const std::vector<std::string> &parts, char sep) {
+    std::string out;
+    for (size_t k = 0; k < parts.size(); ++k) {
+        if (k) out += sep;
+        out += parts[k];
     }
+    return out;
+}
+
+// The ALT of one dict entry "<samples>;<REF>,<ALT>;<rsID>;<AF>", read from the right
+// like enricher.py's entry.rsplit(';', 3)[1].split(',', 1)[1], so a ';' in a sample
+// name cannot move it. Every entry this program builds holds at least three ';'.
+static std::string entryAlt(const std::string &e) {
+    size_t p3 = e.rfind(';');
+    size_t p2 = (p3 == std::string::npos || p3 == 0) ? std::string::npos : e.rfind(';', p3 - 1);
+    size_t p1 = (p2 == std::string::npos || p2 == 0) ? std::string::npos : e.rfind(';', p2 - 1);
+    if (p1 == std::string::npos) return e;  // unreachable for entries built here
+    std::string refalt = e.substr(p1 + 1, p2 - p1 - 1);
+    size_t c = refalt.find(',');
+    return (c == std::string::npos) ? refalt : refalt.substr(c + 1);
+}
+
+// Store one record's per-ALT entries under "chr,pos", MERGED with what earlier
+// records stored there -- enricher.py's _dict_put, see it for the rationale. A new
+// key gets the entries joined by '$' (as before); at an existing key an ALT already
+// listed has its entry replaced by the later record's, any other ALT is appended.
+static void dictPut(const std::string &key, const std::vector<std::string> &entries) {
+    std::map<std::string, size_t>::iterator it = chr_dict_index.find(key);
+    if (it == chr_dict_index.end()) {
+        chr_dict_index[key] = chr_dict_snps.size();
+        chr_dict_snps.push_back(std::make_pair(key, joinStr(entries, '$')));
+        return;
+    }
+    std::string &val = chr_dict_snps[it->second].second;  // merge, keep position
+    std::vector<std::string> merged = splitStr(val, '$');
+    std::vector<std::string> alts;
+    for (size_t k = 0; k < merged.size(); ++k) alts.push_back(entryAlt(merged[k]));
+    for (size_t k = 0; k < entries.size(); ++k) {
+        std::string a = entryAlt(entries[k]);
+        size_t j = 0;
+        while (j < alts.size() && alts[j] != a) ++j;
+        if (j < alts.size()) {
+            merged[j] = entries[k];
+        } else {
+            merged.push_back(entries[k]);
+            alts.push_back(a);
+        }
+    }
+    val = joinStr(merged, '$');
 }
 
 // fake indel fasta pieces and log rows
@@ -243,6 +298,60 @@ static std::vector<std::vector<std::string>> log_indels;  // 7 cols each
 static bool doYes = false;
 
 // ---------------------------------------------------------------------------
+// isPlainNumber(s): enricher.py's _AF_NUMBER, the grammar
+// [+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?, checked before strtod, which
+// on its own would also take "nan", "inf", hex and leading spaces, where Python's
+// float() takes other spellings ("1_000", trailing spaces): the check is what makes
+// both ports read every AF string alike.
+// ---------------------------------------------------------------------------
+
+static inline bool isDigitC(char c) { return c >= '0' && c <= '9'; }
+
+static bool isPlainNumber(const std::string &s) {
+    size_t i = 0, n = s.size();
+    if (i < n && (s[i] == '+' || s[i] == '-')) ++i;
+    size_t intDigits = 0, fracDigits = 0;
+    while (i < n && isDigitC(s[i])) { ++i; ++intDigits; }
+    if (i < n && s[i] == '.') {
+        ++i;
+        while (i < n && isDigitC(s[i])) { ++i; ++fracDigits; }
+    }
+    if (intDigits == 0 && fracDigits == 0) return false;
+    if (i < n && (s[i] == 'e' || s[i] == 'E')) {
+        size_t j = i + 1, expDigits = 0;
+        if (j < n && (s[j] == '+' || s[j] == '-')) ++j;
+        while (j < n && isDigitC(s[j])) { ++j; ++expDigits; }
+        if (expDigits == 0) return false;
+        i = j;
+    }
+    return i == n;
+}
+
+// rankAf(line, k): how frequent ALT k of this record is, to rank the ALTs of a
+// four-base position -- enricher.py's _rank_af: the highest of its INFO/AF and every
+// INFO/AF_<x> value, 0 when there is none (a sites-only merge such as CRISPRme's mega
+// carries only AF_<x> and AF_max). Ranking only: the dict's AF field is INFO/AF.
+static double rankAf(const std::vector<std::string> &line, size_t k) {
+    bool found = false;
+    double best = 0.0;
+    std::vector<std::string> entries = splitStr(line[7], ';');
+    for (size_t e = 0; e < entries.size(); ++e) {
+        size_t eq = entries[e].find('=');
+        if (eq == std::string::npos) continue;
+        std::string key = entries[e].substr(0, eq);
+        if (key != "AF" && key.compare(0, 3, "AF_") != 0) continue;
+        std::vector<std::string> v = splitStr(entries[e].substr(eq + 1), ',');
+        if (k >= v.size() || !isPlainNumber(v[k])) continue;
+        double x = strtod(v[k].c_str(), NULL);
+        if (!found || x > best) {
+            best = x;
+            found = true;
+        }
+    }
+    return best;
+}
+
+// ---------------------------------------------------------------------------
 // SNPsProcess(line): mutates genomeList and line[1] -> 0-based.
 // ---------------------------------------------------------------------------
 
@@ -250,19 +359,86 @@ static void SNPsProcess(std::vector<std::string> &line) {
     if (line[3].size() > 1) return;  // not a SNP
     long pos0 = strtol(line[1].c_str(), NULL, 10) - 1;
     line[1] = std::to_string(pos0);  // python sets line[1] to 1-based-1
+    if (pos0 < 0 || (size_t)pos0 >= genomeStr.size()) {
+        // enricher.py fails here too (it raised IndexError past the end and coded the
+        // last base for POS 0); reading and writing out of bounds is no answer.
+        fprintf(stderr,
+                "ERROR: %s:%ld is outside the chromosome (%ld bp): is the VCF on another "
+                "assembly?\n",
+                currentChr.c_str(), pos0 + 1, (long)genomeStr.size());
+        exit(1);
+    }
 
-    // build the base SET: reference base + each alt allele of length 1
-    int mask = baseBit(genomeStr[pos0]);
+    // build the base SET: what earlier records coded here (else the reference base)
+    // + each alt allele of length 1. Starting from the reference base alone on each
+    // record kept only the last record's ALT of a split multi-allelic site; see
+    // enricher.py's SNPsProcess.
+    int mask = snpMask[pos0] ? snpMask[pos0] : baseBit(genomeStr[pos0]);
     std::vector<std::string> altAlleles = splitStr(pyStrip(line[4]), ',');
     for (size_t k = 0; k < altAlleles.size(); ++k) {
         if (altAlleles[k].size() > 1) continue;
-        if (!altAlleles[k].empty()) mask |= baseBit(altAlleles[k][0]);
+        int bit = altAlleles[k].empty() ? 0 : baseBit(altAlleles[k][0]);
+        if (!bit) continue;
+        mask |= bit;
+        altAfPos.push_back(pos0);
+        altAfBit.push_back((unsigned char)bit);
+        altAfVal.push_back(rankAf(line, k));
+    }
+    snpMask[pos0] = (unsigned char)mask;
+    if (mask == 15) {
+        // all four bases: 'N' would be written, which the search reads as a gap, not
+        // as "any base". Resolved once every record is read.
+        fourBasePositions.insert(pos0);
+        return;
     }
     char letter = iupacFromMask(mask);
     if (letter != 0) {
         genomeList[pos0] = letter;
     }
     // if letter==0, python loop found no matching value -> genome unchanged.
+}
+
+// ---------------------------------------------------------------------------
+// resolveFourBasePositions(): code each position whose reference base and SNP ALTs
+// cover all four bases with the reference base and its most frequent ALTs, leaving
+// out the rarest ALT by rankAf (a tie leaves out the later of A, C, G, T; an ALT seen
+// on several records counts with its highest value). Mirrors enricher.py, which says
+// why: N is a gap to buildTST and searchTST, not "any base".
+// ---------------------------------------------------------------------------
+
+static void resolveFourBasePositions() {
+    if (fourBasePositions.empty()) return;
+    std::map<std::pair<long, int>, double> best;
+    for (size_t i = 0; i < altAfPos.size(); ++i) {
+        if (!fourBasePositions.count(altAfPos[i])) continue;
+        std::pair<long, int> key(altAfPos[i], (int)altAfBit[i]);
+        std::map<std::pair<long, int>, double>::iterator it = best.find(key);
+        if (it == best.end() || altAfVal[i] > it->second) best[key] = altAfVal[i];
+    }
+    for (std::set<long>::const_iterator p = fourBasePositions.begin();
+         p != fourBasePositions.end(); ++p) {
+        int refBit = baseBit(genomeStr[*p]);
+        int drop = 0;
+        double dropAf = 0.0;
+        const int bits[4] = {1, 2, 4, 8};
+        for (int k = 0; k < 4; ++k) {
+            int b = bits[k];
+            if (b == refBit) continue;
+            std::map<std::pair<long, int>, double>::const_iterator it =
+                best.find(std::make_pair(*p, b));
+            double af = (it == best.end()) ? 0.0 : it->second;
+            // python: min(alts, key=(af, -b))
+            if (drop == 0 || af < dropAf || (af == dropAf && b > drop)) {
+                drop = b;
+                dropAf = af;
+            }
+        }
+        genomeList[*p] = iupacFromMask(15 & ~drop);
+    }
+    printf("NOTE: %ld position(s) of %s carry all four bases between the reference and "
+           "the SNP ALTs; N would read as a gap, so each is coded without its rarest ALT "
+           "(lowest INFO AF or AF_*, ties to the later of A, C, G, T)\n",
+           (long)fourBasePositions.size(), currentChr.c_str());
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +493,7 @@ static void add_to_dict_snps(const std::vector<std::string> &line, int pos_AF) {
         } else {
             val = std::string(";") + line[3] + "," + line[4] + ";" + rsID + ";" + af;
         }
-        dictSet(chr_pos_string, val);
+        dictPut(chr_pos_string, std::vector<std::string>(1, val));
     } else if (line[3].size() == 1) {
         // Case B: multiallelic, ref length 1
         std::vector<std::string> variants = splitStr(line[4], ',');
@@ -373,12 +549,7 @@ static void add_to_dict_snps(const std::vector<std::string> &line, int pos_AF) {
                 }
                 final_entry.push_back(entry);
             }
-            std::string joined;
-            for (size_t k = 0; k < final_entry.size(); ++k) {
-                if (k) joined += "$";
-                joined += final_entry[k];
-            }
-            dictSet(chr_pos_string, joined);
+            dictPut(chr_pos_string, final_entry);
         }
     }
     // len(line[3])>1 : stores nothing
@@ -617,6 +788,7 @@ int main(int argc, char **argv) {
         }
     }
     genomeList = genomeStr;  // mutable copy
+    snpMask.assign(genomeStr.size(), 0);
 
     // --- open VCF ---
     GzReader vcf(altFile.c_str());
@@ -694,6 +866,7 @@ int main(int argc, char **argv) {
         }
         SNPsProcess(line);
     }
+    resolveFourBasePositions();
 
     // --- chromosomeSave(): os.chdir("./SNPs_genome/") then write ---
     if (chdir("./SNPs_genome") != 0) {

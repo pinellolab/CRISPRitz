@@ -61,6 +61,12 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   longer or shorter than the index's, and `index-info` against `searchTST` on 18 files
   damaged in one way each: both refuse every one, for the same reason, and the reader in
   docs/INDEX_FORMAT.md section 7 returns what `index-info` does.
+- `test/test_enricher_multiallelic.py`: 22 unit tests run against both ports (44), with exact
+  expected outputs; 40 of them fail on 2.9.1. In CI with `verify_enricher.sh`, which grows from
+  17 to 30 cases (split multi-allelic sites in every order, genotype shapes, SNP + indel at
+  one position, the four-base rule and its AF/AF_* ranking, two ALTs on one haplotype slot).
+- `docs/MULTIALLELIC_ENRICHMENT.md`: the behaviour, its measurement, what CRISPRme must change
+  to use it, and the published indexes and stores to rebuild.
 
 ### Changed
 - **New indexes are format 2, which CRISPRitz 2.9.1 and earlier cannot search** (2.9.1
@@ -77,6 +83,18 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   length you search with). The guide-length offset is now kept per index file and search
   thread (it was one global that every thread wrote), and a format-2 header whose guide
   length differs from its body's is refused as malformed.
+- **Indexes built with 2.9.1 or earlier from a normalised panel lack the earlier ALTs of every
+  split site; rebuild them**, with their dicts and Tier-0/Tier-1 stores, from one 2.9.2
+  enrichment (`docs/MULTIALLELIC_ENRICHMENT.md` §8 lists the published ones). Cost of the fix:
+  one byte per base and ~17 bytes per SNP ALT; on chr22, 986 s → 1,004 s and 6.72 → 6.86 GB.
+- **The dict now shows the phase of split records as it was phased, conflicts included.**
+  Each entry keeps its own record's genotypes verbatim, and records phased one by one can
+  put two ALTs of a position on one haplotype slot: 672 sample-positions at 584 positions on
+  HGDP + 1000 Genomes chr22 (e.g. 10,661,629 NA18869: `0|1` under G and `0|1` under T), 0 on
+  HPRC chr22. Up to 2.9.1 the dict held one ALT per position, so no reader met one. CRISPRme's
+  per-sample analysis builds a CONFIRMED haplotype holding both ALTs from it (measured
+  through `complete-search --per-sample` on a 2.9.2 index); CRISPRme must handle these
+  before it uses a 2.9.2 index (`docs/MULTIALLELIC_ENRICHMENT.md` §6.3).
 
 ### Fixed
 - **A site whose guide lay within `max_bulges` nt of a contig end or an `N` run was not
@@ -108,6 +126,37 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
 - `searchBruteForce` wrote and read past its per-guide profile table for a PAM longer than
   3 nt (TTTV, NNGRRT); a `-t` run printed garbage in the profile's mismatch columns (43,739
   three-mismatch targets where the targets file has 48). Targets were not affected.
+- **A multi-allelic site split into one record per ALT kept only its last ALT** (the 2.9.1
+  known issue). `bcftools norm -m -any`, which builds every CRISPRme panel, writes a site
+  with several ALTs as one record per ALT; each record rebuilt the position's IUPAC code
+  from the reference base and overwrote its SNP dict entry, so only the last record in the
+  file reached the enriched genome (hence the index) and the dict (hence CRISPRme's Tier-0
+  and Tier-1 stores). Now each record adds its ALTs to what earlier records coded — the code
+  is that of the site written as one record, in any record order — and the dict value lists
+  every ALT, one `$`-joined entry each with its own record's carriers, genotypes, rsID and
+  AF (the form a record listing several ALTs always had; a repeated ALT replaces its own
+  entry). Both ports, byte-identical. Measured on chr22 of HGDP + 1000 Genomes through
+  `add-variants`: 43,389 positions carry two or three SNP records; 45,837 SNP records (2.6 %,
+  5,104 with AC ≥ 41) were not the last and reached neither output; after the fix exactly
+  those 43,389 bases and 43,389 dict values change, each equal to an independent bcftools
+  reconstruction, and the indel log and fake-indel FASTA are byte-identical; `enricher.py`
+  gives the same outputs md5 for md5. The other published panels are affected too, checked
+  the same way on chr22: HPRC (normalised as CRISPRme builds it) 4,765 multi-record
+  positions, mega 16,103. Inputs without split multi-allelic SNP sites give byte-identical
+  outputs.
+- **A record listing three SNP ALTs wrote `N`**, which `index-genome` and `search` read as an
+  assembly gap: every target through the position, the reference one included, left the
+  index (shown through the CLI: 0 targets found, against 1 with the fix). Merging split
+  records would have made it common (2,448 chr22 positions). A position whose reference base
+  and ALTs cover all four bases now keeps the reference and its two most frequent ALTs —
+  ranked by the highest of `INFO/AF` and every `INFO/AF_<x>`, so a sites-only merge carrying
+  only per-dataset AFs (CRISPRme's mega: `AF_max`) ranks too; a tie leaves out the later of A,
+  C, G, T. The dict lists all three, and one stdout line counts such positions. On HGDP +
+  1000 Genomes chr22 the rarest ALT there has AC ≥ 41 at 3 of the 2,448.
+- **A SNP outside the chromosome** (POS 0 or past the end, e.g. a VCF of another assembly)
+  now fails with an error naming the position, in both ports: `enricher.py` raised an
+  `IndexError` past the end and coded the last base for POS 0, `enricher.cpp` read and wrote
+  out of bounds.
 
 ## [2.9.1] - 2026-10-30
 
