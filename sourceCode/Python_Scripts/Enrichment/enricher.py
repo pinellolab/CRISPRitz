@@ -202,8 +202,9 @@ def SNPsProcess(line):
     if referenceNucleotide == 'N':
         # An N is an assembly gap, which buildTST and searchTST match to nothing, and a
         # variant record does not make it a base: the enriched genome holds exactly the
-        # reference's N (2.9.1 coded two or three ALTs over an N, making a gap
-        # searchable). The dict still lists the record.
+        # reference's N (2.9.1 coded a record listing two or three ALTs over an N, making
+        # a gap searchable, and merging split records would have too). The dict still
+        # lists the record.
         return
     # The reference base and every single-character ALT, as A/C/G/T bits. A member
     # that is not A/C/G/T -- the '*' of a spanning deletion, an 'N', a lowercase

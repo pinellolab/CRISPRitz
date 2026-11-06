@@ -154,11 +154,15 @@ with the same rule (owner decision: two ALTs on one haplotype slot are PUTATIVE)
 
 ### 2.4 The indel log and the fake-indel genome
 
-Unchanged. `indel_to_fasta` cuts every contig from the plain reference (`genomeStr`), never
-from the enriched genome, so a merged SNP code next to or at an indel does not reach a
-contig, its log row or its FAKEPOS (unit test `test_indel_outputs_unmoved_by_split_snps`;
-`verify_enricher.sh` cases 19, 21, 28; byte-identical on chr22 of all three panels, section
-4). The multi-allelic indel fix of 2.9.1 (each allele's contig from the reference window) is
+Unchanged by the merge and by `Q`: `indel_to_fasta` cuts every contig from the plain
+reference (`genomeStr`), never from the enriched genome, so a merged SNP code next to or at
+an indel does not reach a contig, its log row or its FAKEPOS (unit test
+`test_indel_outputs_unmoved_by_split_snps`; `verify_enricher.sh` cases 19, 21, 28;
+byte-identical on chr22 of all three panels, section 4, and with 2.10.0 too). The log's AF
+column changes where a record lists `AF` at another place in its INFO than the file's first
+record, as each record's AF is now read by its key (section 2.5): HPRC's chrY log gains the
+AF of 91,950 of its 102,665 rows, every other column unchanged, so it is rebuilt (section
+8). The multi-allelic indel fix of 2.9.1 (each allele's contig from the reference window) is
 untouched and still covered by case 7. CRISPRme's overlay (`overlay_indel_snps.py`) copies
 the new codes onto the contigs' flanks afterwards (section 6.4).
 
@@ -192,8 +196,8 @@ Byte-identical to 2.9.1 in all four outputs and the run log: measured on the 17-
 `verify_enricher.sh` fixture of 2.9.1 with its two split sites reduced to one record each
 (both ports of 2.9.1 and of the branch: identical md5 for every output). The other changes
 of output are a record listing three SNP ALTs (2.2), a SNP outside the chromosome (2.7),
-ALTs on a reference `N` (2.8), and the AF of a record whose INFO does not list `AF` where
-the file's first record does (2.5).
+a record listing two or three ALTs at a reference `N` (2.8), and the AF of a record whose
+INFO does not list `AF` where the file's first record does (2.5).
 
 ### 2.7 A SNP outside the chromosome
 
@@ -209,10 +213,11 @@ write unconditional.
 An `N` in the reference is a gap, and no VCF record makes it a base: the enriched genome
 holds an `N` exactly where the reference does, so its N count is the reference's (unit test
 `test_enriched_genome_keeps_the_references_N`, the reconstruction check of
-`verify_enricher.sh`, and a rebuild gate). Up to 2.9.1 two or three ALTs at a reference `N`
-(a record `N>A,C`, or split records) were coded over it (`M`), making a gap searchable, and a
-record listing three SNP ALTs wrote `N` over a base; the dictionary still lists a record at an
-`N`.
+`verify_enricher.sh`, and a rebuild gate). Up to 2.9.1 a record listing two or three ALTs at
+a reference `N` (`N>A,C`) was coded over it (`M`), making a gap searchable, and a record
+listing three SNP ALTs wrote `N` over a base. Split records at an `N` were not coded over it,
+as 2.9.1 coded each from the reference base alone, but merging them (section 2.1) would have
+been, as on the branch (`f266eac`). The dictionary still lists a record at an `N`.
 
 ## 3. Cost
 
@@ -289,7 +294,9 @@ In both, every base of both genomes matches its rule (0 mismatches) and no varia
 `N`. HPRC's four unchanged positions hold one ALT on two records (section 7, decision 2).
 HPRC's split records are phased consistently: 7,666 sample-positions carry two ALTs at one of
 its 4,761 positions with two or more SNP ALTs in the dictionary, none on one slot (counted as
-for HGDP + 1000 Genomes above, both ways). Mega is sites-only: no genotypes.
+for HGDP + 1000 Genomes above, both ways), with the later record of a repeated allele kept as
+on the branch; 2.10.0 merges the carriers of such records (section 2.3), which puts two ALTs
+on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no genotypes.
 
 ## 5. Tests on the branch
 
@@ -424,8 +431,10 @@ assumed one ALT per position, or that were only ever exercised with one, must be
   **one CONFIRMED set with both**: a row naming two alleles at one position, labelled
   confirmed cis, while the sample is a carrier of neither single-ALT set. Not reachable with
   a 2.9.1 dictionary (one ALT per position); reachable with 2.10.0 on HGDP + 1000 Genomes at
-  584 of the 43,389 chr22 positions with two or more SNP ALTs (1.3 %), in 405 samples; not on
-  HPRC chr22 (0, section 4). Measured on the real data:
+  584 of the 43,389 chr22 positions with two or more SNP ALTs (1.3 %), in 405 samples, and on
+  HPRC chr22 at one position (38,152,965, 37 samples), where the merged carriers of one
+  allele's two records put two ALTs on one slot (section 2.3; the records' own phase puts
+  none, section 4). Measured on the real data:
   - with CRISPRme's own code, as a measurement harness (not the CLI): the 30 dictionary
     keys of chr22:10,661,500-10,661,800 from this branch's chr22 enrichment, compiled by
     `build_dictless_tiers.emit_dictless_tiers` into a Tier-0 registry and Tier-1 store, read
@@ -593,8 +602,9 @@ Taken for CRISPRitz 2.10.0 and CRISPRme 2.9.0 (CRISPRme plan, section 3, B1-B4):
    inputs stays stable. Only an entry merged from two records (decision 2) is in split form.
 4. **Two ALTs on one haplotype slot are PUTATIVE** (B4), resolved in CRISPRme (6.3), which
    has the window and every ALT's carriers in hand: the enricher passes them through
-   verbatim (independently phased split records; 672 sample-positions on HGDP + 1000
-   Genomes chr22, 0 on HPRC). Rejected: writing such a sample's genotypes unphased in the
+   verbatim (independently phased split records: 672 sample-positions on HGDP + 1000
+   Genomes chr22, none on HPRC chr22), and merging an allele's carriers makes some (decision
+   2: 37 on HPRC chr22). Rejected: writing such a sample's genotypes unphased in the
    enricher (it rewrites genotypes the VCF states and still needs the PUTATIVE fix of 6.3),
    and re-phasing each multi-allelic site jointly upstream (a re-phased panel). On the
    CRISPRme side the phase label is per haplotype set, so a set a downgraded sample shares
@@ -630,7 +640,7 @@ are affected.
 | `NNN_3_hg38+hg38_HGDP1kGP` | yes | as NRG |
 | `NRG_3_hg38+hg38_mega` | yes | index bins; `_INDELS` bins; `manifest.json` (registry unchanged) |
 | `NRR_3_hg38+hg38_mega` | yes | as NRG mega |
-| `NRG_3_hg38+hg38_HPRC`, `NRR_3_hg38+hg38_HPRC` | yes | as NRG HGDP1kGP |
+| `NRG_3_hg38+hg38_HPRC`, `NRR_3_hg38+hg38_HPRC` | yes | as NRG HGDP1kGP, and `Dictionaries/log_indels_hg38_HPRC` (its chrY log, below) |
 | `genotypes_hg38_HPRC` | yes | the Tier-1 store |
 | `SHA256SUMS` | yes | every replaced archive |
 
@@ -641,9 +651,20 @@ its `genotypes_hg38_HGDP1kGP` (the same companion), and `SHA256SUMS`.
 (the enriched genome `Genomes/hg38+hg38_<ds>/` and the overlaid fake-indel genome
 `Genomes/hg38+hg38_<ds>_INDELS/`) and their `.SHA256SUMS`.
 
-Unchanged by the enricher (measured on chr22 or derived from the VCF directly): the
-`log_indels_<vcf>/` logs, `indel_genotypes_<vcf>/`, `indel_af_hg38_mega/`, `samplesIDs/`,
-the source VCFs under `vcfs/`. A classic (non-dict-less) publish's
+Unchanged by the enricher (measured on chr22 or derived from the VCF directly):
+`indel_genotypes_<vcf>/`, `indel_af_hg38_mega/`, `samplesIDs/`, the source VCFs under
+`vcfs/`, and the `log_indels_<vcf>/` logs of HGDP + 1000 Genomes and mega. Not HPRC's: a
+log's AF column changes wherever a record lists `INFO/AF` at another place than its VCF's
+first record, as each record's AF is now read by its key (section 2.5), and of the 24 HPRC
+VCFs (the normalised build input) chrY's has such records (96,853 of its 108,023 indel
+records), the 23 others none. With 2.10.0, `log_indels_hg38_HPRC/logchrY` gains the AF of
+91,950 of its 102,665 rows (the published one leaves exactly those empty), every other
+column identical and each AF its record's (0 mismatches against the VCF), and 47,911 of the
+chrY dictionary's 109,033 values change in their AF alone. None of the 23 HGDP + 1000
+Genomes VCFs has such a record, and mega's VCF lists no `AF` key (chr22: only `AF_<panel>`
+and `AF_max`), so their logs keep their AF; on chr22 the logs of all three panels are
+byte-identical to 2.9.1's. Rebuild the logs with the rest rather than carry the published
+ones over. A classic (non-dict-less) publish's
 `Dictionaries/dictionaries_<vcf>/` changes and must be rebuilt with the rest.
 
 Then: `docs/INDEX_PROVENANCE.md` and `docs/PRECOMPUTED_INDEXES.md` record the rebuild and the

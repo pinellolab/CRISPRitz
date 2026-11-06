@@ -361,15 +361,15 @@ lines.append(row(p, "rs1706", b(p), "A,C", "AC=1,1;AF=0.1,0.1", ["0|1","0|2","0|
 # genotypes recoded so 1 is that record's ALT. Each record must ADD its ALT to the
 # position's code and dict entry (2.9.1 and earlier rebuilt the code from the
 # reference base and overwrote the entry, so the last record won). A position whose
-# reference and ALTs cover all four bases keeps the reference and its most frequent
-# ALTs: N, the four-base letter, is a gap to buildTST and searchTST.
+# reference and ALTs cover all four bases is Q, which the search reads as any base
+# (N, the IUPAC letter for the four, is a gap to buildTST and searchTST).
 import itertools
 G1 = ["0|1","0|0","0|0","0|0","0|0"]
 
 # 18) Two ALTs in both orders (1830, 1834); three ALTs -- all four bases -- in all six
-#     orders (1840..1865), the middle ALT the rarest; the same sites as ONE record
-#     (1870: two ALTs, 1875: three), whose codes the split sites equal; three ALTs
-#     whose AFs tie (1880: the later of A/C/G/T is left out).
+#     orders (1840..1865), Q whatever the order and the AFs (the middle ALT is the
+#     rarest); the same sites as ONE record (1870: two ALTs, 1875: three), whose codes
+#     the split sites equal; three ALTs whose AFs tie (1880: Q too).
 p=1830
 lines.append(row(p, "rs1800", b(p), other(p,0), "AC=1;AF=0.1", G1))
 lines.append(row(p, "rs1801", b(p), other(p,1), "AC=2;AF=0.2", ["0|0","1|0","0|1","0|0","0|0"]))
@@ -464,7 +464,7 @@ lines.append(row(p, "rs1906", b(p), other(p,0), "AC=1;AF=0.5", ["0|0","0|0","0|0
 
 # 26) A REFERENCE IUPAC base with two split ALTs (2200, planted 'Y'): it adds no base
 #     of its own, as for one record; a reference N with four split ALTs (1614, in the
-#     planted N run): the rarest of the four is left out.
+#     planted N run): it stays N, as in case 33.
 lines.append(row(2200, "rs1910", "Y", "A", "AC=1;AF=0.1", G1))
 lines.append(row(2200, "rs1911", "Y", "G", "AC=1;AF=0.2", ["0|0","0|1","0|0","0|0","0|0"]))
 for j, (alt, af) in enumerate((("T", "0.2"), ("A", "0.4"), ("G", "0.01"), ("C", "0.3"))):

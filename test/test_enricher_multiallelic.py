@@ -268,7 +268,8 @@ class EnricherMultiallelicTests(object):
                 rec(130, "y1", "R", "C", "AC=1;AF=0.1", ["0|1", "0|0", "0|0", "0|0"]),
                 rec(130, "y2", "R", "T", "AC=1;AF=0.2", ["0|0", "0|1", "0|0", "0|0"])]
         r = self.run_enricher(recs, fasta=fasta)
-        # a reference N is a gap and stays one, whatever the ALTs (2.9.1 wrote M here); a
+        # a reference N is a gap and stays one, whatever the ALTs (merged without that rule,
+        # these two split records give M; 2.9.1 coded each alone and kept the N); a
         # reference IUPAC base adds no base of its own (the rule of 2.9.1)
         self.assertEqual(r.base(120), "N")
         self.assertEqual(r.base(130), "Y")
@@ -291,8 +292,9 @@ class EnricherMultiallelicTests(object):
     def test_enriched_genome_keeps_the_references_N(self):
         """The N-count invariant: whatever the records, the enriched genome holds an N
         exactly where the reference does -- a variant never writes one (a record listing
-        three SNP ALTs wrote N up to 2.9.1) and never codes one away (two or three ALTs on
-        a reference N were coded up to 2.9.1)."""
+        three SNP ALTs wrote N up to 2.9.1) and never codes one away (a record listing two
+        or three ALTs at a reference N was coded up to 2.9.1, and merged split records
+        would be)."""
         fasta = list(REF)
         for k in (20, 21, 22, 23, 24, 200, 330):
             fasta[k - 1] = "N"

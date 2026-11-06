@@ -128,19 +128,22 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   published panels; on HPRC chr22 the merge puts two ALTs on one haplotype slot for 37
   sample-positions, which CRISPRme takes as PUTATIVE.
 - **A reference `N` stays `N`**: the enriched genome holds an `N` exactly where the
-  reference does. Two or three ALTs at a reference `N` (`N>A,C`, or split records) were coded
-  over it (`M`), making a gap searchable. The dict still lists such records.
+  reference does. A record listing two or three ALTs at a reference `N` (`N>A,C`) was coded
+  over it (`M`), making a gap searchable, and merging split records (see Fixed) would have
+  coded them over it too. The dict still lists such records.
 - `add-variants` refuses a reference FASTA holding `Q` (in a chromosome it enriches, in both
   enricher ports, and in one it copies), with `ERROR: <chr> holds 'Q' at <pos>: ...` and exit
   status 1: the search would read it as a four-allele position.
 - **The dict now shows the phase of split records as it was phased, conflicts included.**
   Each entry keeps its own record's genotypes verbatim, and records phased one by one can
   put two ALTs of a position on one haplotype slot: 672 sample-positions at 584 positions on
-  HGDP + 1000 Genomes chr22 (e.g. 10,661,629 NA18869: `0|1` under G and `0|1` under T), 0 on
-  HPRC chr22. Up to 2.9.1 the dict held one ALT per position, so no reader met one. CRISPRme's
-  per-sample analysis builds a CONFIRMED haplotype holding both ALTs from it (measured
-  through `complete-search --per-sample` on a 2.10.0 index); CRISPRme must handle these
-  before it uses a 2.10.0 index (`docs/MULTIALLELIC_ENRICHMENT.md` §6.3).
+  HGDP + 1000 Genomes chr22 (e.g. 10,661,629 NA18869: `0|1` under G and `0|1` under T). On
+  HPRC chr22 the records' own phase puts none there, and the merged carriers of one allele's
+  two records (above) put 37, all at 38,152,965. Up to 2.9.1 the dict held one ALT per
+  position, so no reader met one. CRISPRme's per-sample analysis builds a CONFIRMED haplotype
+  holding both ALTs from it (measured through `complete-search --per-sample` on a 2.10.0
+  index); CRISPRme must handle these before it uses a 2.10.0 index
+  (`docs/MULTIALLELIC_ENRICHMENT.md` §6.3).
 
 ### Fixed
 - **A site whose guide lay within `max_bulges` nt of a contig end or an `N` run was not
