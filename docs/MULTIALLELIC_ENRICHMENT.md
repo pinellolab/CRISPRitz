@@ -47,9 +47,13 @@ The code at a position is the IUPAC letter of **{reference base} ∪ {every sing
 A/C/G/T ALT of every PASS (or `.`) record at that position}**, whatever the order and
 adjacency of those records — the code the same site gets when written as one record listing
 every ALT. A record adds its ALTs to what earlier records coded; it no longer starts from
-the reference base. The rest of the rule is that of 2.9.1: a member that is not A/C/G/T
-(`*`, `N`, a lowercase base) adds nothing, a reference `N` or IUPAC base adds nothing of
-its own, and a set of one base leaves the FASTA letter in place.
+the reference base. Two exceptions are new in 2.10.0: a set of all four bases is written
+`Q`, not its IUPAC letter `N` (section 2.2), and a reference `N` stays `N` whatever the
+records at it list (section 2.8; 2.9.1 coded a record listing two or three ALTs over it).
+The rest of the rule is that of 2.9.1: an ALT that is not A/C/G/T (`*`, `N`, a lowercase
+base) adds nothing, a reference IUPAC base adds nothing of its own (the code there is that
+of the ALTs alone, `Q` if they cover all four bases), and a set of one base leaves the
+FASTA letter in place.
 
 The running union is kept in a byte per position beside the genome (`snp_mask` /
 `snpMask`), because a letter in the genome cannot tell a code the enricher wrote from an
@@ -344,11 +348,13 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
   a reference `N`); both ports byte-identical, with the file set and the run log, and
   checked against what they must be: the enriched genome against an independent
   reconstruction from the FASTA and the VCF (with the N-count invariant), the dictionary
-  and the indel log at cases 24 and 31-33, and a reference holding `q` refused by both
-  ports with one message. Earlier, on the branch, also checked against an independent
-  oracle (91 coded positions, 81 dictionary keys, 0 mismatches) and an independent carrier
-  check at the 62 positions whose SNP records each list one ALT, none repeated (each entry
-  lists exactly its record's carriers, genotypes verbatim; 0 mismatches).
+  at cases 24 and 31-33 (merged carriers, AF by key, the records at a reference `N`, a
+  record listing three SNP ALTs), the indel log's AF at case 31, and a reference holding
+  `q` refused by both ports with one message. Earlier, on the branch, also checked against
+  an independent oracle (91 coded positions, 81 dictionary keys, 0 mismatches) and an
+  independent carrier check at the 62 positions whose SNP records each list one ALT, none
+  repeated (each entry lists exactly its record's carriers, genotypes verbatim; 0
+  mismatches).
 * `test/run_four_allele_test.sh` — `Q` end to end through `crispritz.py` (`add-variants`
   with both ports, `index-genome`, `search`), against an independent oracle and
   `searchBruteForce`; docs/INDEX_FORMAT.md section 11.

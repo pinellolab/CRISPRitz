@@ -95,7 +95,9 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   indel at one position, four bases, two ALTs on one haplotype slot, AF by key, one allele on
   two records, ALTs on a reference `N`) and now also checks the outputs against what they
   must be: the enriched genome against an independent reconstruction (with the N-count
-  invariant), the dict and indel log at the new cases, and a reference holding `Q` refused.
+  invariant), the dict where one allele's records merge, AFs are read by key, records sit at
+  a reference `N` and a record lists three SNP ALTs (cases 24 and 31-33), the indel log's AF
+  read by key (case 31), and a reference holding `Q` refused.
 - `docs/MULTIALLELIC_ENRICHMENT.md`: the behaviour, its measurement, what CRISPRme must change
   to use it, the owner's decisions, and the published indexes and stores to rebuild.
 

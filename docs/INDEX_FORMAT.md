@@ -229,10 +229,11 @@ Notes:
 
 ### 4.1 Q, the four-allele symbol
 
-`add-variants` writes `Q` where a position's reference base (A, C, G or T) and its SNP
-ALTs cover all four bases (docs/MULTIALLELIC_ENRICHMENT.md, section 2.2). Its IUPAC
-letter would be `N`, which section 3 reads as a gap, so up to the four-base rule of the
-multi-allelic work such a position removed every target through it from the index.
+`add-variants` writes `Q` where a position's SNP ALTs, with its reference base when that
+is A, C, G or T, cover all four bases (docs/MULTIALLELIC_ENRICHMENT.md, sections 2.1 and
+2.2; a reference `N` stays `N`). The IUPAC letter of the four would be `N`, which section 3
+reads as a gap, so up to the four-base rule of the multi-allelic work such a position
+removed every target through it from the index.
 `buildTST`, `searchTST` and `searchBruteForce` read `Q` as the mask `1111`: it matches
 every guide base and every PAM letter, so it is never a mismatch.
 

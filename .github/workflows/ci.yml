@@ -59,8 +59,10 @@ jobs:
       # two records, ALTs on a reference N
       # -- then diffs all four outputs byte-for-byte, plus the file set and the run log,
       # and checks them against what they must be: the enriched genome against an
-      # independent reconstruction (the N-count invariant among it), the dict and the
-      # indel log at the new cases, and a reference holding Q refused alike.
+      # independent reconstruction (the N-count invariant among it), the dict at cases
+      # 24 and 31-33 (merged carriers, AF by key, the records at a reference N, a record
+      # listing three SNP ALTs), the indel log's AF at case 31, and a reference holding
+      # Q refused alike.
       - name: Build the C++ enricher
         run: g++ -std=c++11 -O2 sourceCode/Python_Scripts/Enrichment/enricher.cpp -o /tmp/enricher_opt -lz
 

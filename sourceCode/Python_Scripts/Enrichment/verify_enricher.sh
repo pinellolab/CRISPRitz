@@ -32,8 +32,9 @@
 # must be: the enriched genome against an independent reconstruction from the FASTA
 # and the VCF (all four bases are Q, the search's any-base symbol, and an N stays an
 # N: the enriched genome holds an N exactly where the reference does -- the N-count
-# invariant), and the dict and indel log at cases 24 and 31-33. A reference holding
-# 'Q' must be refused by both ports alike.
+# invariant), the dict at cases 24 and 31-33 (merged carriers, AF by key, the records
+# at a reference N, a record listing three SNP ALTs) and the indel log's AF at case 31.
+# A reference holding 'Q' must be refused by both ports alike.
 #
 # Prints "BYTE-IDENTICAL: PASS" only if every check passes.
 #
@@ -450,8 +451,9 @@ lines.append(row(p, "rs1890", b(p), other(p,0), "AC=1;AF=0.1", G1))
 lines.append(row(p, "rs1891", b(p), other(p,1), "AC=1;AF=0.2", ["0|0","0|1","0|0","0|0","0|0"]))
 lines.append(row(p, "rs1892", b(p), other(p,0), "AC=1;AF=0.3", ["0|0","0|0","1|0","0|0","0|0"]))
 
-# 25) AF SPELLINGS on four-base sites: an exponent, '.', no AF value (2160); an ALT on
-#     two records counting with its higher AF (2170).
+# 25) AF SPELLINGS at four-base sites: an exponent, '.', no AF value (2160); an ALT on
+#     two records, whose one entry takes the rsID and AF of the more frequent (2170).
+#     Both are Q whatever the AFs (the four-base rule ranked the ALTs by them).
 p=2160
 lines.append(row(p, "rs1900", b(p), other(p,0), "AC=1;AF=2e-1", G1))
 lines.append(row(p, "rs1901", b(p), other(p,1), "AC=1;AF=.", ["0|0","0|1","0|0","0|0","0|0"]))
@@ -475,9 +477,11 @@ p=2230
 lines.append(row(p, "rs1920", b(p), other(p,0), "AC=1;AF=0.1", G1))
 lines.append(row(p, "rs1921", b(p), "*", "AC=1;AF=0.2", ["0|0","1|0","0|0","0|0","0|0"]))
 
-# 29) FOUR-BASE sites ranked by AF_<x> fields: records with no AF, only per-dataset
-#     AF_<x> and AF_max as a sites-only merge (CRISPRme's mega) writes them (2260),
-#     and a record whose AF_pop beats every AF at its position (2270).
+# 29) FOUR-BASE sites whose records carry AF_<x> fields: no AF, only per-dataset AF_<x>
+#     and AF_max as a sites-only merge (CRISPRme's mega) writes them (2260), and an
+#     AF_pop above every AF at its position (2270). Both are Q whatever these fields
+#     say: the four-base rule ranked the ALTs by AF and every AF_<x>, 2.10.0 ranks
+#     nothing.
 p=2260
 for j, info in enumerate(("AF_one=0.01;AF_max=0.01", "AF_two=0.0002;AF_max=0.0002",
                           "AF_one=0.2;AF_two=0.3;AF_max=0.3")):
@@ -676,29 +680,43 @@ for port, d in (("enricher.py", pydir), ("enricher.cpp", cppdir)):
              ", at the same positions" if nref == ngot else ""))
     bad += bool(diff) + (nref != ngot)
 assert want.count("Q") >= 12 and "N" not in [want[p] for p in mask if ref[p] != "N"]
-# the dict and the indel log at the cases that pin per-record AF and merged alleles
+# the dict at the cases that pin merged alleles, per-record AF, the records at a
+# reference N and a record listing three SNP ALTs; the indel log's AF read by key
 d = json.load(open("%s/%s" % (pydir, jsn)))
 def entries(p):
-    return d["chrTest,%d" % p].split("$")
+    v = d.get("chrTest,%d" % p)
+    return [] if v is None else v.split("$")
 def other(p, k):
     return [x for x in "ACGT" if x != ref[p - 1]][k]
 r = lambda p: ref[p - 1]
 expect = {
-    2130: ["S1:0|1,S3:1|0;%s,%s;rs1892;0.3" % (r(2130), other(2130, 0)),
-           "S2:0|1;%s,%s;rs1891;0.2" % (r(2130), other(2130, 1))],
-    2330: ["S1:0|1;%s,%s;rs1950;0.3" % (r(2330), other(2330, 0))],
-    2335: ["S1:0|1;%s,%s;rs1951;0.15" % (r(2335), other(2335, 0))],
-    2345: ["S1:0|1;%s,%s;rs1953;" % (r(2345), other(2345, 0))],
-    2360: ["S1:1|1,S3:0|1,S4:1|1;%s,%s;rs1962;0.4" % (r(2360), other(2360, 0)),
-           "S2:1|0;%s,%s;rs1961;0.2" % (r(2360), other(2360, 1))],
-    2365: ["S1:1|2;%s,%s;rs1963;0.1" % (r(2365), other(2365, 0)),
-           "S1:0|1,S2:0|1,S3:1|0;%s,%s;rs1963;0.2" % (r(2365), other(2365, 1))],
+    1612: ("listed at a reference N",
+           ["S1:0|1;N,A;rs1970;0.1", "S1:0|1;N,C;rs1971;0.1", "S1:0|1;N,G;rs1972;0.1"]),
+    1616: ("listed at a reference N",
+           ["S1:0|1;N,A;rs1973;0.1", "S2:2|3;N,C;rs1973;0.1", "S2:2|3;N,G;rs1973;0.1",
+            "S3:0|4;N,T;rs1973;0.1"]),
+    2130: ("carriers merged",
+           ["S1:0|1,S3:1|0;%s,%s;rs1892;0.3" % (r(2130), other(2130, 0)),
+            "S2:0|1;%s,%s;rs1891;0.2" % (r(2130), other(2130, 1))]),
+    2330: ("AF by key", ["S1:0|1;%s,%s;rs1950;0.3" % (r(2330), other(2330, 0))]),
+    2335: ("AF by key", ["S1:0|1;%s,%s;rs1951;0.15" % (r(2335), other(2335, 0))]),
+    2345: ("AF by key", ["S1:0|1;%s,%s;rs1953;" % (r(2345), other(2345, 0))]),
+    2360: ("carriers merged",
+           ["S1:1|1,S3:0|1,S4:1|1;%s,%s;rs1962;0.4" % (r(2360), other(2360, 0)),
+            "S2:1|0;%s,%s;rs1961;0.2" % (r(2360), other(2360, 1))]),
+    2365: ("carriers merged",
+           ["S1:1|2;%s,%s;rs1963;0.1" % (r(2365), other(2365, 0)),
+            "S1:0|1,S2:0|1,S3:1|0;%s,%s;rs1963;0.2" % (r(2365), other(2365, 1))]),
+    2380: ("a record listing three SNP ALTs",
+           ["S1:0|1;%s,%s;rs1974;0.1" % (r(2380), other(2380, 0)),
+            "S2:0|2;%s,%s;rs1974;0.2" % (r(2380), other(2380, 1)),
+            "S3:3|0;%s,%s;rs1974;0.3" % (r(2380), other(2380, 2))]),
 }
-for p, e in sorted(expect.items()):
+for p, (what, e) in sorted(expect.items()):
     ok = entries(p) == e
     bad += not ok
-    print("  %s  : dict at %d (%s)" % ("OK  " if ok else "DIFF", p, "$".join(entries(p)) if not ok else
-                                       "carriers merged" if p in (2130, 2360, 2365) else "AF by key"))
+    print("  %s  : dict at %d (%s)" % ("OK  " if ok else "DIFF", p,
+                                       what if ok else "$".join(entries(p)) or "no such key"))
 rows = [x.split("\t") for x in open("%s/%s" % (pydir, log)).read().splitlines()[1:]]
 af = [x[3] for x in rows if x[4].startswith("chrTest_2340_")]
 bad += af != ["0.05"]
