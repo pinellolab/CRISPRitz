@@ -164,7 +164,9 @@ record, as each record's AF is now read by its key (section 2.5): HPRC's chrY lo
 AF of 91,950 of its 102,665 rows, every other column unchanged, so it is rebuilt (section
 8). The multi-allelic indel fix of 2.9.1 (each allele's contig from the reference window) is
 untouched and still covered by case 7. CRISPRme's overlay (`overlay_indel_snps.py`) copies
-the new codes onto the contigs' flanks afterwards (section 6.4).
+the enriched genome's codes onto the contigs' flanks afterwards, but only those its
+`_IUPAC_AMBIG` lists, which up to CRISPRme 2.8.1 has no `Q`: it must learn `Q`, or every
+flank base at a four-allele position keeps its reference base (section 6.4).
 
 ### 2.5 FILTER and AF act per ALT, and AF is read from each record
 
@@ -190,14 +192,33 @@ records — measured with bcftools 1.24 on a site `G>A,C,T` with AF 0.3, 0.0005,
 
 So filter **after** splitting, as the published panels are built.
 
-### 2.6 Inputs without split multi-allelic SNP sites
+### 2.6 Inputs with one SNP record per position
 
-Byte-identical to 2.9.1 in all four outputs and the run log: measured on the 17-case
-`verify_enricher.sh` fixture of 2.9.1 with its two split sites reduced to one record each
-(both ports of 2.9.1 and of the branch: identical md5 for every output). The other changes
-of output are a record listing three SNP ALTs (2.2), a SNP outside the chromosome (2.7),
-a record listing two or three ALTs at a reference `N` (2.8), and the AF of a record whose
-INFO does not list `AF` where the file's first record does (2.5).
+What sections 2.1 and 2.3 change needs two SNP records at a position, so it changes nothing
+where no position holds more than one: on the 17-case `verify_enricher.sh` fixture of 2.9.1
+with its two split sites reduced to one record each, both ports of 2.9.1 and of the branch
+gave identical md5 for all four outputs and the run log. Such an input is still not enriched
+by 2.10.0 as by 2.9.1 wherever
+
+* a record lists three SNP ALTs: `Q`, where 2.9.1 wrote `N` (2.2);
+* a record lists two or three ALTs at a reference `N`: the `N` stays, where 2.9.1 coded it
+  (2.8);
+* a record lists `AF` at another place in its INFO than the file's first record: it gets
+  its AF, in the dictionary and the indel log (2.5);
+* a SNP lies outside the chromosome: an error (2.7), as is a reference holding `Q` (2.2).
+
+Measured with 2.10.0 against 2.9.1 (the CRISPRme 2.8.1 SIF's) on ml008. On the reduced
+fixture both ports of each give the same dictionary, indel log, fake-indel genome and run
+log, and genomes that differ at one base, 1,618, where case 17 lists `N>A,C` at a reference
+`N` (`M` in 2.9.1, `N` now). Through `add-variants` (compiled ports) on hg38 chr22 with the
+raw HPRC vcfwave VCF (`ALL.chr22.HPRC.vcfwave.vcf.gz` of `vcfs/hg38_HPRC/`, 623,085
+records, which keep a site's ALTs on one record: 529,585 positions with a SNP record, none
+with two; no record listing two or three ALTs at a reference `N`; `AF` at the same place in
+every record's INFO), the dictionary, indel log and fake-indel FASTA are byte-identical, and
+the genome differs at 61 bases, those of the 61 records listing three SNP ALTs: `N` in 2.9.1
+(11,658,752 `N` against the reference's 11,658,691), `Q` now. So an enrichment of a VCF that
+keeps a site's ALTs on one record changes too wherever one of the above occurs, as on the
+raw HPRC vcfwave VCFs: rebuild it.
 
 ### 2.7 A SNP outside the chromosome
 
@@ -344,8 +365,11 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
 Nothing in CRISPRme's file formats has to change: the Tier-0 registry and the Tier-1 store
 already hold one record per `(pos, alt)` and several per position, and every dictionary
 reader already splits a value on `$`. What changes is **content** (positions that held one
-ALT now hold two or three), so the data must be rebuilt (section 8), and a few places that
-assumed one ALT per position, or that were only ever exercised with one, must be fixed.
+ALT now hold two or three, and the enriched genome holds `Q`), so the data must be rebuilt
+(section 8), a few places that assumed one ALT per position, or that were only ever
+exercised with one, must be fixed, and every table that decodes IUPAC letters must read `Q`
+as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and the overlay,
+6.4).
 
 ### 6.1 Pin, provenance, and a guard against mixing
 
@@ -397,20 +421,29 @@ assumed one ALT per position, or that were only ever exercised with one, must be
   (`totalDict[...][(pos_c, elem)]`), and the lattice only combines strictly increasing
   columns (`if newkey[-2] > key[-2]`, line 1198), so two ALTs of one position never share a
   haplotype. The per-haplotype test `allele != "0"` (lines 947-952) is right for split-record
-  entries (a slot holding the other ALT reads `0`). No change; but note it is **wrong for
-  entries of a record listing several ALTs** (`1|2` puts the sample on both slots of both
-  ALTs) — pre-existing, not reachable on the published panels; the observed path below
-  resolves it per record and could be reused here. This path (and its population-level
-  greedy, `by_pos`, from line 1027) substitutes **every** ALT the dictionary lists, without
-  checking the target's IUPAC column (with the four-base rule it also tried the ALT the code
-  left out; with `Q` the column holds every ALT). Filtering by the column, as the observed
-  path does, would make the two paths agree.
+  entries (a slot holding the other ALT reads `0`). No change for split records (but see `Q`,
+  below); note it is **wrong for entries of a record listing several ALTs** (`1|2` puts the
+  sample on both slots of both ALTs) — pre-existing, not reachable on the published panels;
+  the observed path below resolves it per record and could be reused here. This path (and
+  its population-level greedy, `by_pos`, from line 1027) substitutes **every** ALT the
+  dictionary lists, without checking the target's IUPAC column (with the four-base rule it
+  also tried the ALT the code left out; with `Q` the column holds every ALT). Filtering by
+  the column, as the observed path does, would make the two paths agree.
   A phased sample whose slot holds two ALTs of one column (section 4) is put on that slot's
   seed of both ALTs (lines 944-962), and the peel (lines 1242-1267) leaves it on both
   maximal combinations, so it is listed as a carrier of both ALTs' haplotypes, each row
   naming one ALT per column. This path labels no row CONFIRMED (the only phase it gives is
   PUTATIVE, to the SNP+SNP companion, line 1376), so listing the sample under both is the
   conservative reading: no change.
+* **Must change — `Q`, in both paths.** A target goes to `iupac_decomposition` only if it
+  holds a letter of `iupac_nucleotides` (line 2068; the set at line 149), and a column is
+  decomposed only if its letter is in `iupac_code` (line 927 in the legacy path, line 638 in
+  the observed path below; the table at lines 183-205). Neither has `Q`, nor has
+  `iupac_code_set` (lines 150-180; the observed path's column filter, line 655), so a target
+  whose only variant column is `Q` is taken for a reference target, and at a `Q` column of
+  any other target no ALT is substituted: none of a four-allele position's three ALTs
+  reaches a row. Add `Q` and `q` to the three as any base, `{A, C, G, T}`
+  (docs/INDEX_FORMAT.md section 8, item 8).
 * Observed-haplotype path, `_iupac_decomposition_observed` (lines 607-), taken whenever a
   Tier-1 store is present (line 904); it enumerates haplotypes under the per-sample analysis,
   the default on a phased genotyped index such as HGDP + 1000 Genomes (`crisprme.py`, lines
@@ -418,13 +451,12 @@ assumed one ALT per position, or that were only ever exercised with one, must be
   (line 699). The alt index is resolved per record from its carriers
   (line 675, `observed_haplotypes._alt_index_for_record`) — `1` for split-record entries —
   and the target's own IUPAC column filters the ALTs (#139, line 655): at a four-allele
-  position that column is `Q`, which must read as all four bases (docs/INDEX_FORMAT.md
-  section 8, item 8), so no ALT is dropped there; with the four-base rule the left-out ALT
-  was. Its CONFIRMED sets are
-  right **only where a sample's split records put its ALTs on different slots** (measured
-  with CRISPRme's own module: `1|0` under A and `0|1` under C gives the two sets {A} and
-  {C}). Records phased independently do not always do so, and the default panel has 672 such
-  sample-positions on chr22 (section 4):
+  position that column is `Q`, which keeps every ALT once the tables read it as all four
+  bases (the `Q` item above); the four-base rule's code dropped the left-out ALT there. Its
+  CONFIRMED sets are right **only where a sample's split records put its ALTs on different
+  slots** (measured with CRISPRme's own module: `1|0` under A and `0|1` under C gives the
+  two sets {A} and {C}). Records phased independently do not always do so, and the default
+  panel has 672 such sample-positions on chr22 (section 4):
 * **Must change — `observed_haplotypes._per_sample_variant_sets`, CONFIRMED branch (lines
   200-218).** It groups a phased sample's ALTs by slot (`slots.setdefault(h,
   set()).add((pos_c, alt))`, line 208), so a slot holding two ALTs of one column becomes
@@ -528,10 +560,21 @@ assumed one ALT per position, or that were only ever exercised with one, must be
   haplotype (line 629: `slots = None  # two alts on one slot: not a haplotype`) and resolves
   that sample PUTATIVE on the alleles it carries (lines 643-665), which is what 6.3 asks of
   the SNP path.
-* `overlay_indel_snps.py`: copies each flank base's code from the enriched genome
-  (`_IUPAC_AMBIG`, line 34, includes `B`/`D`/`H`/`V`; the enricher never writes `N` for a
-  variant). No change; the overlaid fake-indel genome and its `_INDELS` index must be
-  **rebuilt** (section 4: measured which flank bases change).
+* **Must change — `overlay_indel_snps.py`** (the same in CRISPRme 2.8.1, `0b8943e`). It
+  copies a flank base's code from the enriched genome only if the code is in
+  `_IUPAC_AMBIG` (line 34: `RYSWKMBDHV`, upper and lower case), which holds `B`/`D`/`H`/`V`
+  (the enricher never writes `N` for a variant) but not `Q`. So a flank base at a
+  four-allele position keeps its reference base, and the indel search finds a target that
+  needs an indel and one of that position's three ALTs only with a mismatch there, if at
+  all. Add `Q` and `q` to `_IUPAC_AMBIG` (docs/INDEX_FORMAT.md section 8, item 8). Measured
+  with the script itself, as shipped and with `Q` added, on the 2.10.0 chr22 enrichments
+  (in the CRISPRme 2.8.1 SIF on ml008): on HGDP + 1000 Genomes (2,448 `Q`) it codes 671,160
+  flank bases, 15,471 fewer than with `Q` (686,631, as many as it codes on the 2.9.1
+  enrichment, section 4), and those 15,471 keep their reference base where they should read
+  `Q`, in 2,027 of the 240,557 contigs; on HPRC, normalised as `hprc_build.sh` does (92
+  `Q`), 613,366 against 624,345: 10,979 bases in 3,344 of 195,813 contigs. The overlaid
+  fake-indel genome and its `_INDELS` index must be **rebuilt** (section 4: measured which
+  flank bases change).
 * `build_indel_genotypes.py` (keyed `<pos>_<REF>_<ALT>`) and the log-driven carriers: not
   affected.
 
@@ -575,6 +618,9 @@ last ALT of a split site, and what `Q` is (a target may show it in its DNA colum
   chr20:12296886 (G>A, 1,451 copies, absent from the 2.8.x Tier-1 store; G>C, 2 copies,
   present), run through `complete-search` before and after the rebuild.
 * A guard test for 6.1: tiers and index from different enrichments are refused.
+* `Q` (6.3, 6.4): a target through a `Q` column, alone and beside another variant column,
+  yields each of the position's three ALTs in both SNP paths, and the overlay writes `Q` on
+  a fake-indel flank base at a four-allele position.
 
 ## 7. Decisions of the owner
 
@@ -614,11 +660,12 @@ Taken for CRISPRitz 2.10.0 and CRISPRme 2.9.0 (CRISPRme plan, section 3, B1-B4):
 
 ## 8. Published indexes and stores to rebuild
 
-Every variant index built from a panel VCF holding more than one SNP record at a position,
-and everything derived from its enrichment. Reference-only indexes (`NRG_3_hg38`,
-`NRR_3_hg38`, `NGG_3_hg38`, `NNN_3_hg38`, `NNNNNNNN_3_hg38`) are not affected by the
-enricher, but are rebuilt too, in index format 2 (docs/INDEX_FORMAT.md; owner decision C1:
-one format on the Hub, and the sites at contig ends and N runs format 2 adds).
+Every variant index built from a panel VCF holding more than one SNP record at a position
+(or a record listing three SNP ALTs, section 2.6), and everything derived from its
+enrichment. Reference-only indexes (`NRG_3_hg38`, `NRR_3_hg38`, `NGG_3_hg38`, `NNN_3_hg38`,
+`NNNNNNNN_3_hg38`) are not affected by the enricher, but are rebuilt too, in index format 2
+(docs/INDEX_FORMAT.md; owner decision C1: one format on the Hub, and the sites at contig
+ends and N runs format 2 adds).
 
 Panels, each measured on its published chr22 source VCF (`vcfs/<panel>/` of
 `lucapinello/crisprme-data`): **HGDP + 1000 Genomes** (`hg38_HGDP1kGP`) — 43,389 positions

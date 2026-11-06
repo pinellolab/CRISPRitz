@@ -191,8 +191,14 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   reconstruction, and the indel log and fake-indel FASTA are byte-identical; `enricher.py`
   gives the same outputs md5 for md5. The other published panels are affected too, checked
   the same way on chr22: HPRC (normalised as CRISPRme builds it) 4,765 multi-record
-  positions, mega 16,103. Inputs without split multi-allelic SNP sites give byte-identical
-  outputs.
+  positions, mega 16,103. This fix changes nothing where no position holds more than one SNP
+  record, but other changes of this release do (docs/MULTIALLELIC_ENRICHMENT.md section
+  2.6): a record listing three SNP ALTs is now `Q`, one listing two or three ALTs at a
+  reference `N` leaves the `N`, one listing `AF` at another place in its INFO than the
+  file's first record gets its AF, and a SNP outside the chromosome is an error. So an
+  enrichment of a VCF that keeps a site's ALTs on one record can change too: on chr22 with
+  the raw HPRC vcfwave VCF (no position with two SNP records), the genome differs at 61
+  bases, each `N` → `Q`, and the dict, indel log and fake-indel FASTA are byte-identical.
 - **A record listing three SNP ALTs wrote `N`**, which `index-genome` and `search` read as an
   assembly gap: every target through the position, the reference one included, left the
   index (shown through the CLI: 0 targets found, against 1 with the fix). Merging split

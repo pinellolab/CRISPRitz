@@ -679,13 +679,15 @@ of `a5379e0`:
    of an enriched genome, a fake-indel genome overlaid from it, or a target must read `Q`
    as any base, `{A, C, G, T}`, and never as `N` (a gap, which matches nothing): the
    IUPAC tables of CRISPRme 2.8.1 have no `Q` (`pam_filter._IUPAC`/`_TARGET_IUPAC`,
-   `overlay_indel_snps._IUPAC_AMBIG`, `new_simple_analysis.iupac_code`,
+   `overlay_indel_snps._IUPAC_AMBIG`,
+   `new_simple_analysis.iupac_code`/`iupac_code_set`/`iupac_nucleotides`,
    `analisi_indels_NNN.iupac_code`, `twopass_find.IUPAC_TO_SET`, among the ~20 modules
-   that decode IUPAC letters), and `crispritz_bins`' site rule must count `Q` as a base,
-   which matches every PAM letter. A header flag says which `.bin` files hold `Q`
-   (`FOUR_ALLELE`, bit 2; `index-info`'s `four_allele`), and a format-2 reader must
-   accept that bit. The dictionaries list every ALT of such a position, each in its own
-   entry (docs/MULTIALLELIC_ENRICHMENT.md, section 2.3).
+   that decode IUPAC letters; docs/MULTIALLELIC_ENRICHMENT.md sections 6.3 and 6.4 say what
+   the SNP path and the overlay lose without it), and `crispritz_bins`' site rule must
+   count `Q` as a base, which matches every PAM letter. A header flag says which `.bin`
+   files hold `Q` (`FOUR_ALLELE`, bit 2; `index-info`'s `four_allele`), and a format-2
+   reader must accept that bit. The dictionaries list every ALT of such a position, each in
+   its own entry (docs/MULTIALLELIC_ENRICHMENT.md, section 2.3).
 
 ## 9. searchBruteForce
 
