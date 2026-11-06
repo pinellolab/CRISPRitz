@@ -464,6 +464,72 @@ void deSerialize(vector<Tnode> &albero, ifstream &fileTree, vector<bitset<4>> &p
 	} // go to eqkid
 }
 
+// The tree of a file flagged CZI_FLAG_FOUR_ALLELE, read nibble by nibble. Its bytes are
+// laid out as in any tree, but a slot's value depends on the slot (include/indexFormat.h):
+// in the root, lo and hi slots 0 = no kid, 1..14 the IUPAC letters, 15 = Q; in an eq
+// slot 15 = end of string, 1..14 the letters, 0 = Q. readPair cannot tell them apart: it
+// reads every 1111 high nibble as an end of string and skips the byte's low nibble.
+struct NibbleReader
+{
+	ifstream *f;
+	unsigned char byte;
+	bool have_low;
+	int next()
+	{
+		if (have_low)
+		{
+			have_low = false;
+			return byte & 0x0F;
+		}
+		char c;
+		f->get(c);
+		byte = (unsigned char)c;
+		have_low = true;
+		return byte >> 4;
+	}
+	void align() { have_low = false; } // an end of string in a high nibble ends its byte
+};
+
+// The IUPAC letter of a 4-bit A|C|G|T mask; 15 (all four) is Q, the fifth symbol.
+static char nibbleSymbol(int n)
+{
+	static const char sym[16] = {'?', 'A', 'C', 'M', 'G', 'R', 'S', 'V', 'T', 'W', 'Y', 'H', 'K', 'D', 'B', 'Q'};
+	return sym[n & 0x0F];
+}
+
+// deSerialize for a file flagged CZI_FLAG_FOUR_ALLELE: n is the node's symbol, read from
+// its parent's slot (an eq slot's 0 already turned into Q's 15).
+static void deSerializeQ(NibbleReader &r, int n, int &pNode)
+{
+	int thr = omp_get_thread_num();
+	int i = pNode;
+	albero_glb[thr][i].splitchar = nibbleSymbol(n);
+	albero_glb[thr][i].splitchar_bit = bitset<4>(n);
+	int k = r.next(); // lo slot
+	if (k != 0)
+	{
+		albero_glb[thr][i].lokid = ++pNode;
+		deSerializeQ(r, k, pNode);
+	}
+	k = r.next(); // hi slot
+	if (k != 0)
+	{
+		albero_glb[thr][i].hikid = ++pNode;
+		deSerializeQ(r, k, pNode);
+	}
+	k = r.next(); // eq slot
+	if (k == 0x0F)
+	{
+		r.align();
+		r.f->read((char *)&(albero_glb[thr][i].eqkid), sizeof(int));
+	}
+	else
+	{
+		albero_glb[thr][i].eqkid = ++pNode;
+		deSerializeQ(r, k == CZI_NIBBLE_Q_EQ ? CZI_NIBBLE_Q : k, pNode);
+	}
+}
+
 // The header of a .bin (docs/INDEX_FORMAT.md). Format 1 (CRISPRitz <= 2.9.1) has
 // none: its first int is the leaf count. Format 2 starts with CZI_MAGIC.
 struct IndexHeader
@@ -570,6 +636,8 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 	idxFacts[thr].format = hdr.format;
 	idxFacts[thr].mb = hdr.format == 2 ? hdr.mb : max_bulges;
 	idxFacts[thr].pamless = hdr.format == 2 ? (hdr.flags & CZI_FLAG_PAMLESS) != 0 : !buildPamConstrained;
+	// Q, the four-allele symbol, occurs only in a file flagged for it
+	const bool quad = hdr.format == 2 && (hdr.flags & CZI_FLAG_FOUR_ALLELE) != 0;
 
 	fileTree.read((char *)&numLeaves, sizeof(int)); // read number of leaves
 	// Defense-in-depth: refuse to load a non-tree file (it should already be filtered to
@@ -697,6 +765,15 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 				targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("0111");
 				//cout << "V";
 				break;
+			case 0xF0: //Q, all four bases: only in a file flagged CZI_FLAG_FOUR_ALLELE
+				if (quad)
+				{
+					targetOnDNA[thr][i].guideDNA[j] = 'Q';
+					targetOnDNA[thr][i].guideDNA_bit[j] = bitset<4>("1111");
+					break;
+				}
+				cerr << "Error on reading the PAM, input char is not an IUPAC nucleotide: " << mask << endl;
+				break;
 			default:
 				cerr << "Error on reading the PAM, input char is not an IUPAC nucleotide: " << mask << endl;
 				break;
@@ -769,6 +846,13 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 
 	albero_glb[omp_get_thread_num()].resize(numNodes);
 	int pNode = 0;
+	if (quad)
+	{
+		NibbleReader r = {&fileTree, 0, false};
+		deSerializeQ(r, r.next(), pNode); // the root's slot is no eq slot
+		fileTree.close();
+		return;
+	}
 	fileTree.get(in);
 
 	readPair(pairNuc_bit, pairNuc, in);
@@ -1614,6 +1698,7 @@ int main(int argc, char **argv)
 	// with a note on stdout saying what that changes (section 5.1).
 	{
 		int nFormat[3] = {0, 0, 0};
+		int nQuad = 0;
 		bool mbNoted = false;
 		vector<int> guideLenNoted;
 		for (size_t f = 0; f < file_stats_vec.size(); ++f)
@@ -1631,6 +1716,8 @@ int main(int argc, char **argv)
 				return 1;
 			}
 			nFormat[h.format]++;
+			if (h.format == 2 && (h.flags & CZI_FLAG_FOUR_ALLELE))
+				nQuad++;
 			// the body opens with numLeaves and the guide length the index was built
 			// for (a file too short for them is refused by loadTST, as in 2.9.1)
 			int body[2];
@@ -1691,6 +1778,8 @@ int main(int argc, char **argv)
 			cout << " 1 (CRISPRitz <= 2.9.1) x" << nFormat[1];
 		if (nFormat[2])
 			cout << " 2 x" << nFormat[2];
+		if (nQuad)
+			cout << " (" << nQuad << " holding Q, the four-allele symbol)";
 		cout << endl;
 	}
 

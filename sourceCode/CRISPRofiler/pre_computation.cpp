@@ -80,6 +80,12 @@ void genomebitconversion() //converto il genoma dal fasta alla versione bit
 		{
 			genomebit[i] = bitset<4>(string("0111"));
 		}
+		else if (genome[i] == 'Q')
+		{
+			//all four bases (a SNP position whose reference base and ALTs cover A, C, G
+			//and T); N, and any other byte, stays the 0000 gap
+			genomebit[i] = bitset<4>(string("1111"));
+		}
 	}
 }
 

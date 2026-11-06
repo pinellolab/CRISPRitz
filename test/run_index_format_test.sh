@@ -80,8 +80,8 @@ import json, re, sys
 v2, v1 = (json.load(open(p)) for p in sys.argv[1:3])
 assert v2["formats"] == ["2"] and len(v2["files"]) == 6 and v2["pams"] == v1["pams"] == ["NGG"], v2
 for f in v2["files"].values():
-    assert f == dict(f, format=2, pam_at_start=False, pamless=False, guide_len=20, pam_len=3,
-                     max_bulges=2, pam="NGG", complete=True) and f["num_leaves"] > 0, f
+    assert f == dict(f, format=2, pam_at_start=False, pamless=False, four_allele=False, guide_len=20,
+                     pam_len=3, max_bulges=2, pam="NGG", complete=True) and f["num_leaves"] > 0, f
     assert "error" not in f, f
 assert v1["formats"] == ["1"] and all(f["format"] == 1 and "error" not in f
                                       for f in v1["files"].values()), v1
@@ -161,7 +161,7 @@ def at(off, val, d=data):  # an int32 of the header (or body) set to val
     struct.pack_into("=i", d, off, val)
     return d
 put("header_len_40", at(8, 40))      # header_len (the reviewer's case)
-put("flag_bit_2", at(12, 4))         # a reserved flag bit
+put("flag_bit_3", at(12, 8))         # a reserved flag bit (bit 2 marks the four-allele symbol Q)
 put("guide_len_0", at(16, 0))
 put("pam_len_0", at(20, 0))
 put("max_bulges_32", at(24, 32))
@@ -198,7 +198,7 @@ while IFS='|' read -r case engine info; do
   echo "  ok: ${case}: searchTST and index-info refuse it ($(head -1 "ii_${case}.err" | sed 's/.*NGG_f1_1.bin: //' | cut -c1-70))"
 done <<'EOF'
 header_len_40|has a malformed index header (version 2, flags 0, PAM length 3, header length 40)|malformed index header (version 2, flags 0, PAM length 3, header length 40,
-flag_bit_2|has a malformed index header (version 2, flags 4,|malformed index header (version 2, flags 4,
+flag_bit_3|has a malformed index header (version 2, flags 8,|malformed index header (version 2, flags 8,
 guide_len_0|has a malformed index header (version 2, flags 0, PAM length 3, header length 31)|malformed index header (version 2, flags 0, PAM length 3, header length 31, guide length 0, max bulges 2)
 pam_len_0|has a malformed index header (version 2, flags 0, PAM length 0,|malformed index header (version 2, flags 0, PAM length 0,
 max_bulges_32|has a malformed index header (version 2, flags 0, PAM length 3, header length 31)|malformed index header (version 2, flags 0, PAM length 3, header length 31, guide length 20, max bulges 32)

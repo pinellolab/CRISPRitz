@@ -134,6 +134,9 @@ string complementSeq(const string &target)
 		case 'N':
 			tmp += 'N';
 			break;
+		case 'Q': //all four bases (include/indexFormat.h): its own complement
+			tmp += 'Q';
+			break;
 		default:
 			cerr << "The character (" << c << ") of the PAM is not part of the IUPAC nucleotide nomenclature" << endl;
 			tmp += 'N';
@@ -228,6 +231,8 @@ char pairNuc[2];
 bool flag = true;
 unsigned char bitNuc;
 double num_iupac = 0;
+long num_quad_targets = 0; // stored targets (guide, pad or flank) holding Q
+int num_quad_bins = 0;	   // .bin files flagged CZI_FLAG_FOUR_ALLELE
 
 //check http://cactus.io/resources/toolbox/decimal-binary-octal-hexadecimal-conversion
 void writePair()
@@ -293,6 +298,12 @@ void writePair()
 			bitNuc = 0x70;
 			num_iupac++;
 			break; //0 1 1 1   0 0 0 0
+		case 'Q': //all four bases, in a root, lo or hi slot (include/indexFormat.h)
+			bitNuc = CZI_NIBBLE_Q << 4;
+			break; //1 1 1 1   0 0 0 0
+		case 'q': //all four bases, in an eq slot, where 1111 ends a string
+			bitNuc = CZI_NIBBLE_Q_EQ << 4;
+			break; //0 0 0 0   0 0 0 0
 		case '0':
 			bitNuc = 0x0;
 			break; //0 0 0 0   0 0 0 0
@@ -359,6 +370,12 @@ void writePair()
 			bitNuc += 0x07;
 			num_iupac++;
 			break; //0 0 0 0   0 1 1 1
+		case 'Q': //all four bases, in a root, lo or hi slot
+			bitNuc += CZI_NIBBLE_Q;
+			break; //0 0 0 0   1 1 1 1
+		case 'q': //all four bases, in an eq slot
+			bitNuc += CZI_NIBBLE_Q_EQ;
+			break; //0 0 0 0   0 0 0 0
 		case '0':
 			bitNuc += 0x0;
 			break; //0 0 0 0   0 0 0 0
@@ -371,23 +388,26 @@ void writePair()
 	fileTree.put(bitNuc);
 }
 
-// Serialize TST
-void serialize(Tptr p)
+// Serialize TST. Each node's symbol is written in its parent's slot; via_eq says that
+// slot is an eq slot, where the four-allele symbol Q is written as 'q' (the 0000
+// nibble: 1111 ends a string there, include/indexFormat.h). A tree without Q is
+// written byte for byte as by CRISPRitz 2.9.1.
+void serialize(Tptr p, bool via_eq)
 {
-
+	char sc = (p->splitchar == 'Q' && via_eq) ? 'q' : p->splitchar;
 	if (flag)
 	{ // write current node and recur for its children
-		pairNuc[0] = p->splitchar;
+		pairNuc[0] = sc;
 		flag = false;
 	}
 	else
 	{
-		pairNuc[1] = p->splitchar;
+		pairNuc[1] = sc;
 		writePair();
 		flag = true;
 	}
 	if (p->lokid > 0)
-		serialize(&tree[p->lokid]); // go to lokid
+		serialize(&tree[p->lokid], false); // go to lokid
 	else
 	{
 		if (flag)
@@ -403,7 +423,7 @@ void serialize(Tptr p)
 		}
 	}
 	if (p->hikid > 0)
-		serialize(&tree[p->hikid]); // go to hikid
+		serialize(&tree[p->hikid], false); // go to hikid
 	else
 	{
 		if (flag)
@@ -419,7 +439,7 @@ void serialize(Tptr p)
 		}
 	}
 	if (p->eqkid > 0)
-		serialize(&tree[p->eqkid]); // go to eqkid
+		serialize(&tree[p->eqkid], true); // go to eqkid
 	else
 	{
 		if (flag)
@@ -432,11 +452,28 @@ void serialize(Tptr p)
 	}
 }
 
+// Whether a leaf's stored strings hold the four-allele symbol Q
+bool leafHoldsQ(const Tleaf &leaf)
+{
+	return leaf.guideDNA.find('Q') != string::npos || leaf.pamDNA.find('Q') != string::npos;
+}
+
 // Write to file
 void saveTST(int inizio, int fine, int part)
 {
 	double start, end;
 	int arrayDim = fine - inizio;
+	// the file is flagged CZI_FLAG_FOUR_ALLELE when one of its leaves holds Q (in the
+	// tree string or the flank), so that a reader that cannot decode Q refuses it
+	bool holdsQ = false;
+	for (int i = inizio; i < fine; i++)
+		if (leafHoldsQ(targetOnDNA[i]))
+		{
+			holdsQ = true;
+			num_quad_targets++;
+		}
+	if (holdsQ)
+		num_quad_bins++;
 	string fileName = pamRNA + "_" + chrName + "_" + to_string(part) + ".bin";
 	fileTree.open(fileName, ios::out | ios::binary);
 	if (!fileTree.is_open())
@@ -448,7 +485,8 @@ void saveTST(int inizio, int fine, int part)
 	// format-2 header (docs/INDEX_FORMAT.md): magic, version, header length, flags,
 	// guide length, PAM length, max bulges, then the build PAM region
 	int header[6] = {CZI_FORMAT_VERSION, CZI_HEADER_FIXED + (int)pamRNA.size(),
-					 (pam_at_start ? CZI_FLAG_PAM_AT_START : 0) | (pam_unconstrained_g ? CZI_FLAG_PAMLESS : 0),
+					 (pam_at_start ? CZI_FLAG_PAM_AT_START : 0) | (pam_unconstrained_g ? CZI_FLAG_PAMLESS : 0) |
+						 (holdsQ ? CZI_FLAG_FOUR_ALLELE : 0),
 					 len_guide_used, (int)pamRNA.size(), max_bulges_g};
 	fileTree.write(CZI_MAGIC, 4);
 	fileTree.write((char *)header, sizeof(header));
@@ -515,6 +553,9 @@ void saveTST(int inizio, int fine, int part)
 			case 'N':
 				bitNuc += 0x0; //'N' is the 0000 nibble: nothing to add
 				break;
+			case 'Q':
+				bitNuc += CZI_NIBBLE_Q; //all four bases: 1111, meets every PAM letter
+				break;
 			default:
 				cerr << "The PAM cannot contain the character (" << *ppp << ")" << endl;
 				break;
@@ -542,7 +583,7 @@ void saveTST(int inizio, int fine, int part)
 			fileTree.write((char *)&targetOnDNA[i].next, sizeof(int));
 	}
 	fileTree.write((char *)&nodeUsed, sizeof(int)); // write number of nodes
-	serialize(&tree[0]);							// serialize TST
+	serialize(&tree[0], false);						// serialize TST (the root's slot is no eq slot)
 	fileTree.write(CZI_MAGIC, 4);					// end-of-index marker
 
 	// every write above is checked here, at once: a full disk used to leave a cut-short
@@ -743,6 +784,10 @@ int main(int argc, char **argv)
 		delete[] tree;
 	}
 
+	if (num_quad_bins)
+		cout << "FOUR-ALLELE (Q): " << num_quad_targets << " target(s) hold Q, the symbol of a position "
+			 << "whose reference base and SNP ALTs cover all four bases; " << num_quad_bins
+			 << " index file(s) flagged for it (docs/INDEX_FORMAT.md)\n";
 	globalend = omp_get_wtime(); // end global time
 	cout << "-----------------------"
 		 << "\n";

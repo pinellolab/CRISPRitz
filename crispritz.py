@@ -693,7 +693,7 @@ def genomeEnrichment():
     print("Runtime: %s seconds" % (time.time() - start_time))
 
 
-# The first and last 4 bytes of an index (.bin) of format 2 (CRISPRitz 2.9.2 on). See
+# The first and last 4 bytes of an index (.bin) of format 2 (CRISPRitz 2.10.0 on). See
 # docs/INDEX_FORMAT.md: format 1 (CRISPRitz <= 2.9.1) has no header, its first int is
 # the leaf count.
 CZI_MAGIC = b"CZI\xfe"
@@ -736,6 +736,7 @@ def read_index_header(path):
             "format": version if version >= 2 else None,
             "pam_at_start": bool(flags & 1),
             "pamless": bool(flags & 2),
+            "four_allele": bool(flags & 4),
             "guide_len": guide,
             "pam_len": pam_len,
             "max_bulges": mb,
@@ -743,8 +744,9 @@ def read_index_header(path):
         if version > 2:
             return refused(info, "index format %d, newer than this CRISPRitz reads (formats 1 and "
                                  "2): update CRISPRitz, or rebuild the index with this one" % version)
-        # bit 0: PAM at the 5' end, bit 1: PAM-less; max_bulges fits pad_valid's 5 bits
-        if (version != 2 or flags & ~3 or not 1 <= pam_len <= 1000 or header_len != 28 + pam_len
+        # bit 0: PAM at the 5' end, bit 1: PAM-less, bit 2: holds Q, the four-allele
+        # symbol; max_bulges fits pad_valid's 5 bits
+        if (version != 2 or flags & ~7 or not 1 <= pam_len <= 1000 or header_len != 28 + pam_len
                 or guide < 1 or not 0 <= mb <= 31):
             return refused(info, "malformed index header (version %d, flags %d, PAM length %d, "
                                  "header length %d, guide length %d, max bulges %d)"
@@ -788,12 +790,13 @@ def indexInfo():
         print(
             "crispritz.py index-info <index_dir>\n"
             "\nPrints, as JSON, the index format of each .bin of a TST index (1: built by "
-            "CRISPRitz <= 2.9.1; 2: built by 2.9.2 or later, see docs/INDEX_FORMAT.md), "
-            "for format 2 the parameters it was built with, and, as writes_format, the "
-            "format this CRISPRitz builds. Reads only each file's header, the start of its "
-            "body and its last bytes. Exits 1 if the directory holds no .bin, a .bin "
-            "that searchTST would refuse (its \"error\" entry says why), or .bin files "
-            "named for more than one PAM (pams)."
+            "CRISPRitz <= 2.9.1; 2: built by 2.10.0 or later, see docs/INDEX_FORMAT.md), "
+            "for format 2 the parameters it was built with (four_allele: the file holds Q, "
+            "the symbol of a position whose reference base and SNP ALTs cover all four "
+            "bases), and, as writes_format, the format this CRISPRitz builds. Reads only "
+            "each file's header, the start of its body and its last bytes. Exits 1 if the "
+            "directory holds no .bin, a .bin that searchTST would refuse (its \"error\" "
+            "entry says why), or .bin files named for more than one PAM (pams)."
         )
         sys.exit()
     index_dir = os.path.realpath(sys.argv[2])

@@ -457,6 +457,7 @@ def read_index_header(path):
             "format": version if version >= 2 else None,
             "pam_at_start": bool(flags & 1),
             "pamless": bool(flags & 2),
+            "four_allele": bool(flags & 4),
             "guide_len": guide,
             "pam_len": pam_len,
             "max_bulges": mb,
@@ -464,8 +465,9 @@ def read_index_header(path):
         if version > 2:
             return refused(info, "index format %d, newer than this CRISPRitz reads (formats 1 and "
                                  "2): update CRISPRitz, or rebuild the index with this one" % version)
-        # bit 0: PAM at the 5' end, bit 1: PAM-less; max_bulges fits pad_valid's 5 bits
-        if (version != 2 or flags & ~3 or not 1 <= pam_len <= 1000 or header_len != 28 + pam_len
+        # bit 0: PAM at the 5' end, bit 1: PAM-less, bit 2: holds Q, the four-allele
+        # symbol; max_bulges fits pad_valid's 5 bits
+        if (version != 2 or flags & ~7 or not 1 <= pam_len <= 1000 or header_len != 28 + pam_len
                 or guide < 1 or not 0 <= mb <= 31):
             return refused(info, "malformed index header (version %d, flags %d, PAM length %d, "
                                  "header length %d, guide length %d, max bulges %d)"

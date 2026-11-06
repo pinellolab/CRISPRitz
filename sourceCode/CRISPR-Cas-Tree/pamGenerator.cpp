@@ -90,6 +90,18 @@ vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal 
 		{
 			genomeBit.push_back(bitset<4>(string("0111")));
 		}
+		else if (genome[i] == 'Q')
+		{
+			//all four bases: a SNP position whose reference base and ALTs cover A, C,
+			//G and T (the enricher writes Q there). Not N, which stays the 0000 gap.
+			genomeBit.push_back(bitset<4>(string("1111")));
+		}
+		else
+		{
+			//any other byte is a gap too. Until 2.9.1 nothing was pushed here, so the
+			//scan read every later position one base off per such byte.
+			genomeBit.push_back(bitset<4>(string("0000")));
+		}
 	}
 	return genomeBit;
 }
