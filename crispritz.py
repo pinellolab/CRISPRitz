@@ -466,6 +466,24 @@ def _enricher_command():
     return [sys.executable, corrected_origin_path + "Python_Scripts/Enrichment/enricher.py"]
 
 
+def _first_q(fasta):
+    """The 1-based position of the first 'Q' (either case) in the sequence of the
+    one-sequence FASTA ``fasta``, else 0. The enricher writes Q where a position's
+    reference base and SNP ALTs cover all four bases, and the search reads it as any
+    base, so a reference must not hold one: the enricher refuses it in the
+    chromosomes it enriches, and add-variants in those it copies."""
+    seen = 0
+    with open(fasta, "rb") as fh:
+        fh.readline()  # the header
+        for line in fh:
+            line = line.rstrip(b"\r\n")
+            hits = [k for k in (line.find(b"Q"), line.find(b"q")) if k >= 0]
+            if hits:
+                return seen + min(hits) + 1
+            seen += len(line)
+    return 0
+
+
 def genomeEnrichment_subprocess_VCF(altfile, genfile, dirGenome, doit, dirVCFFiles):
     """Enrich one chromosome; return the enricher's exit status for the parent to
     check. This runs in a Pool worker, so it must not exit the way _run_checked
@@ -567,6 +585,16 @@ def genomeEnrichment():
         )
         - chr_with_vcf
     )
+    # the chromosomes without a VCF are copied as they are (below): refuse a 'Q' in them
+    # as the enricher does in the others, before any work is done
+    for f in sorted(chr_wihtout_vcf):
+        q = _first_q(dirGenome + "/" + f + contains_enr + "." + file_ends)
+        if q:
+            sys.stderr.write(
+                "ERROR: %s holds 'Q' at %d: the reference FASTA must hold A/C/G/T, N and IUPAC "
+                "codes only (Q is reserved for four-allele SNP positions)\n" % (f, q)
+            )
+            sys.exit(1)
 
     # read number of mismatches
     th = 1

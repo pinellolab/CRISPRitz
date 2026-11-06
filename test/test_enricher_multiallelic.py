@@ -9,12 +9,16 @@ tests pin the merged behaviour on small synthetic inputs, with exact expected ou
 
   * every ALT of a split site is coded, in any record order, and the code equals the
     one the same site gets written as a single record listing every ALT;
-  * a position whose reference and ALTs cover all four bases keeps the reference and
-    its most frequent ALTs (N is a gap to the search, not "any base");
+  * a position whose reference and ALTs cover all four bases is coded Q, which the
+    search reads as any base (N is a gap to the search, not "any base"), and a
+    reference N stays N: the enriched genome holds exactly the reference's N;
   * the dict lists every ALT, each entry with its own record's carriers, genotypes,
-    rsID and AF, joined by '$' like a multi-ALT record's value;
-  * non-PASS records, duplicate ALTs, '*', haploid / unphased / missing genotypes,
-    non-adjacent records, an indel at the same position, a reference N or IUPAC base;
+    rsID and AF, joined by '$' like a multi-ALT record's value; the same REF>ALT on two
+    records is one entry with the carriers of both;
+  * each record's AF is read by its key, whatever the INFO field's order;
+  * non-PASS records, '*', haploid / unphased / missing genotypes, non-adjacent
+    records, an indel at the same position, a reference N or IUPAC base, a reference
+    that already holds Q (refused);
   * the indel log and fake-indel contigs do not move;
   * a position with one record behaves exactly as before.
 
@@ -190,60 +194,33 @@ class EnricherMultiallelicTests(object):
                 got = self.run_enricher(list(order))
                 self.assertEqual(got.genome, joined.genome, "order %s" % [o.split("\t")[4] for o in order])
 
-    def test_four_bases_keep_reference_and_most_frequent_alts(self):
+    def test_four_bases_coded_Q(self):
+        """A position whose reference base and ALTs cover all four bases is Q, in every
+        record order and whatever the ALTs' AFs, and the dict lists all three ALTs."""
         p = 80
         a, b, c = others(p)
-        afs = {a: "0.05", b: "0.0001", c: "0.3"}  # b is the rarest -> left out
+        afs = {a: "0.05", b: "0.0001", c: "0.3"}
         split = [rec(p, "rs" + x, ref1(p), x, "AC=1;AF=" + afs[x], ["0|1", "0|0", "0|0", "0|0"])
                  for x in (a, b, c)]
-        want = code_of({ref1(p), a, c})
         for order in itertools.permutations(split):
             r = self.run_enricher(list(order))
-            self.assertEqual(r.base(p), want)
-            self.assertNotEqual(r.base(p), "N")
-            self.assertIn("NOTE: 1 position(s) of %s carry all four bases" % CHROM, r.stdout)
+            self.assertEqual(r.base(p), "Q")
+            self.assertEqual(r.stdout.count("NOTE: 1 position(s) of %s carry all four bases" % CHROM), 1)
+            self.assertIn("each is coded Q, which the search reads as any base", r.stdout)
             # the dict still lists all three, in file order
             self.assertEqual([e.split(";")[1] for e in r.entries(p)],
                              [ref1(p) + "," + o.split("\t")[4] for o in order])
 
-    def test_four_bases_tie_leaves_out_later_base(self):
-        p = 90
-        a, b, c = others(p)  # A/C/G/T order; all AF equal -> drop c (the latest)
-        split = [rec(p, "rs" + x, ref1(p), x, "AC=1;AF=0.01", ["0|1", "0|0", "0|0", "0|0"])
-                 for x in (c, a, b)]
-        self.assertEqual(self.run_enricher(split).base(p), code_of({ref1(p), a, b}))
-        # and with AF absent from the INFO field: every AF reads 0 -> same tie rule
-        split = [rec(p, "rs" + x, ref1(p), x, "AC=1", ["0|1", "0|0", "0|0", "0|0"])
-                 for x in (b, c, a)]
-        self.assertEqual(self.run_enricher(split).base(p), code_of({ref1(p), a, b}))
-
-    def test_four_bases_af_spellings(self):
-        """Exponent, '.', missing AF: '.' and a missing value read as 0."""
-        p = 100
-        a, b, c = others(p)
-        recs = [rec(p, "rsa", ref1(p), a, "AC=1;AF=2e-1", ["0|1", "0|0", "0|0", "0|0"]),
-                rec(p, "rsb", ref1(p), b, "AC=1;AF=.", ["0|1", "0|0", "0|0", "0|0"]),
-                rec(p, "rsc", ref1(p), c, "AC=1;AF=1.5E-3", ["0|1", "0|0", "0|0", "0|0"])]
-        self.assertEqual(self.run_enricher(recs).base(p), code_of({ref1(p), a, c}))
-
-    def test_four_bases_ranked_by_af_fields(self):
-        """No INFO/AF (a sites-only merge such as CRISPRme's mega: AF_<dataset>, AF_max):
-        the ALTs rank by their highest AF_* value, not all 0 (which would leave the choice
-        to base order); with AF and AF_* both present the higher counts."""
-        p = 230
-        a, b, c = others(p)
-        # base order alone would leave out c; AF_max says b is the rarest
-        recs = [rec(p, "m" + x, ref1(p), x, info, ["0|0", "0|0", "0|0", "0|0"])
-                for x, info in ((a, "AF_one=0.01;AF_max=0.01"), (b, "AF_two=0.0002;AF_max=0.0002"),
-                                (c, "AF_one=0.2;AF_two=0.3;AF_max=0.3"))]
-        r = self.run_enricher(recs, header=None)
-        self.assertEqual(r.base(p), code_of({ref1(p), a, c}))
-        # AF 0.001 but AF_pop 0.4 for a: a is common somewhere, so c (0.002) is left out
-        q = 235
-        a, b, c = others(q)
-        recs = [rec(q, "n" + x, ref1(q), x, info, ["0|1", "0|0", "0|0", "0|0"])
-                for x, info in ((a, "AC=1;AF=0.001;AF_pop=0.4"), (b, "AC=1;AF=0.01"), (c, "AC=1;AF=0.002"))]
-        self.assertEqual(self.run_enricher(recs).base(q), code_of({ref1(q), a, b}))
+    def test_four_bases_whatever_the_af_fields(self):
+        """Equal AFs, no AF, '.' or an exponent, only per-dataset AF_<x> fields (a
+        sites-only merge such as CRISPRme's mega): no ALT is left out, so none ranks."""
+        for p, infos in ((90, ("AC=1;AF=0.01",) * 3), (95, ("AC=1",) * 3),
+                         (100, ("AC=1;AF=2e-1", "AC=1;AF=.", "AC=1;AF=1.5E-3")),
+                         (230, ("AF_one=0.01;AF_max=0.01", "AF_two=0.0002;AF_max=0.0002",
+                                "AF_one=0.2;AF_two=0.3;AF_max=0.3"))):
+            recs = [rec(p, "r%d%s" % (p, x), ref1(p), x, info, ["0|1", "0|0", "0|0", "0|0"])
+                    for x, info in zip(others(p), infos)]
+            self.assertEqual(self.run_enricher(recs).base(p), "Q", infos)
 
     def test_four_bases_joined_record_no_longer_writes_N(self):
         """A record listing three SNP ALTs used to write N, a gap to the search."""
@@ -251,17 +228,35 @@ class EnricherMultiallelicTests(object):
         a, b, c = others(p)
         r = self.run_enricher([rec(p, "rsJ", ref1(p), ",".join([a, b, c]),
                                    "AC=1,1,1;AF=0.2,0.3,0.001", ["0|1", "0|2", "3|0", "0|0"])])
-        self.assertEqual(r.base(p), code_of({ref1(p), a, b}))
+        self.assertEqual(r.base(p), "Q")
 
-    def test_four_bases_alt_on_two_records_counts_highest_af(self):
+    def test_four_bases_over_a_repeated_alt(self):
+        """Four records, one ALT twice: Q, and the repeated ALT is one dict entry."""
         p = 115
         a, b, c = others(p)
         recs = [rec(p, "r1", ref1(p), a, "AC=1;AF=0.001", ["0|1", "0|0", "0|0", "0|0"]),
                 rec(p, "r2", ref1(p), b, "AC=1;AF=0.01", ["0|0", "0|1", "0|0", "0|0"]),
                 rec(p, "r3", ref1(p), c, "AC=1;AF=0.1", ["0|0", "0|0", "0|1", "0|0"]),
                 rec(p, "r4", ref1(p), a, "AC=1;AF=0.5", ["0|0", "0|0", "0|0", "0|1"])]
-        # a counts with 0.5, so b (0.01) is the rarest
-        self.assertEqual(self.run_enricher(recs).base(p), code_of({ref1(p), a, c}))
+        r = self.run_enricher(recs)
+        self.assertEqual(r.base(p), "Q")
+        self.assertEqual(r.entries(p), ["S1:0|1,S4:0|1;%s,%s;r4;0.5" % (ref1(p), a),
+                                        "S2:0|1;%s,%s;r2;0.01" % (ref1(p), b),
+                                        "S3:0|1;%s,%s;r3;0.1" % (ref1(p), c)])
+
+    def test_reference_holding_Q_is_refused(self):
+        """Q is the four-allele symbol, read as any base by the search: a reference FASTA
+        holding one (in either case) is refused, with or without a variant there."""
+        for k, letter in ((60, "Q"), (250, "q")):
+            fasta = REF[:k - 1] + letter + REF[k:]
+            r = Run(self.cmd, [rec(50, "x", ref1(50), others(50)[0], "AC=1;AF=0.1",
+                                   ["0|1", "0|0", "0|0", "0|0"])], fasta=fasta)
+            self.addCleanup(r.cleanup)
+            self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+            self.assertIn("ERROR: %s holds 'Q' at %d: the reference FASTA must hold A/C/G/T, N "
+                          "and IUPAC codes only (Q is reserved for four-allele SNP positions)"
+                          % (CHROM, k), r.stderr)
+            self.assertFalse(os.path.exists(r.path("SNPs_genome", "res_enriched")))
 
     def test_reference_N_and_reference_iupac(self):
         fasta = list(REF)
@@ -273,17 +268,53 @@ class EnricherMultiallelicTests(object):
                 rec(130, "y1", "R", "C", "AC=1;AF=0.1", ["0|1", "0|0", "0|0", "0|0"]),
                 rec(130, "y2", "R", "T", "AC=1;AF=0.2", ["0|0", "0|1", "0|0", "0|0"])]
         r = self.run_enricher(recs, fasta=fasta)
-        # a reference N or IUPAC base adds no base of its own (the rule of 2.9.1)
-        self.assertEqual(r.base(120), "M")
+        # a reference N is a gap and stays one, whatever the ALTs (2.9.1 wrote M here); a
+        # reference IUPAC base adds no base of its own (the rule of 2.9.1)
+        self.assertEqual(r.base(120), "N")
         self.assertEqual(r.base(130), "Y")
+        self.assertEqual([e.split(";")[2] for e in r.entries(120)], ["n1", "n2"])
         # one record alone leaves a single base -> the FASTA letter stays, as before
         r1 = self.run_enricher(recs[:1] + recs[2:3], fasta=fasta)
         self.assertEqual(r1.base(120), "N")
         self.assertEqual(r1.base(130), "R")
-        # four ALTs on a reference N: the rarest of the four is left out
+        # four ALTs on a reference N, split or joined: still N, not Q
         recs4 = [rec(120, "n" + x, "N", x, "AC=1;AF=" + af, ["0|1", "0|0", "0|0", "0|0"])
                  for x, af in (("A", "0.4"), ("C", "0.3"), ("G", "0.01"), ("T", "0.2"))]
-        self.assertEqual(self.run_enricher(recs4, fasta=fasta).base(120), "H")
+        self.assertEqual(self.run_enricher(recs4, fasta=fasta).base(120), "N")
+        joined = rec(120, "nJ", "N", "A,C,G,T", "AC=1,1,1,1;AF=0.4,0.3,0.01,0.2",
+                     ["0|1", "2|3", "0|4", "0|0"])
+        self.assertEqual(self.run_enricher([joined], fasta=fasta).base(120), "N")
+        # four ALTs on a reference IUPAC base: they cover every base, so Q
+        recs4 = [rec(130, "y" + x, "R", x, "AC=1;AF=0.1", ["0|1", "0|0", "0|0", "0|0"]) for x in "ACGT"]
+        self.assertEqual(self.run_enricher(recs4, fasta=fasta).base(130), "Q")
+
+    def test_enriched_genome_keeps_the_references_N(self):
+        """The N-count invariant: whatever the records, the enriched genome holds an N
+        exactly where the reference does -- a variant never writes one (a record listing
+        three SNP ALTs wrote N up to 2.9.1) and never codes one away (two or three ALTs on
+        a reference N were coded up to 2.9.1)."""
+        fasta = list(REF)
+        for k in (20, 21, 22, 23, 24, 200, 330):
+            fasta[k - 1] = "N"
+        fasta = "".join(fasta)
+        g1 = ["0|1", "0|0", "0|0", "0|0"]
+        recs = []
+        for p, alts in ((20, "A"), (21, "A,C"), (22, "A,C,G"), (23, "A,C,G,T"), (200, "G,T"),
+                        (330, "N,*")):
+            recs.append(rec(p, "j%d" % p, "N", alts, "AC=1;AF=0.1", g1))
+        for x in "ACGT":
+            recs.append(rec(24, "s" + x, "N", x, "AC=1;AF=0.1", g1))
+        for p, n in ((60, 3), (61, 3), (62, 2), (63, 1)):
+            for x in others(p)[:n]:
+                recs.append(rec(p, "q%d%s" % (p, x), ref1(p), x, "AC=1;AF=0.1", g1))
+        recs.append(rec(70, "jq", ref1(70), ",".join(others(70)), "AC=1,1,1;AF=0.1,0.1,0.1", g1))
+        recs.append(rec(75, "nn", ref1(75), "N", "AC=1;AF=0.1", g1))
+        for mode in ("yes", "no"):
+            g = self.run_enricher(recs, mode=mode, fasta=fasta).genome
+            self.assertEqual(len(g), len(fasta))
+            self.assertEqual([i for i, c in enumerate(g) if c == "N"],
+                             [i for i, c in enumerate(fasta) if c == "N"], mode)
+            self.assertEqual([i + 1 for i, c in enumerate(g) if c == "Q"], [60, 61, 70], mode)
 
     def test_genome_is_the_same_without_the_dict(self):
         """Mode 'no' (genome only) codes every position exactly as mode 'yes'."""
@@ -349,7 +380,7 @@ class EnricherMultiallelicTests(object):
         r = self.run_enricher(recs)
         self.assertEqual(r.entries(q), ["S1:0|1;%s,%s;t%s;%s" % (ref1(q), x, x, af)
                                         for x, af in ((b1, "0.3"), (b2, "0.001"), (b3, "0.2"))])
-        self.assertEqual(r.base(q), code_of({ref1(q), b1, b3}))  # b2 is the rarest
+        self.assertEqual(r.base(q), "Q")
 
     def test_record_without_carriers_is_listed(self):
         p = 165
@@ -370,16 +401,67 @@ class EnricherMultiallelicTests(object):
         self.assertEqual([e.split(";")[2] for e in r.entries(p)], ["p1", "p3"])
         self.assertNotIn("NOTE:", r.stdout)
 
-    def test_same_alt_on_two_records_keeps_the_later(self):
+    def test_same_alt_on_two_records_merges_carriers(self):
+        """The same REF>ALT on two records is one entry listing the carriers of both (up
+        to 2.9.1 the later record's entry replaced the earlier). A carrier of both phased
+        alike gets, slot by slot, the ALT wherever either record puts it (S1 0|1 + 1|0 =
+        1|1); otherwise, as unphased slots cannot be matched up, the genotype with more
+        copies of it (S4 1 + 1/1 = 1/1; S3 0/1 + 1|. ties: the earlier). The rsID and AF
+        are the more frequent record's."""
         p = 180
         a1, a2 = others(p)[:2]
-        recs = [rec(p, "d1", ref1(p), a1, "AC=1;AF=0.1", ["0|1", "0|0", "0|0", "0|0"]),
-                rec(p, "d2", ref1(p), a2, "AC=1;AF=0.2", ["0|0", "0|1", "0|0", "0|0"]),
-                rec(p, "d3", ref1(p), a1, "AC=1;AF=0.3", ["0|0", "0|0", "1|0", "0|0"])]
+        recs = [rec(p, "d1", ref1(p), a1, "AC=1;AF=0.1", ["0|1", "0|0", "0/1", "1"]),
+                rec(p, "d2", ref1(p), a2, "AC=1;AF=0.2", ["0|0", "0|1", "0|0", "0"]),
+                rec(p, "d3", ref1(p), a1, "AC=1;AF=0.3", ["1|0", "0|0", "1|.", "1/1"])]
         r = self.run_enricher(recs)
-        self.assertEqual(r.entries(p), ["S3:1|0;%s,%s;d3;0.3" % (ref1(p), a1),
+        self.assertEqual(r.entries(p), ["S1:1|1,S3:0/1,S4:1/1;%s,%s;d3;0.3" % (ref1(p), a1),
                                         "S2:0|1;%s,%s;d2;0.2" % (ref1(p), a2)])
         self.assertEqual(r.base(p), code_of({ref1(p), a1, a2}))
+        # a less frequent second record keeps the first's rsID and AF; a tie too
+        for af2, want in (("0.05", ("d1", "0.1")), ("0.1", ("d1", "0.1")), ("1e-1", ("d1", "0.1")),
+                          (".", ("d1", "0.1"))):
+            recs = [rec(p, "d1", ref1(p), a1, "AC=1;AF=0.1", ["0|1", "0|0", "0|0", "0|0"]),
+                    rec(p, "d3", ref1(p), a1, "AC=1;AF=" + af2, ["0|0", "1|0", "0|0", "0|0"])]
+            self.assertEqual(self.run_enricher(recs).entries(p),
+                             ["S1:0|1,S2:1|0;%s,%s;%s;%s" % ((ref1(p), a1) + want)], af2)
+
+    def test_same_alt_on_a_record_listing_several(self):
+        """The same ALT on a split record and as the second ALT of a record listing
+        several: the merged entry's genotypes are in split form (1 = that ALT, 0 = the
+        reference or another ALT), so a 1|2 carrier of the joined record reads 0|1 there,
+        while the joined record's other ALT keeps its genotypes verbatim."""
+        p = 185
+        a1, a2 = others(p)[:2]
+        recs = [rec(p, "s1", ref1(p), a2, "AC=1;AF=0.1", ["0|1", "0|0", "0|0", "0|0"]),
+                rec(p, "j1", ref1(p), a1 + "," + a2, "AC=2,2;AF=0.2,0.3", ["1|2", "2|0", "0|1", "0|0"])]
+        r = self.run_enricher(recs)
+        self.assertEqual(r.entries(p), [
+            "S1:0|1,S2:1|0;%s,%s;j1;0.3" % (ref1(p), a2),
+            "S1:1|2,S3:0|1;%s,%s;j1;0.2" % (ref1(p), a1)])
+        # the other way round: the joined record first, then the split record
+        r = self.run_enricher(recs[::-1])
+        self.assertEqual(r.entries(p), [
+            "S1:1|2,S3:0|1;%s,%s;j1;0.2" % (ref1(p), a1),
+            "S1:0|1,S2:1|0;%s,%s;j1;0.3" % (ref1(p), a2)])
+
+    def test_af_read_per_record_by_key(self):
+        """Each record's INFO/AF, wherever the field stands in its INFO: up to 2.9.1 the AF
+        field's place came from the first record, so a record with its INFO fields in
+        another order or number got no AF in the dict and the indel log (HPRC chrY lost
+        91,950 of 102,665 indel AFs). A key that only starts with AF is not AF."""
+        recs = [rec(50, "a", ref1(50), others(50)[0], "AC=1;AN=8", ["0|1", "0|0", "0|0", "0|0"]),
+                rec(60, "b", ref1(60), others(60)[0], "AF=0.25;AC=1", ["0|1", "0|0", "0|0", "0|0"]),
+                rec(70, "c", ref1(70), others(70)[0], "AC=1;AN=8;AF_afr=0.5;AF=0.125", ["0|1", "0|0", "0|0", "0|0"]),
+                rec(80, "d", ref1(80), ref1(80) + "T", "DP=9;AF=0.375;AC=3", ["0|1", "0|0", "0|0", "0|0"]),
+                rec(90, "e", ref1(90), others(90)[0] + "," + others(90)[1], "AN=8;AC=1,2;AF=0.1,0.2",
+                    ["0|1", "0|2", "0|0", "0|0"]),
+                rec(100, "f", ref1(100), others(100)[0], "AF_max=0.4;AC=1", ["0|1", "0|0", "0|0", "0|0"])]
+        r = self.run_enricher(recs)
+        self.assertEqual([r.entries(p)[0].split(";")[3] for p in (50, 60, 70, 90, 100)],
+                         ["", "0.25", "0.125", "0.1", ""])
+        self.assertEqual(r.entries(90)[1].split(";")[3], "0.2")
+        log = r.raw("SNPs_genome/log%s.txt" % CHROM).decode().splitlines()
+        self.assertEqual([row.split("\t")[3] for row in log[1:]], ["0.375"])
 
     def test_joined_and_split_records_at_one_position(self):
         p = 190
@@ -390,7 +472,7 @@ class EnricherMultiallelicTests(object):
         self.assertEqual(r.entries(p), ["S1:0|1;%s,%s;j1;0.1" % (ref1(p), a1),
                                         "S2:2|0;%s,%s;j1;0.2" % (ref1(p), a2),
                                         "S3:1|0;%s,%s;s1;0.05" % (ref1(p), a3)])
-        self.assertEqual(r.base(p), code_of({ref1(p), a1, a2}))  # a3 is the rarest
+        self.assertEqual(r.base(p), "Q")
 
     def test_star_record_after_a_snp(self):
         p = 200
@@ -436,7 +518,7 @@ class EnricherMultiallelicTests(object):
         self.assertEqual(mixed.raw(log), alone.raw(log))
         self.assertEqual(mixed.raw(fake), alone.raw(fake))
         self.assertEqual(alone.raw(log).decode().count("\n"), 3)  # header + 2 indels
-        self.assertEqual(mixed.base(p), code_of({ref1(p), a2, a3}))  # a1 is the rarest
+        self.assertEqual(mixed.base(p), "Q")
         self.assertEqual(mixed.base(q), code_of({ref1(q), b1, b2}))
         self.assertEqual([e.split(";")[2] for e in mixed.entries(p)], ["s1", "s2", "s3"])
         self.assertEqual([e.split(";")[2] for e in mixed.entries(q)], ["w1", "w2"])

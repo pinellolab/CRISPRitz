@@ -22,11 +22,20 @@
 # at one position and inside an indel's window, a split record beside a multi-ALT
 # record, a non-PASS split record, the same ALT twice, AF spellings and AF_<x>
 # fields, a reference IUPAC base and N, '*', the chromosome edges, and split records
-# phased so that one haplotype slot holds two ALTs. Besides the
-# four outputs, the file set and the run log (stdout+stderr, e.g. the skip warnings
-# and the four-base note) must match.
+# phased so that one haplotype slot holds two ALTs. Cases 31-33 cover each record's
+# INFO/AF read by its key wherever it stands, the same REF>ALT on two records merged
+# into one dict entry, and ALTs on a reference N. Besides the four outputs, the file
+# set and the run log (stdout+stderr, e.g. the skip warnings and the four-base note)
+# must match.
 #
-# Prints "BYTE-IDENTICAL: PASS" only if every output diff is empty.
+# Agreement is not correctness, so the outputs are also checked against what they
+# must be: the enriched genome against an independent reconstruction from the FASTA
+# and the VCF (all four bases are Q, the search's any-base symbol, and an N stays an
+# N: the enriched genome holds an N exactly where the reference does -- the N-count
+# invariant), and the dict and indel log at cases 24 and 31-33. A reference holding
+# 'Q' must be refused by both ports alike.
+#
+# Prints "BYTE-IDENTICAL: PASS" only if every check passes.
 #
 # Usage: verify_enricher.sh [path-to-enricher-binary]
 #        (defaults to ./enricher, then /tmp/enricher_opt)
@@ -57,16 +66,17 @@ trap 'rm -rf "$WORK"' EXIT
 echo "Work dir: $WORK"
 
 # ---------------------------------------------------------------------------
-# synthetic chromosome FASTA (2,400 bp, mixed case to exercise upper()). The
+# synthetic chromosome FASTA (2,800 bp, mixed case to exercise upper()). The
 # first 400 bp -- all that cases 1-8 touch -- are the same draws as when the
-# chromosome was 400 bp long, and the first 1,800 -- cases 9-17 -- the same as
-# when it was 1,800 bp long; the rest holds cases 18-30 (case 14 follows the end).
+# chromosome was 400 bp long, the first 1,800 -- cases 9-17 -- the same as when it
+# was 1,800 bp long, and the first 2,400 -- cases 18-30 -- the same as when it was
+# 2,400 bp long; the rest holds cases 31-33 (case 14 follows the end).
 # ---------------------------------------------------------------------------
 CHR_FA="$WORK/chrTest.fa"
 python3 - "$CHR_FA" <<'PY'
 import sys, random
 random.seed(1234)
-seq = [random.choice('ACGTacgt') for _ in range(2400)]
+seq = [random.choice('ACGTacgt') for _ in range(2800)]
 # case 15: a hard-masked N run and an IUPAC base in the reference itself
 for i in range(1610, 1621):
     seq[i - 1] = 'N'
@@ -432,7 +442,9 @@ lines.append(row(p, "rs1880", b(p), other(p,0), "AC=1;AF=0.1", G1))
 lines.append(row(p, "rs1881", b(p), other(p,1), "AC=5;AF=0.5", ["1|1","1|1","1|0","0|0","0|0"], filt="LowQual"))
 lines.append(row(p, "rs1882", b(p), other(p,2), "AC=1;AF=0.2", ["0|0","0|1","0|0","0|0","0|0"]))
 
-# 24) THE SAME ALT ON TWO RECORDS: the later record's entry replaces the earlier (2130).
+# 24) THE SAME ALT ON TWO RECORDS: one entry with the carriers of both, and the rsID and
+#     AF of the more frequent record (2130; up to 2.9.1 the later record's entry
+#     replaced the earlier).
 p=2130
 lines.append(row(p, "rs1890", b(p), other(p,0), "AC=1;AF=0.1", G1))
 lines.append(row(p, "rs1891", b(p), other(p,1), "AC=1;AF=0.2", ["0|0","0|1","0|0","0|0","0|0"]))
@@ -486,6 +498,38 @@ lines.append(row(p, "rs1941", b(p), other(p,1), "AC=4;AF=0.4", ["0|1","1|0","0|1
 p=2305
 for j, af in enumerate(("0.3", "0.001", "0.2")):
     lines.append(row(p, "rs%d" % (1942 + j), b(p), other(p,j), "AC=1;AF=" + af, G1))
+
+# 31) INFO/AF READ BY ITS KEY in every record: the file's first record (case 1) has AF
+#     second in INFO, as up to 2.9.1 every record's AF was looked for there; here AF
+#     stands first (2330), after a gnomAD-style AF_afr (2335), third on an insertion
+#     (2340, the indel log's AF) and nowhere, beside AF_max (2345: no AF).
+lines.append(row(2330, "rs1950", b(2330), other(2330), "AF=0.3;AC=1", G1))
+lines.append(row(2335, "rs1951", b(2335), other(2335), "DP=7;AC=1;AF_afr=0.5;AF=0.15", G1))
+lines.append(row(2340, "rs1952", b(2340), b(2340)+"GT", "AN=10;AC=1;AF=0.05", G1))
+lines.append(row(2345, "rs1953", b(2345), other(2345), "AF_max=0.2;AC=1", G1))
+
+# 32) THE SAME REF>ALT ON TWO SPLIT RECORDS with carriers on both, one of them on the
+#     same slot and one on the other (2360), and on a record listing several ALTs then
+#     a split record (2365): one entry each, genotypes in split form (1 = that ALT).
+p=2360
+lines.append(row(p, "rs1960", b(p), other(p,0), "AC=2;AF=0.1", ["0|1","0|0","0|1","0|0","0|0"]))
+lines.append(row(p, "rs1961", b(p), other(p,1), "AC=1;AF=0.2", ["0|0","1|0","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1962", b(p), other(p,0), "AC=3;AF=0.4", ["1|0","0|0","0|1","1|1","0|0"]))
+p=2365
+lines.append(row(p, "rs1963", b(p), other(p,0)+","+other(p,1), "AC=1,2;AF=0.1,0.2",
+                 ["1|2","0|2","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1964", b(p), other(p,1), "AC=1;AF=0.05", ["0|0","0|0","1|0","0|0","0|0"]))
+
+# 33) ALTS ON A REFERENCE N (the planted N run 1610-1620): three split ALTs (1612) and
+#     a record listing all four (1616) leave the N; the four-base sites elsewhere are
+#     Q, here one record listing three SNP ALTs (2380).
+for j, alt in enumerate("ACG"):
+    lines.append(row(1612, "rs%d" % (1970 + j), "N", alt, "AC=1;AF=0.1", G1))
+lines.append(row(1616, "rs1973", "N", "A,C,G,T", "AC=1,1,1,1;AF=0.1,0.1,0.1,0.1",
+                 ["0|1","2|3","0|4","0|0","0|0"]))
+p=2380
+lines.append(row(p, "rs1974", b(p), ",".join(other(p,j) for j in range(3)), "AC=1,1,1;AF=0.1,0.2,0.3",
+                 ["0|1","0|2","3|0","0|0","0|0"]))
 
 # 14) THE CHROMOSOME EDGES (records listed last; the enricher does not need
 #     sorted input): an insertion at POS 1 and a 2-bp deletion at POS 25 have
@@ -584,6 +628,102 @@ if diff "$WORK/log_py.txt" "$WORK/log_cpp.txt" > /dev/null 2>&1; then
 else
     echo "  DIFF : run log"
     diff "$WORK/log_py.txt" "$WORK/log_cpp.txt" | head -20
+    FAIL=1
+fi
+
+# ---------------------------------------------------------------------------
+# agreement is not correctness: the outputs against what they must be
+# ---------------------------------------------------------------------------
+echo "Checking outputs against an independent reconstruction:"
+if python3 - "$CHR_FA" "$VCF_PLAIN" "$PYDIR" "$CPPDIR" "$ENRICHED" "$JSON" "$LOG" <<'PY'
+import json, sys
+fa, vcf, pydir, cppdir, enriched, jsn, log = sys.argv[1:]
+ref = "".join(open(fa).read().splitlines()[1:]).upper()
+BIT = {"A": 1, "C": 2, "G": 4, "T": 8}
+CODE = {3: "M", 5: "R", 9: "W", 6: "S", 10: "Y", 12: "K", 14: "B", 13: "D", 11: "H", 7: "V", 15: "Q"}
+# every PASS record with a one-base REF codes its one-character A/C/G/T ALTs at POS,
+# added to the reference base when that is A/C/G/T; a reference N stays N; one base
+# leaves the reference letter
+mask = {}
+for line in open(vcf):
+    if line.startswith("#"):
+        continue
+    f = line.rstrip("\n").split("\t")
+    if f[6] not in ("PASS", ".") or len(f[3]) != 1:
+        continue
+    pos = int(f[1]) - 1
+    m = mask.get(pos, BIT.get(ref[pos], 0))
+    for alt in f[4].split(","):
+        if len(alt) == 1:
+            m |= BIT.get(alt, 0)
+    mask[pos] = m
+want = list(ref)
+for pos, m in mask.items():
+    if ref[pos] != "N" and m in CODE:
+        want[pos] = CODE[m]
+want = "".join(want)
+bad = 0
+for port, d in (("enricher.py", pydir), ("enricher.cpp", cppdir)):
+    got = "".join(open("%s/%s" % (d, enriched)).read().splitlines()[1:])
+    diff = [i + 1 for i in range(max(len(got), len(want))) if got[i:i + 1] != want[i:i + 1]]
+    nref = [i for i, c in enumerate(ref) if c == "N"]
+    ngot = [i for i, c in enumerate(got) if c == "N"]
+    print("  %s  : %s enriched genome == the reconstruction (%d bases, %d coded, %d Q)%s"
+          % ("OK  " if not diff else "DIFF", port, len(want), len(mask),
+             want.count("Q"), "" if not diff else ": differs at %s" % diff[:10]))
+    print("  %s  : %s N-count invariant: %d N in the reference, %d in the enriched genome%s"
+          % ("OK  " if nref == ngot else "DIFF", port, len(nref), len(ngot),
+             ", at the same positions" if nref == ngot else ""))
+    bad += bool(diff) + (nref != ngot)
+assert want.count("Q") >= 12 and "N" not in [want[p] for p in mask if ref[p] != "N"]
+# the dict and the indel log at the cases that pin per-record AF and merged alleles
+d = json.load(open("%s/%s" % (pydir, jsn)))
+def entries(p):
+    return d["chrTest,%d" % p].split("$")
+def other(p, k):
+    return [x for x in "ACGT" if x != ref[p - 1]][k]
+r = lambda p: ref[p - 1]
+expect = {
+    2130: ["S1:0|1,S3:1|0;%s,%s;rs1892;0.3" % (r(2130), other(2130, 0)),
+           "S2:0|1;%s,%s;rs1891;0.2" % (r(2130), other(2130, 1))],
+    2330: ["S1:0|1;%s,%s;rs1950;0.3" % (r(2330), other(2330, 0))],
+    2335: ["S1:0|1;%s,%s;rs1951;0.15" % (r(2335), other(2335, 0))],
+    2345: ["S1:0|1;%s,%s;rs1953;" % (r(2345), other(2345, 0))],
+    2360: ["S1:1|1,S3:0|1,S4:1|1;%s,%s;rs1962;0.4" % (r(2360), other(2360, 0)),
+           "S2:1|0;%s,%s;rs1961;0.2" % (r(2360), other(2360, 1))],
+    2365: ["S1:1|2;%s,%s;rs1963;0.1" % (r(2365), other(2365, 0)),
+           "S1:0|1,S2:0|1,S3:1|0;%s,%s;rs1963;0.2" % (r(2365), other(2365, 1))],
+}
+for p, e in sorted(expect.items()):
+    ok = entries(p) == e
+    bad += not ok
+    print("  %s  : dict at %d (%s)" % ("OK  " if ok else "DIFF", p, "$".join(entries(p)) if not ok else
+                                       "carriers merged" if p in (2130, 2360, 2365) else "AF by key"))
+rows = [x.split("\t") for x in open("%s/%s" % (pydir, log)).read().splitlines()[1:]]
+af = [x[3] for x in rows if x[4].startswith("chrTest_2340_")]
+bad += af != ["0.05"]
+print("  %s  : indel log AF at 2340 by key (%s)" % ("OK  " if af == ["0.05"] else "DIFF", af))
+sys.exit(1 if bad else 0)
+PY
+then :; else FAIL=1; fi
+
+# a reference holding Q, the four-allele symbol, is refused by both ports alike
+QDIR="$WORK/refQ"
+mkdir -p "$QDIR/py/SNPs_genome" "$QDIR/cpp/SNPs_genome"
+sed '3s/^\(.\{10\}\)./\1q/' "$CHR_FA" > "$QDIR/chrTest.fa"
+for port in py cpp; do
+    if [ "$port" = py ]; then cmd=(python3 "$ENRICHER_PY"); else cmd=("$ENRICHER_BIN"); fi
+    ( cd "$QDIR/$port" && "${cmd[@]}" "$VCF_GZ" "$QDIR/chrTest.fa" "resultTest" "yes" "$VCF_PLAIN" ) \
+        > "$QDIR/$port.out" 2> "$QDIR/$port.err"
+    echo $? > "$QDIR/$port.rc"
+done
+QMSG="ERROR: chrTest holds 'Q' at 71: the reference FASTA must hold A/C/G/T, N and IUPAC codes only (Q is reserved for four-allele SNP positions)"
+if [ "$(cat "$QDIR/py.rc")" = 1 ] && [ "$(cat "$QDIR/cpp.rc")" = 1 ] \
+   && [ "$(cat "$QDIR/py.err")" = "$QMSG" ] && [ "$(cat "$QDIR/cpp.err")" = "$QMSG" ]; then
+    echo "  OK   : a reference holding 'q' is refused by both ports (exit 1, the same message)"
+else
+    echo "  DIFF : a reference holding 'q': exit $(cat "$QDIR/py.rc") / $(cat "$QDIR/cpp.rc")"
+    cat "$QDIR/py.err" "$QDIR/cpp.err"
     FAIL=1
 fi
 

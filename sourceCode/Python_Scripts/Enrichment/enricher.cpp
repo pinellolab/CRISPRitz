@@ -174,8 +174,9 @@ static char iupacFromMask(int mask) {
         case (1 | 4 | 8): return 'D';  // A,G,T
         case (1 | 2 | 8): return 'H';  // A,C,T
         case (1 | 2 | 4): return 'V';  // A,C,G
-        case (1 | 2 | 4 | 8): return 'N';  // A,C,G,T -- SNPsProcess never writes it
-                                           // (resolveFourBasePositions)
+        // A,C,G,T: Q, which the search reads as any base -- not N, an assembly gap that
+        // matches nothing (enricher.py's _IUPAC_BY_MASK[15])
+        case (1 | 2 | 4 | 8): return 'Q';
         default: return 0;  // no matching key -> genome unchanged (python: no key hit)
     }
 }
@@ -228,17 +229,17 @@ static std::string genomeList;
 // Kept beside genomeList because a letter there cannot tell a code written here from
 // an ambiguity code the reference FASTA already holds.
 static std::vector<unsigned char> snpMask;
-// Every single-base A/C/G/T ALT seen, with its frequency (rankAf), for the positions
-// that end up holding all four bases (resolveFourBasePositions). enricher.py's alt_af_*.
-static std::vector<long> altAfPos;
-static std::vector<unsigned char> altAfBit;
-static std::vector<double> altAfVal;
-static std::set<long> fourBasePositions;
+// positions coded Q (all four bases), counted for the stdout note
+static long fourBaseCount = 0;
 
 // SNP dict: preserve insertion order (python dict) -> use vector of pairs,
 // with a lookup map for "already present" merge semantics.
 static std::vector<std::pair<std::string, std::string>> chr_dict_snps;
 static std::map<std::string, size_t> chr_dict_index;
+// (key, "REF,ALT") -> the allele index of that entry's ALT in its record, for an entry
+// of a record listing several ALTs (1, a split record's, is not stored) --
+// enricher.py's entry_allele
+static std::map<std::pair<std::string, std::string>, int> entryAllele;
 
 static std::string joinStr(const std::vector<std::string> &parts, char sep) {
     std::string out;
@@ -249,43 +250,159 @@ static std::string joinStr(const std::vector<std::string> &parts, char sep) {
     return out;
 }
 
-// The ALT of one dict entry "<samples>;<REF>,<ALT>;<rsID>;<AF>", read from the right
-// like enricher.py's entry.rsplit(';', 3)[1].split(',', 1)[1], so a ';' in a sample
-// name cannot move it. Every entry this program builds holds at least three ';'.
-static std::string entryAlt(const std::string &e) {
+// The four ';' fields of one dict entry "<samples>;<REF>,<ALT>;<rsID>;<AF>", split from
+// the right like enricher.py's entry.rsplit(';', 3), so a ';' in a sample name cannot
+// move them. Every entry this program builds holds at least three ';'.
+static std::vector<std::string> entryFields(const std::string &e) {
     size_t p3 = e.rfind(';');
     size_t p2 = (p3 == std::string::npos || p3 == 0) ? std::string::npos : e.rfind(';', p3 - 1);
     size_t p1 = (p2 == std::string::npos || p2 == 0) ? std::string::npos : e.rfind(';', p2 - 1);
-    if (p1 == std::string::npos) return e;  // unreachable for entries built here
-    std::string refalt = e.substr(p1 + 1, p2 - p1 - 1);
-    size_t c = refalt.find(',');
-    return (c == std::string::npos) ? refalt : refalt.substr(c + 1);
+    std::vector<std::string> f(4);
+    if (p1 == std::string::npos) {  // unreachable for entries built here
+        f[1] = e;
+        return f;
+    }
+    f[0] = e.substr(0, p1);
+    f[1] = e.substr(p1 + 1, p2 - p1 - 1);
+    f[2] = e.substr(p2 + 1, p3 - p2 - 1);
+    f[3] = e.substr(p3 + 1);
+    return f;
+}
+
+static bool allDigits(const std::string &a) {
+    if (a.empty()) return false;
+    for (size_t c = 0; c < a.size(); ++c)
+        if (a[c] < '0' || a[c] > '9') return false;
+    return true;
+}
+
+// A GT split into alleles and the separators between them, as enricher.py's
+// re.split(r'([|/])', gt): even entries alleles, odd entries '|' or '/'.
+static std::vector<std::string> gtTokens(const std::string &gt) {
+    std::vector<std::string> t(1);
+    for (size_t c = 0; c < gt.size(); ++c) {
+        if (gt[c] == '|' || gt[c] == '/') {
+            t.push_back(std::string(1, gt[c]));
+            t.push_back("");
+        } else {
+            t.back().push_back(gt[c]);
+        }
+    }
+    return t;
+}
+
+// GT gt with allele k written 1 and every other called allele 0 -- enricher.py's
+// _gt_for_allele: the form of a split record's genotypes, where 1 is its one ALT.
+static std::string gtForAllele(const std::string &gt, int k) {
+    std::vector<std::string> t = gtTokens(gt);
+    std::string out;
+    for (size_t i = 0; i < t.size(); ++i) {
+        if (allDigits(t[i]))
+            out += (atol(t[i].c_str()) == k) ? "1" : "0";
+        else
+            out += t[i];
+    }
+    return out;
+}
+
+// One sample's genotypes of one allele on two records, the earlier first, both in split
+// form -- enricher.py's _gt_union: phased alike (as many alleles, every separator '|'), a
+// slot holds the allele if either record puts it there, else a called 0 if either has
+// one; otherwise the genotype with more copies of the allele (on a tie, the earlier).
+static std::string gtUnion(const std::string &gt1, const std::string &gt2) {
+    std::vector<std::string> t1 = gtTokens(gt1), t2 = gtTokens(gt2);
+    bool alike = t1.size() == t2.size();
+    for (size_t i = 0; alike && i < t1.size(); ++i)
+        if (t1[i] == "/" || t2[i] == "/") alike = false;
+    if (!alike)
+        return std::count(t2.begin(), t2.end(), std::string("1")) >
+                       std::count(t1.begin(), t1.end(), std::string("1"))
+                   ? gt2
+                   : gt1;
+    std::string out;
+    for (size_t i = 0; i < t1.size(); ++i) {
+        const std::string &x = t1[i], &y = t2[i];
+        if (x == "|")
+            out += x;
+        else if (x == "1" || y == "1")
+            out += "1";
+        else if (x == "0" || y == "0")
+            out += "0";
+        else
+            out += x;
+    }
+    return out;
+}
+
+static double afRank(const std::string &af);
+
+// One allele's dict entries from two records (the same REF>ALT twice) -- enricher.py's
+// _merge_entries: every carrier of either, genotypes in split form, a carrier of both
+// with the union of its two; the rsID and AF of the more frequent record (highest
+// INFO/AF; on a tie, the earlier).
+static std::string mergeEntries(const std::string &oldE, int kOld, const std::string &newE, int kNew) {
+    std::vector<std::string> fo = entryFields(oldE), fn = entryFields(newE);
+    std::map<std::string, std::string> gts;  // sample -> GT
+    const std::string *samples[2] = {&fo[0], &fn[0]};
+    const int ks[2] = {kOld, kNew};
+    for (int r = 0; r < 2; ++r) {
+        if (samples[r]->empty()) continue;
+        std::vector<std::string> carriers = splitStr(*samples[r], ',');
+        for (size_t c = 0; c < carriers.size(); ++c) {
+            size_t colon = carriers[c].rfind(':');
+            std::string name = carriers[c].substr(0, colon);
+            std::string gt = gtForAllele(carriers[c].substr(colon + 1), ks[r]);
+            std::map<std::string, std::string>::iterator it = gts.find(name);
+            if (it == gts.end())
+                gts[name] = gt;
+            else
+                it->second = gtUnion(it->second, gt);
+        }
+    }
+    std::vector<std::string> listed;
+    for (std::map<std::string, std::string>::const_iterator it = gts.begin(); it != gts.end(); ++it)
+        listed.push_back(it->first + ":" + it->second);
+    std::sort(listed.begin(), listed.end());
+    bool newer = afRank(fn[3]) > afRank(fo[3]);
+    return joinStr(listed, ',') + ";" + fo[1] + ";" + (newer ? fn[2] : fo[2]) + ";" + (newer ? fn[3] : fo[3]);
 }
 
 // Store one record's per-ALT entries under "chr,pos", MERGED with what earlier
 // records stored there -- enricher.py's _dict_put, see it for the rationale. A new
-// key gets the entries joined by '$' (as before); at an existing key an ALT already
-// listed has its entry replaced by the later record's, any other ALT is appended.
-static void dictPut(const std::string &key, const std::vector<std::string> &entries) {
+// key gets the entries joined by '$' (as before); at an existing key an allele already
+// listed (the same REF>ALT) gets the carriers of both (mergeEntries), any other ALT is
+// appended. alleles[i] is the allele index of entries[i]'s ALT in its record.
+static void dictPut(const std::string &key, const std::vector<std::string> &entries,
+                    const std::vector<int> &alleles) {
     std::map<std::string, size_t>::iterator it = chr_dict_index.find(key);
     if (it == chr_dict_index.end()) {
         chr_dict_index[key] = chr_dict_snps.size();
         chr_dict_snps.push_back(std::make_pair(key, joinStr(entries, '$')));
+        for (size_t k = 0; k < entries.size(); ++k)
+            if (alleles[k] != 1) entryAllele[std::make_pair(key, entryFields(entries[k])[1])] = alleles[k];
         return;
     }
     std::string &val = chr_dict_snps[it->second].second;  // merge, keep position
     std::vector<std::string> merged = splitStr(val, '$');
-    std::vector<std::string> alts;
-    for (size_t k = 0; k < merged.size(); ++k) alts.push_back(entryAlt(merged[k]));
+    std::vector<std::string> refalts;
+    for (size_t k = 0; k < merged.size(); ++k) refalts.push_back(entryFields(merged[k])[1]);
     for (size_t k = 0; k < entries.size(); ++k) {
-        std::string a = entryAlt(entries[k]);
+        std::string ra = entryFields(entries[k])[1];
         size_t j = 0;
-        while (j < alts.size() && alts[j] != a) ++j;
-        if (j < alts.size()) {
-            merged[j] = entries[k];
+        while (j < refalts.size() && refalts[j] != ra) ++j;
+        if (j < refalts.size()) {
+            std::pair<std::string, std::string> id(key, ra);
+            std::map<std::pair<std::string, std::string>, int>::iterator ka = entryAllele.find(id);
+            int kOld = 1;
+            if (ka != entryAllele.end()) {
+                kOld = ka->second;
+                entryAllele.erase(ka);
+            }
+            merged[j] = mergeEntries(merged[j], kOld, entries[k], alleles[k]);
         } else {
             merged.push_back(entries[k]);
-            alts.push_back(a);
+            refalts.push_back(ra);
+            if (alleles[k] != 1) entryAllele[std::make_pair(key, ra)] = alleles[k];
         }
     }
     val = joinStr(merged, '$');
@@ -327,28 +444,11 @@ static bool isPlainNumber(const std::string &s) {
     return i == n;
 }
 
-// rankAf(line, k): how frequent ALT k of this record is, to rank the ALTs of a
-// four-base position -- enricher.py's _rank_af: the highest of its INFO/AF and every
-// INFO/AF_<x> value, 0 when there is none (a sites-only merge such as CRISPRme's mega
-// carries only AF_<x> and AF_max). Ranking only: the dict's AF field is INFO/AF.
-static double rankAf(const std::vector<std::string> &line, size_t k) {
-    bool found = false;
-    double best = 0.0;
-    std::vector<std::string> entries = splitStr(line[7], ';');
-    for (size_t e = 0; e < entries.size(); ++e) {
-        size_t eq = entries[e].find('=');
-        if (eq == std::string::npos) continue;
-        std::string key = entries[e].substr(0, eq);
-        if (key != "AF" && key.compare(0, 3, "AF_") != 0) continue;
-        std::vector<std::string> v = splitStr(entries[e].substr(eq + 1), ',');
-        if (k >= v.size() || !isPlainNumber(v[k])) continue;
-        double x = strtod(v[k].c_str(), NULL);
-        if (!found || x > best) {
-            best = x;
-            found = true;
-        }
-    }
-    return best;
+// afRank(af): an AF value string as a number, to tell which of two records of one
+// allele is the more frequent (mergeEntries) -- enricher.py's _af_rank: 0 when it is
+// missing or not a plain decimal number.
+static double afRank(const std::string &af) {
+    return isPlainNumber(af) ? strtod(af.c_str(), NULL) : 0.0;
 }
 
 // ---------------------------------------------------------------------------
@@ -369,28 +469,22 @@ static void SNPsProcess(std::vector<std::string> &line) {
         exit(1);
     }
 
+    // An N is an assembly gap and stays one: the enriched genome holds exactly the
+    // reference's N (see enricher.py's SNPsProcess). The dict still lists the record.
+    if (genomeStr[pos0] == 'N') return;
+
     // build the base SET: what earlier records coded here (else the reference base)
     // + each alt allele of length 1. Starting from the reference base alone on each
     // record kept only the last record's ALT of a split multi-allelic site; see
-    // enricher.py's SNPsProcess.
+    // enricher.py's SNPsProcess. All four bases are Q (iupacFromMask).
     int mask = snpMask[pos0] ? snpMask[pos0] : baseBit(genomeStr[pos0]);
     std::vector<std::string> altAlleles = splitStr(pyStrip(line[4]), ',');
     for (size_t k = 0; k < altAlleles.size(); ++k) {
-        if (altAlleles[k].size() > 1) continue;
-        int bit = altAlleles[k].empty() ? 0 : baseBit(altAlleles[k][0]);
-        if (!bit) continue;
-        mask |= bit;
-        altAfPos.push_back(pos0);
-        altAfBit.push_back((unsigned char)bit);
-        altAfVal.push_back(rankAf(line, k));
+        if (altAlleles[k].size() != 1) continue;
+        mask |= baseBit(altAlleles[k][0]);
     }
+    if (mask == 15 && snpMask[pos0] != 15) ++fourBaseCount;
     snpMask[pos0] = (unsigned char)mask;
-    if (mask == 15) {
-        // all four bases: 'N' would be written, which the search reads as a gap, not
-        // as "any base". Resolved once every record is read.
-        fourBasePositions.insert(pos0);
-        return;
-    }
     char letter = iupacFromMask(mask);
     if (letter != 0) {
         genomeList[pos0] = letter;
@@ -399,74 +493,28 @@ static void SNPsProcess(std::vector<std::string> &line) {
 }
 
 // ---------------------------------------------------------------------------
-// resolveFourBasePositions(): code each position whose reference base and SNP ALTs
-// cover all four bases with the reference base and its most frequent ALTs, leaving
-// out the rarest ALT by rankAf (a tie leaves out the later of A, C, G, T; an ALT seen
-// on several records counts with its highest value). Mirrors enricher.py, which says
-// why: N is a gap to buildTST and searchTST, not "any base".
+// afValue(line): raw INFO/AF value string of this record, found by its exact key,
+// or "" if the record has none. Mirrors enricher.py's _af_value() -- see that
+// function's comment: until 2.9.1 the AF field's place was taken from the first
+// record only, and a record listing its INFO fields otherwise got "".
 // ---------------------------------------------------------------------------
 
-static void resolveFourBasePositions() {
-    if (fourBasePositions.empty()) return;
-    std::map<std::pair<long, int>, double> best;
-    for (size_t i = 0; i < altAfPos.size(); ++i) {
-        if (!fourBasePositions.count(altAfPos[i])) continue;
-        std::pair<long, int> key(altAfPos[i], (int)altAfBit[i]);
-        std::map<std::pair<long, int>, double>::iterator it = best.find(key);
-        if (it == best.end() || altAfVal[i] > it->second) best[key] = altAfVal[i];
-    }
-    for (std::set<long>::const_iterator p = fourBasePositions.begin();
-         p != fourBasePositions.end(); ++p) {
-        int refBit = baseBit(genomeStr[*p]);
-        int drop = 0;
-        double dropAf = 0.0;
-        const int bits[4] = {1, 2, 4, 8};
-        for (int k = 0; k < 4; ++k) {
-            int b = bits[k];
-            if (b == refBit) continue;
-            std::map<std::pair<long, int>, double>::const_iterator it =
-                best.find(std::make_pair(*p, b));
-            double af = (it == best.end()) ? 0.0 : it->second;
-            // python: min(alts, key=(af, -b))
-            if (drop == 0 || af < dropAf || (af == dropAf && b > drop)) {
-                drop = b;
-                dropAf = af;
-            }
-        }
-        genomeList[*p] = iupacFromMask(15 & ~drop);
-    }
-    printf("NOTE: %ld position(s) of %s carry all four bases between the reference and "
-           "the SNP ALTs; N would read as a gap, so each is coded without its rarest ALT "
-           "(lowest INFO AF or AF_*, ties to the later of A, C, G, T)\n",
-           (long)fourBasePositions.size(), currentChr.c_str());
-}
-
-// ---------------------------------------------------------------------------
-// afValue(line, pos_AF): raw AF value string for this record, or "" if
-// unavailable. Mirrors enricher.py's _af_value() -- see that function's
-// comment for the full rationale. pos_AF < 0 means "no exact AF= key found
-// in the first record" (the int sentinel for python's None); this also
-// guards pos_AF landing out of range for a *later* record with fewer INFO
-// fields than record 1, and re-verifies the key on every call rather than
-// trusting the cached position blindly.
-// ---------------------------------------------------------------------------
-
-static std::string afValue(const std::vector<std::string> &line, int pos_AF) {
-    if (pos_AF < 0) return "";
+static std::string afValue(const std::vector<std::string> &line) {
     std::vector<std::string> splitted = splitStr(line[7], ';');
-    if ((size_t)pos_AF >= splitted.size()) return "";
-    const std::string &entry = splitted[pos_AF];
-    size_t eq = entry.find('=');
-    std::string key = (eq == std::string::npos) ? entry : entry.substr(0, eq);
-    if (key != "AF") return "";
-    return (eq == std::string::npos) ? "" : entry.substr(eq + 1);
+    for (size_t p = 0; p < splitted.size(); ++p) {
+        const std::string &entry = splitted[p];
+        size_t eq = entry.find('=');
+        std::string key = (eq == std::string::npos) ? entry : entry.substr(0, eq);
+        if (key == "AF") return (eq == std::string::npos) ? "" : entry.substr(eq + 1);
+    }
+    return "";
 }
 
 // ---------------------------------------------------------------------------
-// add_to_dict_snps(line, pos_AF)
+// add_to_dict_snps(line)
 // ---------------------------------------------------------------------------
 
-static void add_to_dict_snps(const std::vector<std::string> &line, int pos_AF) {
+static void add_to_dict_snps(const std::vector<std::string> &line) {
     if (line[3].size() == 1 && line[4].size() == 1) {
         // Case A: biallelic SNP
         std::vector<std::string> list_samples;
@@ -479,7 +527,7 @@ static void add_to_dict_snps(const std::vector<std::string> &line, int pos_AF) {
         }
         std::string chr_pos_string = currentChr + "," + line[1];
         std::string rsID = line[2];
-        std::string af = afValue(line, pos_AF);
+        std::string af = afValue(line);
         std::string val;
         if (!list_samples.empty()) {
             std::vector<std::string> sorted_s = list_samples;
@@ -493,7 +541,7 @@ static void add_to_dict_snps(const std::vector<std::string> &line, int pos_AF) {
         } else {
             val = std::string(";") + line[3] + "," + line[4] + ";" + rsID + ";" + af;
         }
-        dictPut(chr_pos_string, std::vector<std::string>(1, val));
+        dictPut(chr_pos_string, std::vector<std::string>(1, val), std::vector<int>(1, 1));
     } else if (line[3].size() == 1) {
         // Case B: multiallelic, ref length 1
         std::vector<std::string> variants = splitStr(line[4], ',');
@@ -524,7 +572,7 @@ static void add_to_dict_snps(const std::vector<std::string> &line, int pos_AF) {
             }
             std::string chr_pos_string = currentChr + "," + line[1];
             std::string rsID0 = splitStr(line[2], ',')[0];
-            std::vector<std::string> af = splitStr(afValue(line, pos_AF), ',');
+            std::vector<std::string> af = splitStr(afValue(line), ',');
 
             std::vector<std::string> final_entry;
             for (size_t idx = 0; idx < snps.size(); ++idx) {
@@ -549,19 +597,19 @@ static void add_to_dict_snps(const std::vector<std::string> &line, int pos_AF) {
                 }
                 final_entry.push_back(entry);
             }
-            dictPut(chr_pos_string, final_entry);
+            dictPut(chr_pos_string, final_entry, values_for_allele_info);
         }
     }
     // len(line[3])>1 : stores nothing
 }
 
 // ---------------------------------------------------------------------------
-// indel_to_fasta(line, id_indel, pos_AF, start_fake_pos)
+// indel_to_fasta(line, id_indel, start_fake_pos)
 // returns updated (id_indel, start_fake_pos)
 // ---------------------------------------------------------------------------
 
 static void indel_to_fasta(const std::vector<std::string> &line, long &id_indel,
-                           int pos_AF, long &start_fake_pos) {
+                           long &start_fake_pos) {
     bool cond = (line[3].size() > 1 || line[4].size() > 1) &&
                 line[3].find('<') == std::string::npos;
     if (!cond) return;
@@ -603,7 +651,7 @@ static void indel_to_fasta(const std::vector<std::string> &line, long &id_indel,
     }
 
     std::string rsID0 = splitStr(line[2], ',')[0];
-    std::vector<std::string> af = splitStr(afValue(line, pos_AF), ',');
+    std::vector<std::string> af = splitStr(afValue(line), ',');
 
     long posv = strtol(line[1].c_str(), NULL, 10);
     long start_position = posv - 26;
@@ -787,6 +835,17 @@ int main(int argc, char **argv) {
             genomeStr.push_back(c);
         }
     }
+    // Q is reserved for four-allele SNP positions (see enricher.py)
+    {
+        size_t q = genomeStr.find('Q');
+        if (q != std::string::npos) {
+            fprintf(stderr,
+                    "ERROR: %s holds 'Q' at %ld: the reference FASTA must hold A/C/G/T, N "
+                    "and IUPAC codes only (Q is reserved for four-allele SNP positions)\n",
+                    currentChr.c_str(), (long)q + 1);
+            return 1;
+        }
+    }
     genomeList = genomeStr;  // mutable copy
     snpMask.assign(genomeStr.size(), 0);
 
@@ -826,8 +885,6 @@ int main(int argc, char **argv) {
     }
 
     // process data lines
-    bool first_line = true;
-    int pos_AF = -1;  // -1 if no exact "AF=" INFO key is found in the first record
     std::string raw;
     while (vcf.getRawLine(raw)) {
         std::vector<std::string> line = splitStr(pyStrip(raw), '\t');
@@ -838,35 +895,17 @@ int main(int argc, char **argv) {
         // crash. Normalize the ID field's ';' to ',' so rsID stays one field.
         if (line.size() > 2)
             std::replace(line[2].begin(), line[2].end(), ';', ',');
-        if (first_line) {
-            first_line = false;
-            std::vector<std::string> splitted = splitStr(line[7], ';');
-            for (size_t p = 0; p < splitted.size(); ++p) {
-                // exact key match, not a prefix match: a prefix match would
-                // also accept e.g. gnomAD-style "AF_afr=", and either garble
-                // that value or -- worse -- lock onto it and skip a later,
-                // real "AF=" field in the same record. The `break` only fires
-                // on a real match, so this still keeps scanning past a
-                // non-matching population-specific field to find the true
-                // "AF=" wherever it appears in the record.
-                size_t eq = splitted[p].find('=');
-                std::string key = (eq == std::string::npos)
-                                       ? splitted[p]
-                                       : splitted[p].substr(0, eq);
-                if (key == "AF") {
-                    pos_AF = (int)p;
-                    break;
-                }
-            }
-        }
         if (line[6] != "PASS" && line[6] != ".") continue;  // '.' = no filter applied (e.g. HPRC vcfwave VCFs)
         if (doYes) {
-            add_to_dict_snps(line, pos_AF);
-            indel_to_fasta(line, id_indel, pos_AF, start_fake_pos);
+            add_to_dict_snps(line);
+            indel_to_fasta(line, id_indel, start_fake_pos);
         }
         SNPsProcess(line);
     }
-    resolveFourBasePositions();
+    if (fourBaseCount)
+        printf("NOTE: %ld position(s) of %s carry all four bases between the reference and the "
+               "SNP ALTs; each is coded Q, which the search reads as any base (N stays a gap)\n",
+               fourBaseCount, currentChr.c_str());
 
     // --- chromosomeSave(): os.chdir("./SNPs_genome/") then write ---
     if (chdir("./SNPs_genome") != 0) {

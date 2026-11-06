@@ -49,14 +49,18 @@ jobs:
       # enricher.cpp is meant to be a faithful port of enricher.py, and the
       # packaged install silently falls back to the Python one when the binary is
       # absent, so the two must not drift. verify_enricher.sh synthesizes a VCF of
-      # 30 cases -- biallelic and multiallelic SNPs, a non-PASS record, insertions,
+      # 33 cases -- biallelic and multiallelic SNPs, a non-PASS record, insertions,
       # deletions, a site carrying TWO indel alleles (the case where a per-allele
       # window built on the previous allele's output compounds them), the SNP+indel
       # combinations, the chromosome edges, multiallelic SNPs whose ALTs include
       # '*', and multi-allelic sites split into one record per ALT (every record
-      # order, the all-four-bases rule, genotype shapes, SNP + indel at one position,
-      # two ALTs on one haplotype slot)
-      # -- then diffs all four outputs byte-for-byte, plus the file set and the run log.
+      # order, all four bases coded Q, genotype shapes, SNP + indel at one position,
+      # two ALTs on one haplotype slot), INFO/AF read by its key, the same REF>ALT on
+      # two records, ALTs on a reference N
+      # -- then diffs all four outputs byte-for-byte, plus the file set and the run log,
+      # and checks them against what they must be: the enriched genome against an
+      # independent reconstruction (the N-count invariant among it), the dict and the
+      # indel log at the new cases, and a reference holding Q refused alike.
       - name: Build the C++ enricher
         run: g++ -std=c++11 -O2 sourceCode/Python_Scripts/Enrichment/enricher.cpp -o /tmp/enricher_opt -lz
 
@@ -105,6 +109,28 @@ jobs:
       # and a dedicated PAM, under a timeout and a 4 GB address-space cap.
       - name: buildTST on a contig too short for a target
         run: bash test/run_short_contig_test.sh
+
+  four-allele:
+    name: four-allele symbol Q end to end (add-variants, index-genome, search == oracle and brute force)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # python3-pandas: add-variants runs enricher.py too (the test compares both ports)
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1 zlib1g-dev python3-pandas
+
+      # A position whose reference base and SNP ALTs cover A, C, G and T is written Q,
+      # which buildTST, searchTST and searchBruteForce read as any base (N stays a gap).
+      # Synthetic contigs put Q in guides, in PAMs that exist only through it, in the
+      # pad, beside N runs and on contig ends; through crispritz.py add-variants (both
+      # ports), index-genome (3' and 5', dedicated and PAM-less) and search, every
+      # search must equal test/boundary/oracle.py, every 0-bulge one searchBruteForce,
+      # no row may hold an N, and a .bin is flagged four_allele exactly when it holds Q.
+      - name: Run four-allele test
+        run: bash test/run_four_allele_test.sh
 
   golden:
     name: golden search regression (Cas9 NGG + Cas12a TTTV)
@@ -188,7 +214,7 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends g++ libgomp1
+          sudo apt-get install -y --no-install-recommends g++ libgomp1 zlib1g-dev python3-pandas
 
       # searchOnTST.cpp had a heap-buffer-overflow (CRISPRme #105) that
       # AddressSanitizer aborts on when combined with a degenerate odd-length
@@ -208,11 +234,15 @@ jobs:
 
       # The boundary suite under ASan: all three binaries (buildTST, searchTST,
       # searchBruteForce) instrumented, over index format 2's boundary sites (pad
-      # and flank off the contig, signed window starts) and the format-1 reader.
-      - name: Run ASan boundary + format-1 tests
+      # and flank off the contig, signed window starts), the format-1 reader, the
+      # damaged files of the index-format test and the four-allele symbol Q (its
+      # slot-dependent tree nibbles; the enricher instrumented too).
+      - name: Run ASan boundary, format-1, index-format and four-allele tests
         run: |
           QUICK=1 bash test/run_boundary_test.sh
           bash test/run_format1_test.sh
+          bash test/run_index_format_test.sh
+          bash test/run_four_allele_test.sh
         env:
           OMP_NUM_THREADS: "1"
           CXXFLAGS: "-fsanitize=address -g -O1"
