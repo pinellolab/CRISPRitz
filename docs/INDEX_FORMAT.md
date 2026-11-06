@@ -808,12 +808,13 @@ compared for both versions; the other sizes agree to the byte).
    index's `.bin`. The boundary suite runs `index-info` on each index it builds (exit 0,
    nothing on stderr, the header's parameters those of the build).
 4. **The four-allele symbol** (`test/run_four_allele_test.sh`, `test/four_allele/`):
-   44 synthetic contigs (each case on both strands) whose split and multi-ALT SNP
+   46 synthetic contigs (each case on both strands) whose split and multi-ALT SNP
    records put `Q` in guide regions (where it turns a reference mismatch into a
    match, up to six in one guide), in PAMs that exist only through it (NGG's GG, one
    G or its N; TTTV's T or V), beyond a guide's far end, next to N runs and on contig
-   ends, a run of 30, ALTs on reference `N` (which stay `N`), and a 20-kb background
-   with 3% `Q`, IUPAC codes and N runs, through `crispritz.py`: `add-variants` with
+   ends, a run of 30, ALTs on reference `N` (which stay `N`), a 20-kb background with
+   3% `Q`, IUPAC codes and N runs, and a guide with one `N` beside an NGG PAM, through
+   `crispritz.py`: `add-variants` with
    both enricher ports (identical; `Q` exactly at the four-base positions, `N` exactly
    the reference's), `index-genome` for NGG (`-bMax` 0, 2), NRG, a PAM-less K=8 flank,
    5' TTTV and a 5' PAM-less K=4 flank (a `.bin` flagged `four_allele` exactly when
@@ -822,7 +823,10 @@ compared for both versions; the other sizes agree to the byte).
    through `Q`), the 11 without bulges equal to `searchBruteForce`, no row holding an
    `N`, every row its contig's bases, the 38 planted perfect sites found, and
    `--prune-pam` equal to the dedicated index; and `searchBruteForce` at `-mm 120`
-   reports no window with an N in its guide. The pre-`Q` engine (`d75c603`) fails it:
+   reports no window with an N in its guide, though 6 NGG windows hold exactly one
+   there (the planted guide, both strands): the brute force of 2.9.1 and of `524b594`,
+   which counted an `N` as 101 mismatches, reports 12 rows through them. The pre-`Q`
+   engine (`d75c603`) fails it:
    its `buildTST` writes to stderr on `Q`, its `searchBruteForce` reads `Q` as a gap
    (109 rows only the index finds), and its enricher writes no `Q`.
 5. **Existing tests** (`run_golden_test.sh`, `run_minimal_test.sh`,

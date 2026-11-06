@@ -129,7 +129,8 @@ jobs:
       # ports), index-genome (3' and 5', dedicated and PAM-less) and search, every
       # search must equal test/boundary/oracle.py, every 0-bulge one searchBruteForce,
       # no row may hold an N, a .bin is flagged four_allele exactly when it holds Q, and
-      # the brute force at -mm 120 reports no window with an N in its guide.
+      # the brute force at -mm 120 reports no window with an N in its guide (a guide
+      # with one N is planted beside a PAM: an N used to cost 101 mismatches).
       - name: Run four-allele test
         run: bash test/run_four_allele_test.sh
 

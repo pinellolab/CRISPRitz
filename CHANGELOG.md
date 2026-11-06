@@ -79,13 +79,15 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   damaged in one way each: both refuse every one, for the same reason, and the reader in
   docs/INDEX_FORMAT.md section 7 returns what `index-info` does.
 - `test/run_four_allele_test.sh`: `Q` end to end through `crispritz.py` -- `add-variants`
-  with both enricher ports on 44 synthetic contigs whose split and multi-ALT records put `Q`
+  with both enricher ports on 46 synthetic contigs whose split and multi-ALT records put `Q`
   in guides, in PAMs that exist only through it, in the bulge pad, beside `N` runs and on
   contig ends, then 3' and 5', dedicated and PAM-less indexes, and 23 searches with and
   without bulges and `--prune-pam`: every search equals the independent oracle, every
   0-bulge one `searchBruteForce` (every target the brute force finds, the index finds), no
   row holds an `N`, a `.bin` is flagged exactly when it holds `Q`, and the brute force at
-  `-mm 120` reports no window with an `N` in its guide. The engine before `Q` fails it.
+  `-mm 120` reports no window with an `N` in its guide, where a guide with one `N` is planted
+  beside a PAM (an `N` cost 101 mismatches: 2.9.1's `searchBruteForce` reports it). The
+  engine before `Q` fails it.
 - `test/test_enricher_multiallelic.py`: 24 unit tests run against both ports (48), with exact
   expected outputs (every ALT, `Q`, the N-count invariant, merged carriers, each record's AF,
   a reference holding `Q`); 44 of them fail on 2.9.1. In CI with `verify_enricher.sh`, which

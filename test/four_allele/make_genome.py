@@ -23,7 +23,9 @@ written in target-strand orientation:
   bg   a 20-kb background: random bases, 3% four-allele positions, 4% two- or
        three-base ones, N runs, and G planted with 0-4 mismatches next to NGG and
        after TTTV;
-  ctl  a contig with no variant (its index files are not flagged for Q).
+  ctl  a contig with no variant (its index files are not flagged for Q);
+  Ng   G with one base an N, next to NGG: a guide region holding exactly one N, which
+       no index stores and the brute force must drop whatever the mismatch budget.
 
 Each case is written on the + strand and, reverse-complemented with its VCF, on the -
 strand. sites.tsv lists every planted site whose enriched sequence is a perfect match
@@ -129,6 +131,10 @@ def main():
             alts[i] = "".join(rng.sample([b for b in "ACGT" if b != bg[i]], rng.randrange(1, 3)))
     cases.append(("bg", "".join(bg), alts, []))
     case("ctl", [(rnd(40), {}), ("SITE3", G + pam3, {}), (rnd(40), {})])
+    # Ng: one N in a guide region beside a PAM. searchBruteForce counted an N as 101
+    # mismatches, so a budget of 101 or more reported the window; the N runs above give
+    # none (no PAM where a guide reaches exactly one base into a run)
+    case("Ng", [(rnd(30), {}), (G[:7] + "N" + G[8:] + pam3, {}), (rnd(30), {})])
 
     os.makedirs(os.path.join(out, "ref"), exist_ok=True)
     os.makedirs(os.path.join(out, "vcf"), exist_ok=True)

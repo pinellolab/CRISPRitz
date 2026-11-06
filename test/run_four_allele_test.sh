@@ -13,7 +13,8 @@
 # records put Q in guide regions (making a reference mismatch a match), in PAMs (a
 # PAM that exists only through Q), beyond a guide's far end (the pad a DNA bulge
 # reads), next to N runs and on contig ends, a run of 30 Q's, ALTs on reference N
-# (which stay N), and a background with Q, IUPAC codes and N runs. Then:
+# (which stay N), a background with Q, IUPAC codes and N runs, and a guide region with
+# one N beside a PAM. Then:
 #
 #   1. ENRICH  : add-variants with each enricher port; the two enriched genomes are
 #                identical, Q exactly where the reference base and ALTs cover four
@@ -30,7 +31,8 @@
 #                planted perfect site is found; --prune-pam equals the dedicated index.
 #   4. GAPS    : searchBruteForce with a mismatch budget of 120 (more than the 101 an N
 #                used to cost) reports no window with an N in its guide, as an index
-#                never holds one.
+#                never holds one, though the genome holds NGG windows with exactly one
+#                N there (the planted guide with one N, on both strands).
 #   5. BYTES   : a genome byte that is no base, IUPAC code, N or Q is a gap too: the PAM
 #                scans of buildTST and searchBruteForce used to skip it, reading every
 #                later PAM one base off, so a perfect site after it was lost.
@@ -241,6 +243,10 @@ echo "  ok: 6 indexes; a .bin is flagged four_allele in its header exactly when 
 
 echo "########## 3. SEARCH ##########"
 body() { tail -n +2 "$1" | LC_ALL=C sort; }
+# the rows of a targets file whose DNA holds an N (n when a mismatch). Not a pipe into
+# grep -q: under pipefail, the SIGPIPE of the writer it leaves on a match (once the rows
+# exceed a pipe buffer) failed the pipeline, which a ! then read as no match
+with_n() { awk -F'\t' 'NR > 1 && $3 ~ /[Nn]/ {n++} END {print n + 0}' "$1"; }
 n_cmp=0; n_rows=0; n_bf=0; n_q_rows=0
 search() {  # <index name> <index pam> <mb> <search pam> <prune 0|1> <mm> <bDNA> <bRNA>
   local name=$1 ipam=$2 mb=$3 spam=$4 prune=$5 mm=$6 bd=$7 br=$8 side=3 flag="" oflag=""
@@ -260,7 +266,7 @@ search() {  # <index name> <index pam> <mb> <search pam> <prune 0|1> <mm> <bDNA>
     || { head -12 "${WORK}/${tag}.diff"; fail "${tag}: indexed search != oracle ($(grep -c '^<' "${WORK}/${tag}.diff" || true) extra, $(grep -c '^>' "${WORK}/${tag}.diff" || true) missing)"; }
   "${PYTHON}" "${SCRIPT_DIR}/boundary/check_rows.py" "${GE}" "${WORK}/${tag}.targets.txt" > "${WORK}/${tag}.chk" \
     || { head -5 "${WORK}/${tag}.chk"; fail "${tag}: $(tail -1 "${WORK}/${tag}.chk")"; }
-  ! tail -n +2 "${WORK}/${tag}.targets.txt" | cut -f3 | grep -q '[Nn]' || fail "${tag}: a row holds an N"
+  [ "$(with_n "${WORK}/${tag}.targets.txt")" = 0 ] || fail "${tag}: $(with_n "${WORK}/${tag}.targets.txt") rows hold an N"
   local rows; rows="$(wc -l < "${WORK}/${tag}.oracle" | tr -d ' ')"
   [ "${rows}" -gt 0 ] || fail "${tag}: no rows (vacuous comparison)"
   n_cmp=$((n_cmp + 1)); n_rows=$((n_rows + rows))
@@ -314,16 +320,37 @@ print("  ok: all %d planted perfect sites found (Q in the guide, in the PAM, bes
 PY
 
 echo "########## 4. GAPS in the brute-force scan ##########"
+# the windows an N costing 101 mismatches let through at -mm 120: an NGG PAM and exactly
+# one N in the guide region (four_allele/make_genome.py plants them, case Ng)
+one_n="$("${PYTHON}" - "${GE}" <<'PY'
+import os, sys
+BITS = {"A": 1, "C": 2, "G": 4, "T": 8, "R": 5, "Y": 10, "S": 6, "W": 9, "K": 12, "M": 3,
+        "B": 14, "D": 13, "H": 11, "V": 7, "Q": 15}  # N, as any other byte: 0, a gap
+COMP = {"A": "T", "C": "G", "G": "C", "T": "A", "R": "Y", "Y": "R", "S": "S", "W": "W", "K": "M",
+        "M": "K", "B": "V", "V": "B", "D": "H", "H": "D", "N": "N", "Q": "Q"}
+n = 0
+for name in os.listdir(sys.argv[1]):
+    with open(os.path.join(sys.argv[1], name)) as fh:
+        fh.readline()
+        seq = "".join(l.strip() for l in fh)
+    for T in (seq, "".join(COMP[c] for c in reversed(seq))):
+        b = [BITS.get(c, 0) for c in T]
+        n += sum(1 for g0 in range(len(T) - 22)
+                 if b[g0 + 20] and b[g0 + 21] & 4 and b[g0 + 22] & 4 and b[g0:g0 + 20].count(0) == 1)
+print(n)
+PY
+)" || fail "counting the windows with one N in the guide region failed"
+[ "${one_n}" -ge 2 ] || fail "only ${one_n} NGG windows hold exactly one N in the guide region (vacuous check)"
 ( cd "${WORK}" && "${PYTHON}" "${CZ}" search "${GE}/" "${PAMS}/NGG.txt" "${WORK}/guides3.txt" gaps \
     -mm 120 -th 1 -r > gaps.log 2> gaps.err ) || fail "brute force at -mm 120 failed"
 quiet "brute force at -mm 120" "${WORK}/gaps.log" "${WORK}/gaps.err"
 rows="$(tail -n +2 "${WORK}/gaps.targets.txt" | wc -l | tr -d ' ')"
 [ "${rows}" -gt 1000 ] || fail "brute force at -mm 120: only ${rows} rows"
-! tail -n +2 "${WORK}/gaps.targets.txt" | cut -f3 | grep -q '[Nn]' \
-  || fail "brute force at -mm 120 reports $(tail -n +2 "${WORK}/gaps.targets.txt" | cut -f3 | grep -c '[Nn]') windows holding an N"
+[ "$(with_n "${WORK}/gaps.targets.txt")" = 0 ] \
+  || fail "brute force at -mm 120 reports $(with_n "${WORK}/gaps.targets.txt") windows holding an N"
 "${PYTHON}" "${SCRIPT_DIR}/boundary/check_rows.py" "${GE}" "${WORK}/gaps.targets.txt" > /dev/null \
   || fail "brute force at -mm 120: a row is not its contig's bases"
-echo "  ok: searchBruteForce at -mm 120: ${rows} rows, none with an N in its guide"
+echo "  ok: searchBruteForce at -mm 120: ${rows} rows, none with an N in its guide, of ${one_n} NGG windows with one there"
 
 echo "########## 5. OTHER BYTES in the genome ##########"
 # an 'X' amid A/T (no PAM within reach, so no stored window holds it), then a perfect site
