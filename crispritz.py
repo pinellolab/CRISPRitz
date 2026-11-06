@@ -568,7 +568,18 @@ def genomeEnrichment():
         for x in vcf_chr.split("."):
             if "chr" in x:
                 chr_with_vcf.add(x)
-    list_file_ends = [f for f in listdir(dirGenome) if isfile(join(dirGenome, f))]
+    # the chromosome FASTA files: any other file beside them (a README, a .DS_Store, a
+    # .fai) is no chromosome. Taken for one, a README was copied as one ('cp: cannot
+    # stat' on stderr), and any of them listed first gave its extension to the
+    # chromosomes copied below, none of which was
+    list_file_ends = [
+        f
+        for f in listdir(dirGenome)
+        if isfile(join(dirGenome, f)) and f.endswith((".fa", ".fasta"))
+    ]
+    if not list_file_ends:
+        sys.stderr.write("ERROR: %s holds no .fa or .fasta file\n" % dirGenome)
+        sys.exit(1)
     file_ends = list_file_ends[0].split(".")[-1]  # For .fa or .fasta
     contains_enr = ""
     if ".enriched." in list_file_ends[0]:
@@ -579,20 +590,20 @@ def genomeEnrichment():
         set(
             [
                 f.split(contains_enr + ".fa")[0]
-                for f in listdir(dirGenome)
-                if isfile(join(dirGenome, f))
+                for f in list_file_ends
             ]
         )
         - chr_with_vcf
     )
     # the chromosomes without a VCF are copied as they are (below): refuse a 'Q' in them
     # as the enricher does in the others, before any work is done
-    for f in sorted(chr_wihtout_vcf):
-        q = _first_q(dirGenome + "/" + f + contains_enr + "." + file_ends)
+    for f in sorted(list_file_ends):
+        chrom = f.split(contains_enr + ".fa")[0]
+        q = _first_q(join(dirGenome, f)) if chrom in chr_wihtout_vcf else 0
         if q:
             sys.stderr.write(
                 "ERROR: %s holds 'Q' at %d: the reference FASTA must hold A/C/G/T, N and IUPAC "
-                "codes only (Q is reserved for four-allele SNP positions)\n" % (f, q)
+                "codes only (Q is reserved for four-allele SNP positions)\n" % (chrom, q)
             )
             sys.exit(1)
 

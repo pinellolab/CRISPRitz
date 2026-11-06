@@ -324,10 +324,13 @@ for HGDP + 1000 Genomes above, both ways). Mega is sites-only: no genotypes.
 * `test/run_four_allele_test.sh` — `Q` end to end through `crispritz.py` (`add-variants`
   with both ports, `index-genome`, `search`), against an independent oracle and
   `searchBruteForce`; docs/INDEX_FORMAT.md section 11.
+* `test/run_add_variants_status_test.sh` — with the shipped enricher, whatever is on
+  `PATH`: a chromosome `add-variants` copies (no VCF) holding `q` is refused before any
+  enrichment, a README, `.DS_Store` and `.fai` beside the chromosomes are ignored (exit 0,
+  nothing on stderr), and a folder holding no FASTA is refused.
 * The existing scripts pass unchanged on Linux (g++ 14): `run_minimal_test.sh` (NGG, WTN,
   WTN under AddressSanitizer), `run_golden_test.sh`, `run_pam_filter_test.sh` (31
-  assertions), `run_flank_n_test.sh`, `run_short_contig_test.sh`,
-  `run_add_variants_status_test.sh`.
+  assertions), `run_flank_n_test.sh`, `run_short_contig_test.sh`.
 
 ## 6. What CRISPRme must change
 
