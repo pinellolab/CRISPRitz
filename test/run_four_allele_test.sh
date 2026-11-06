@@ -28,7 +28,10 @@
 #                target the brute-force scan finds is found by searchTST; every row is
 #                its contig's own bases (check_rows.py), and no row holds an N; every
 #                planted perfect site is found; --prune-pam equals the dedicated index.
-#   4. BYTES   : a genome byte that is no base, IUPAC code, N or Q is a gap too: the PAM
+#   4. GAPS    : searchBruteForce with a mismatch budget of 120 (more than the 101 an N
+#                used to cost) reports no window with an N in its guide, as an index
+#                never holds one.
+#   5. BYTES   : a genome byte that is no base, IUPAC code, N or Q is a gap too: the PAM
 #                scans of buildTST and searchBruteForce used to skip it, reading every
 #                later PAM one base off, so a perfect site after it was lost.
 #
@@ -310,7 +313,19 @@ assert not missing, missing
 print("  ok: all %d planted perfect sites found (Q in the guide, in the PAM, beside N runs, at contig ends)" % len(want))
 PY
 
-echo "########## 4. OTHER BYTES in the genome ##########"
+echo "########## 4. GAPS in the brute-force scan ##########"
+( cd "${WORK}" && "${PYTHON}" "${CZ}" search "${GE}/" "${PAMS}/NGG.txt" "${WORK}/guides3.txt" gaps \
+    -mm 120 -th 1 -r > gaps.log 2> gaps.err ) || fail "brute force at -mm 120 failed"
+quiet "brute force at -mm 120" "${WORK}/gaps.log" "${WORK}/gaps.err"
+rows="$(tail -n +2 "${WORK}/gaps.targets.txt" | wc -l | tr -d ' ')"
+[ "${rows}" -gt 1000 ] || fail "brute force at -mm 120: only ${rows} rows"
+! tail -n +2 "${WORK}/gaps.targets.txt" | cut -f3 | grep -q '[Nn]' \
+  || fail "brute force at -mm 120 reports $(tail -n +2 "${WORK}/gaps.targets.txt" | cut -f3 | grep -c '[Nn]') windows holding an N"
+"${PYTHON}" "${SCRIPT_DIR}/boundary/check_rows.py" "${GE}" "${WORK}/gaps.targets.txt" > /dev/null \
+  || fail "brute force at -mm 120: a row is not its contig's bases"
+echo "  ok: searchBruteForce at -mm 120: ${rows} rows, none with an N in its guide"
+
+echo "########## 5. OTHER BYTES in the genome ##########"
 # an 'X' amid A/T (no PAM within reach, so no stored window holds it), then a perfect site
 mkdir -p "${WORK}/gx"
 "${PYTHON}" - "${WORK}/gx/chrX1.fa" "${GUIDE}" <<'PY'
