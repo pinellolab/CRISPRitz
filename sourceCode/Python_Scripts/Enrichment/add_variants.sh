@@ -9,7 +9,7 @@
 # script if it is not on PATH.
 #
 # "Byte-identical" is a VERIFIED claim, not an assumption: verify_enricher.sh
-# diffs every output of both ports over a synthetic VCF of 30 cases (the SNP+indel
+# diffs every output of both ports over a synthetic VCF of 33 cases (the SNP+indel
 # combinations and the split multi-allelic sites among them), and runs in CI as the
 # `enricher-ports` job, beside test/test_enricher_multiallelic.py, which checks each
 # port's exact outputs. It WAS an assumption until

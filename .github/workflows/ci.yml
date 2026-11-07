@@ -184,7 +184,7 @@ jobs:
       # Format 2's header and trailer, crispritz.py index-info, a directory mixing the
       # two formats, max_bulges taken from the header, and the reader's refusals
       # (cut-short file, PAM side mismatch, unknown version; buildTST -bMax > 31);
-      # index-info must refuse each of 18 damaged files searchTST refuses, for the
+      # index-info must refuse each of 20 damaged files searchTST refuses, for the
       # same reason, and docs/INDEX_FORMAT.md section 7's reader must agree with it.
       - name: Run index-format test
         run: bash test/run_index_format_test.sh
