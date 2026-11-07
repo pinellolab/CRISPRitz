@@ -18,7 +18,7 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 ## [2.10.0] - unreleased
 
 Not yet tagged: the date is set when it is. Released together with rebuilt indexes and the
-CRISPRme release that pins it (CRISPRme 2.9.0): the IDX-13, IDX-4 and IDX-15 fixes below
+CRISPRme release that pins it (CRISPRme 2.10.0): the IDX-13, IDX-4 and IDX-15 fixes below
 change what an index holds, and every allele of a split multi-allelic site, the
 four-allele symbol `Q` and the merged carriers change what an enrichment holds, so they
 take effect only on genomes enriched and indexes built by this version (the brute-force

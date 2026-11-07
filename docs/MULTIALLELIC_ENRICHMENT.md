@@ -668,7 +668,7 @@ last ALT of a split site, and what `Q` is (a target may show it in its DNA colum
 
 ## 7. Decisions of the owner
 
-Taken for CRISPRitz 2.10.0 and CRISPRme 2.9.0 (CRISPRme plan, section 3, B1-B4):
+Taken for CRISPRitz 2.10.0 and CRISPRme 2.10.0 (CRISPRme plan, section 3, B1-B4):
 
 1. **Four-base positions: the fifth symbol `Q`** (B1), so all four alleles are searchable
    (section 2.2). The branch kept the reference and the two most frequent ALTs (by AF),
