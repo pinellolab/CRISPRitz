@@ -654,12 +654,12 @@ of `a5379e0`:
        index fails the check. Its count exceeds the format-1 leaf count on 361 of the
        885 contigs, so a contig whose last part is full can be taken for one that
        lacks a part.
-4. **Engine/index pairing.** An index built by 2.10.0 cannot be searched by
-   CRISPRitz <= 2.9.1. Where CRISPRme resolves or downloads an index, read the formats
-   of its `.bin` files (section 7: `index-info` exits 1 on one that `searchTST` would
-   refuse) and refuse a format-2 index when the pinned engine is older, naming both;
-   record `index_format` in the index's `index_meta.json` and on the published
-   archive's card.
+4. **Engine/index pairing.** An index built by 2.10.0 cannot be searched by CRISPRitz <=
+   2.9.1. Where CRISPRme resolves or downloads an index, read the formats of its `.bin`
+   files (section 7: `index-info` exits 1 on one that `searchTST` refuses whatever the
+   search, as far as its first and last bytes and its size show) and refuse a format-2
+   index when the pinned engine is older, naming both; record `index_format` in the
+   index's `index_meta.json` and on the published archive's card.
 5. **Boundary rows downstream.** Format 2 returns sites whose pad runs off a contig
    or into an N, and, with `--prune-pam`, sites whose distal flank does. Any step
    that cuts a fixed window around a target (scoring context, variant lookup at
