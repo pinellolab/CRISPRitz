@@ -29,8 +29,8 @@ static const int CZI_FLAG_KNOWN = CZI_FLAG_PAM_AT_START | CZI_FLAG_PAMLESS | CZI
 // values -- a root, lo or hi slot: 0 = no kid and the 14 IUPAC letters; an eq slot:
 // the 14 letters and 15 = end of string -- so Q takes the value its slot never uses:
 // 15 in a root, lo or hi slot (its A|C|G|T mask), 0 in an eq slot. A flank nibble Q
-// is 15. Only a file flagged CZI_FLAG_FOUR_ALLELE holds them; a file without Q is
-// written byte for byte as before, so an older reader refuses only what it cannot
+// is 15. Only a file flagged CZI_FLAG_FOUR_ALLELE holds them, and Q changes no byte
+// of a file that does not hold it, so an older reader refuses only what it cannot
 // decode.
 static const unsigned char CZI_NIBBLE_Q = 0x0F;    // root, lo and hi slots; flanks
 static const unsigned char CZI_NIBBLE_Q_EQ = 0x00; // eq slots

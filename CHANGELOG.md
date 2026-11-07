@@ -42,7 +42,8 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   build parameters (PAM side, all-N PAM, guide length, PAM length, max bulges, the PAM) -- and
   ends with the magic, so an index says what it holds and a cut-short file is recognised.
   The per-leaf `'0'`/`'_'` marker becomes a flags byte (strand shape, flank off the contig,
-  bases of the bulge pad that exist), so leaf records keep their size; the tree is unchanged.
+  bases of the bulge pad that exist), so leaf records keep their size; the tree is unchanged
+  but for `Q` (above).
   `searchTST` reads formats 1 and 2 and refuses an unknown version, a cut-short file, or a
   PAM width or side that differs from the search's, before searching. `buildTST` checks its
   writes (a full disk used to leave a cut-short `.bin` behind an exit 0) and refuses `-bMax`

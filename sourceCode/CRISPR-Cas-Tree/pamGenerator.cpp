@@ -349,8 +349,9 @@ bool pamUnconstrained(const string &pam_sequence)
 
 // The sites of a contig, in the order the 2.9.1 builder found them (by the start nt
 // of their K flank bases; at each nt the PAM read forward first, then reversed), so
-// that a contig with no boundary site yields the same leaves, tree and search output
-// as before. A site is stored when its guide lies inside the contig:
+// that a contig of bases, IUPAC codes and N with no boundary site yields the same
+// leaves, tree and search output as in 2.9.1. A site is stored when its guide lies
+// inside the contig:
 //  - dedicated PAM: the K PAM bases match (a genomic N matches no PAM letter, not even
 //    N) and lie inside the contig; the scan reaches the last PAM that fits, nt =
 //    length() - K (until 2.9.1 it stopped one short on a 3' PAM, and on a 5' PAM

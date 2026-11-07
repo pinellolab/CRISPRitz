@@ -216,7 +216,7 @@ body (from header_len)
                           same string
   }
   int32  numNodes
-  tree                    unchanged
+  tree                    as format 1, plus Q (section 4.1)
 trailer
   int32  magic            the same 4 bytes; a file not ending in them is cut short
 ```
@@ -228,10 +228,10 @@ Notes:
   format-1 index of the same genome (one of bases, IUPAC codes and N, section 3.1)
   only by the sites B2/B3/B4 add and 32 + K bytes of header and trailer per `.bin`
   (section 10 has the measurement).
-* The tree serialization, the sort and the leaf chains are unchanged. A contig with
-  no boundary site, every byte of which is a base, an IUPAC code or N (section 3.1),
-  therefore has the same tree as in 2.9.1 and every search over it returns the same
-  rows in the same order.
+* The tree serialization (but for `Q`, section 4.1), the sort and the leaf chains are
+  unchanged. A contig with no boundary site, every byte of which is a base, an IUPAC
+  code or N (section 3.1), therefore has the same tree as in 2.9.1 and every search
+  over it returns the same rows in the same order.
 * `mb` is capped at 31 by the 5-bit `pad_valid`; `buildTST` refuses a larger
   `-bMax` with an error. (The search's guide buffers are 100 characters, so such
   values never worked in practice.)
@@ -717,8 +717,8 @@ more than 100 reported windows holding one), and it reads `Q` as any base.
 ## 10. Cost (measured)
 
 Measured with the build of `feat/engine-boundaries` (`c286bf8`), before `Q`: 2.10.0 writes
-the same bytes for a genome without `Q` (section 4.1), so the reference-genome numbers
-stand for it.
+the same bytes for a genome of bases, IUPAC codes and `N`, as hg38's chromosomes are
+(sections 3.1 and 4.1), so the reference-genome numbers stand for it.
 
 `crispritz.py index-genome <name> <dir with one chromosome> <PAM file> -bMax 2 -th 8`, hg38
 chromosome FASTA (chr22 md5 319cba9f..., chr1 md5 9465e0f0...), CRISPRitz 2.9.1 (the
@@ -854,7 +854,8 @@ compared for both versions; the other sizes agree to the byte).
    (SIGSEGV).
 5. **Existing tests** (`run_golden_test.sh`, `run_minimal_test.sh`,
    `run_pam_filter_test.sh`, `run_flank_n_test.sh`, `run_short_contig_test.sh`) pass;
-   the golden outputs are byte-identical (their genome holds no boundary site).
+   the golden outputs are byte-identical (their genome, of A, C, G and T only, holds no
+   boundary site).
    `run_short_contig_test.sh` now also requires a contig exactly one target long to
    be indexed.
 6. **AddressSanitizer**: all three binaries, over every test above, on arm64 and amd64

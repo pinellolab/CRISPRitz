@@ -399,8 +399,8 @@ void writePair()
 
 // Serialize TST. Each node's symbol is written in its parent's slot; via_eq says that
 // slot is an eq slot, where the four-allele symbol Q is written as 'q' (the 0000
-// nibble: 1111 ends a string there, include/indexFormat.h). A tree without Q is
-// written byte for byte as by CRISPRitz 2.9.1.
+// nibble: 1111 ends a string there, include/indexFormat.h). Q aside, a tree is
+// written byte for byte as CRISPRitz 2.9.1 wrote it.
 void serialize(Tptr p, bool via_eq)
 {
 	char sc = (p->splitchar == 'Q' && via_eq) ? 'q' : p->splitchar;
