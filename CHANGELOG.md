@@ -152,8 +152,11 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   HPRC chr22 the records' own phase puts none there, and the merged carriers of one allele's
   two records (above) put 37, all at 38,152,965. Up to 2.9.1 the dict held one ALT per
   position, so no reader met one. CRISPRme's per-sample analysis builds a CONFIRMED haplotype
-  holding both ALTs from it (measured through `complete-search --per-sample` on a 2.10.0
-  index); CRISPRme must handle these before it uses a 2.10.0 index
+  holding both ALTs from it, measured through `complete-search --per-sample` of CRISPRme
+  `a5379e0` on the multi-allelic branch's enrichment of chr22:1-10,700,000, indexed by
+  CRISPRitz 2.9.1 in format 1, as no CRISPRme release reads a 2.10.0 index yet; 2.10.0
+  enriches those inputs into the same dict and the same bases but one, a `Q` 13 kb from the
+  measured site. CRISPRme must handle these before it uses a 2.10.0 index
   (`docs/MULTIALLELIC_ENRICHMENT.md` §6.3).
 
 ### Fixed
@@ -195,22 +198,23 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   is that of the site written as one record, in any record order — and the dict value lists
   every ALT, one `$`-joined entry each with its own record's carriers, genotypes, rsID and
   AF (the form a record listing several ALTs always had; a repeated allele merges into its
-  own entry, see Changed). Both ports, byte-identical. Measured on chr22 of HGDP + 1000 Genomes through
-  `add-variants`: 43,389 positions carry two or three SNP records; 45,837 SNP records (2.6 %,
-  5,104 with AC ≥ 41) were not the last and reached neither output; after the fix exactly
-  those 43,389 bases and 43,389 dict values change, each equal to an independent bcftools
-  reconstruction, and the indel log and fake-indel FASTA are byte-identical; `enricher.py`
-  gives the same outputs md5 for md5. The other published panels are affected too, checked
-  the same way on chr22: HPRC (normalised as CRISPRme builds it) 4,765 multi-record
-  positions, mega 16,103. This fix changes nothing where no position holds more than one SNP
-  record, but other changes of this release do (docs/MULTIALLELIC_ENRICHMENT.md section
-  2.6): a record listing three SNP ALTs is now `Q`, one listing two or three ALTs at a
-  reference `N` (or another byte that is no base or IUPAC code) leaves it, one listing `AF`
-  at another place in its INFO than the file's first record gets its AF, and a SNP outside
-  the chromosome is an error. So an enrichment of a VCF that keeps a site's ALTs on one
-  record can change too: on chr22 with the raw HPRC vcfwave VCF (no position with two SNP
-  records), the genome differs at 61 bases, each `N` → `Q`, and the dict, indel log and
-  fake-indel FASTA are byte-identical.
+  own entry, see Changed). Both ports, byte-identical. Measured with 2.10.0 on chr22 of
+  HGDP + 1000 Genomes through `add-variants`: 43,389 positions carry two or three SNP
+  records; 45,837 SNP records (2.6 %, 5,104 with AC ≥ 41) were not the last and reached
+  neither output; after the fix exactly those 43,389 bases and 43,389 dict values change,
+  each equal to an independent bcftools reconstruction, and the indel log and fake-indel
+  FASTA are byte-identical; `enricher.py` gives the same outputs md5 for md5. The other
+  published panels are affected too (checked the same way on chr22 with the multi-allelic
+  branch, before `Q` and the merge): HPRC (normalised as CRISPRme builds it) 4,765
+  multi-record positions, mega 16,103. This fix changes nothing where no position holds
+  more than one SNP record, but other changes of this release do
+  (docs/MULTIALLELIC_ENRICHMENT.md section 2.6): a record listing three SNP ALTs is now `Q`,
+  one listing two or three ALTs at a reference `N` (or another byte that is no base or
+  IUPAC code) leaves it, one listing `AF` at another place in its INFO than the file's first
+  record gets its AF, and a SNP outside the chromosome is an error. So an enrichment of a
+  VCF that keeps a site's ALTs on one record can change too: on chr22 with the raw HPRC
+  vcfwave VCF (no position with two SNP records), the genome differs at 61 bases, each `N`
+  → `Q`, and the dict, indel log and fake-indel FASTA are byte-identical.
 - **A record listing three SNP ALTs wrote `N`**, which `index-genome` and `search` read as an
   assembly gap: every target through the position, the reference one included, left the
   index (shown through the CLI: 0 targets found, against 1 with the fix). Merging split

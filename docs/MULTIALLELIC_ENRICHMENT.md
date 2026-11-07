@@ -6,8 +6,9 @@ on `v2.9.1`) and updated for CRISPRitz 2.10.0, which merged it with
 `feat/engine-boundaries` (docs/INDEX_FORMAT.md) and added Q, the four-allele symbol
 (section 2.2), the carriers of one allele on several records merged (section 2.3), each
 record's AF read by its key (section 2.5) and a reference N kept (section 2.8). The
-measurements of section 4 were taken before those four changes, with the four-base rule
-that Q replaced. The CRISPRme code cited is the tree at `a5379e0` of the CRISPRme+ 2.8.1
+measurements of section 4 and of section 6.3 were taken on that branch, before those four
+changes, with the four-base rule that Q replaced; both sections say what 2.10.0 gives on
+the same inputs. The CRISPRme code cited is the tree at `a5379e0` of the CRISPRme+ 2.8.1
 integration branch; line numbers refer to that tree.
 
 **Decided by the owner:** these changes, and the index rebuild they require, go into
@@ -34,7 +35,9 @@ base (section 2.2; the IUPAC letter `N` would be read as a gap). The dictionary 
 ALT, each with its own record's genotypes as they were phased. On HGDP + 1000 Genomes that
 includes 672 chr22 sample-positions with two ALTs on one haplotype slot, which CRISPRme's
 per-sample analysis turns into a CONFIRMED haplotype holding both (measured through the
-CLI): CRISPRme must handle them before it uses a 2.10.0 index (section 6.3).
+CLI on the enrichment of `feat/multiallelic-enrich`, whose dictionary 2.10.0 writes byte
+for byte, indexed by CRISPRitz 2.9.1, as no CRISPRme release reads a 2.10.0 index yet):
+CRISPRme must handle them before it uses a 2.10.0 index (section 6.3).
 
 ## 2. What the enricher does now
 
@@ -268,7 +271,8 @@ Inputs: the published panel's raw VCF (`hgdp1kgp.chr22.norm.vcf.gz`, 1,998,332 r
 of the published install (REF equals the FASTA base at all 1,757,775 SNP-bearing records).
 Each run is the real `crispritz.py add-variants <vcfdir> <genomedir> true`, on ml008 in the
 CRISPRme+ 2.8.1 SIF: **before** = the shipped CRISPRitz 2.9.1 (its compiled `enricher`),
-**after** = this branch, once with the compiled port and once with `enricher.py`. The
+**after** = the branch (`feat/multiallelic-enrich`, the four-base rule), once with the
+compiled port and once with `enricher.py`; 2.10.0 on the same inputs is below. The
 expected outputs come from an independent path: a bcftools 1.24 query of the same VCF
 (site fields of every record; genotypes of every record at the multi-SNP positions),
 compared by a separate script.
@@ -281,8 +285,9 @@ adjacent; 1,289 positions also carry an indel record. The published `registry_hg
 (the index-only install's, compiled from a pre-2.10.0 dictionary) holds 1,711,938 positions on
 chr22 — exactly the positions with a SNP record — none with two ALTs.
 
-Phase of the split records (counted in the branch's dictionary, and again from a bcftools query
-of the VCF's genotypes; both give the same numbers). At the 43,389 positions, 55,826
+Phase of the split records (counted in the branch's dictionary, which 2.10.0 writes byte for
+byte, below, and again from a bcftools query of the VCF's genotypes; both give the same
+numbers). At the 43,389 positions, 55,826
 sample-positions carry two or more different ALTs: 55,154 on different haplotype slots, as a
 `1/2` heterozygote should be, and **672 with two ALTs on one slot**, at **584 positions**, in
 405 samples. The panel was phased (SHAPEIT5) as biallelic records — its
@@ -317,6 +322,18 @@ one):
 final code (commit `8e36f57`, which added the `AF_*` ranking) gives the same five md5s again
 (this panel's INFO holds only `AC`, `AN`, `AF`), as do the CLI demonstrations of 2.2 and 2.5.
 
+**2.10.0 on the same inputs**, both ports through the same CLI (the compiled one is the run
+of section 2.2; `enricher.py` took 1,749 s, peak RSS 3.63 GB): the same five files, md5 for
+md5, and the same run log but for its timings. The dictionary, indel log, fake-indel FASTA
+and `change_version.txt` are the branch's, and the enriched genome (`b62bc9fb…`) differs
+from the branch's at exactly the 2,448 four-base positions, `Q` where the branch wrote `B`,
+`D`, `H` or `V`. Checked as above, with `Q` in place of the four-base rule: every base
+equals the rule at the 1,770,802 positions; the 43,389 bases that change from 2.9.1 are
+exactly the multi-SNP positions (Y→H 9,150, S→V 8,623, K→D 8,045, Y→B 6,658, K→B 3,629,
+R→V 2,079, W→D 1,987, W→H 770, and K, Y, W → `Q` 1,162, 675, 611), and every non-last ALT
+is in the new code; no variant is coded `N`; the 43,389 dictionary values equal the
+reconstruction. So the table holds for 2.10.0 but for the codes of the four-base positions.
+
 **The other two panels**, chr22, the same way (2.9.1 vs the final branch, through
 `add-variants`, checked by a second script that rebuilds the expected code and dict values —
 split and multi-ALT records, the AF/AF_* ranking — from a bcftools query of the VCF):
@@ -334,7 +351,7 @@ for HGDP + 1000 Genomes above, both ways), with the later record of a repeated a
 on the branch; 2.10.0 merges the carriers of such records (section 2.3), which puts two ALTs
 on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no genotypes.
 
-## 5. Tests on the branch
+## 5. Tests
 
 * `test/test_enricher_multiallelic.py` — 24 unit tests, each run against **both** ports
   (48 in all), with exact expected outputs: two and three ALTs in every order, split ==
@@ -373,9 +390,10 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
   `PATH`: a chromosome `add-variants` copies (no VCF) holding `q` is refused before any
   enrichment, a README, `.DS_Store`, `.fai` and macOS `._<name>.fa` beside the chromosomes
   are ignored (exit 0, nothing on stderr), and a folder holding no FASTA is refused.
-* The existing scripts pass unchanged on Linux (g++ 14): `run_minimal_test.sh` (NGG, WTN,
-  WTN under AddressSanitizer), `run_golden_test.sh`, `run_pam_filter_test.sh` (31
-  assertions), `run_flank_n_test.sh`, `run_short_contig_test.sh`.
+* The existing scripts pass on Linux (g++ 14): `run_minimal_test.sh` (NGG, WTN, WTN under
+  AddressSanitizer), `run_golden_test.sh`, `run_pam_filter_test.sh` (31 assertions),
+  `run_flank_n_test.sh` and `run_short_contig_test.sh`, unchanged by the enricher's work
+  (index format 2 extended the last, docs/INDEX_FORMAT.md section 11).
 
 ## 6. What CRISPRme must change
 
@@ -483,9 +501,13 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
   584 of the 43,389 chr22 positions with two or more SNP ALTs (1.3 %), in 405 samples, and on
   HPRC chr22 at one position (38,152,965, 37 samples), where the merged carriers of one
   allele's two records put two ALTs on one slot (section 2.3; the records' own phase puts
-  none, section 4). Measured on the real data:
+  none, section 4). Measured on the real data with the enrichment of the branch
+  (`feat/multiallelic-enrich`, before `Q` and the merged carriers); 2.10.0 enriches alike
+  here: its chr22 dictionary is the branch's byte for byte (section 4), and from the inputs
+  of the CLI run below it writes the same dictionary (3,998 keys) and the same genome but
+  one base, 10,675,050, `Q` where the branch wrote `V`, 13 kb from the target below:
   - with CRISPRme's own code, as a measurement harness (not the CLI): the 30 dictionary
-    keys of chr22:10,661,500-10,661,800 from this branch's chr22 enrichment, compiled by
+    keys of chr22:10,661,500-10,661,800 from the branch's chr22 enrichment, compiled by
     `build_dictless_tiers.emit_dictless_tiers` into a Tier-0 registry and Tier-1 store, read
     back the way `_iupac_decomposition_observed` reads them (lines 636-685) for the target of
     guide `TTATTCCAGACAGATTATGC` + `TAG` at chr22:10,661,610 (column 19 = 10,661,629, coded
@@ -493,12 +515,14 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
     `enumerate_observed_haplotypes` (line 828): five sets, one of them `{(19,G),(19,T)}`
     CONFIRMED with NA18869 its only carrier, its sequence holding T, its info both variants
     (`chr22_10661629_C_G,chr22_10661629_C_T`); NA18869 is in neither {G} nor {T};
-  - through the real CLI, as a user would meet it: `crisprme.py build-index-only` (this
-    branch's compiled enricher in place of the image's, so `add-variants` is the branch's) on hg38
-    chr22:1-10,700,000 with the 4,433 HGDP + 1000 Genomes records it holds (every sample),
-    the index-only layout, then `complete-search --per-sample` with that guide (NRG, 4
-    mismatches, 1/1 bulges); CRISPRme a5379e0 in the rc281 image; exit 0, stderr empty. The
-    per-haplotype report (`observed_haplotypes_raw.tsv`) and
+  - through the real CLI, as a user would meet it: `crisprme.py build-index-only` (the
+    branch's compiled enricher in place of the image's, so `add-variants` is the branch's,
+    and the index is built by the image's CRISPRitz 2.9.1, in format 1: neither its
+    `searchTST` nor CRISPRme `a5379e0` reads format 2, docs/INDEX_FORMAT.md sections 6
+    and 8) on hg38 chr22:1-10,700,000 with the 4,433 HGDP + 1000 Genomes records it holds
+    (every sample), the index-only layout, then `complete-search --per-sample` with that
+    guide (NRG, 4 mismatches, 1/1 bulges); CRISPRme a5379e0 in the rc281 image; exit 0,
+    stderr empty. The per-haplotype report (`observed_haplotypes_raw.tsv`) and
     `all_results_with_alternative_alignments.tsv` hold a row at 10,661,609 (+, no bulge, 1
     mismatch) whose variant columns read `chr22_10661629_C_G,chr22_10661629_C_T` and
     `20C>G,20C>T` (MAF `0.000244439,0.33757`, the reverse of the variants' order: G's AF is
@@ -600,8 +624,10 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
 No format change: a row's variant columns list the ALT each haplotype holds, and two ALTs of
 one position appear in two rows, as they would for a record listing several ALTs
 (`resultIntegrator.py` splits the tokens per row, lines 455-520) — once 6.3 is fixed. Until
-then a 2.10.0 index puts rows naming two ALTs of one position into the per-sample report and
-its companions (measured, 6.3). The SNP+SNP companion took such a row for a co-occurrence
+then the per-sample report and its companions hold rows naming two ALTs of one position
+(measured on the branch's enrichment, indexed in format 1 by CRISPRitz 2.9.1, 6.3), and a
+2.10.0 index, whose enrichment holds the same dictionary, will put them there too once
+CRISPRme reads one. The SNP+SNP companion took such a row for a co-occurrence
 because `_record_snp_snp_cooc` (`new_simple_analysis.py`, lines 387-391) counts distinct
 variant tokens (`chr22_10661629_C_G`, `chr22_10661629_C_T`), not distinct positions; it
 should compare positions. Expect more variant rows and more carriers at the affected
@@ -628,7 +654,8 @@ last ALT of a split site, and what `Q` is (a target may show it in its DNA colum
   alignments and the companions, and list NA18869 under the G and the T rows, neither as
   CONFIRMED.
   The kit — hg38 chr22:1-10,700,000 and the 4,433 HGDP + 1000 Genomes records up to
-  10,699,000 — builds in 15 s and searches in 5 min.
+  10,699,000 — built in 15 s and searched in 5 min in the run of 6.3 (CRISPRitz 2.9.1's
+  index, in format 1).
 * SNP+indel co-occurrence on a column with two ALTs where the guide uses the non-first one
   (6.4), dictionary and Tier-1 sources.
 * An end-to-end guide at a real split site whose earlier record carries a common ALT, e.g.

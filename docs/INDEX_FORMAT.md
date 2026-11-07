@@ -453,7 +453,11 @@ it: `index-genome` with the search's PAM file (its N's are the guide length).
 Byte-identical means the same `.targets.txt` bytes, row order included; tested on
 the repo's fixtures and on indexes built by the 2.9.1 binary (section 11).
 Users' existing indexes keep working unchanged. They keep missing the sites of
-B2-B4 until rebuilt; B1 corrects their index-0 rows at once.
+B2-B4 until rebuilt; B1 corrects their index-0 rows at once. The two older engines'
+cells for a format-2 index were tested with the build of `feat/engine-boundaries`, and
+again on indexes 2.10.0 built (hg38 chr22 NGG, and the NRG index of an enriched chr22,
+all of whose files are flagged for `Q`): the same refusal and the same abort (SIGABRT),
+an empty targets file each.
 
 A format-2 index of a genome holds every site the format-1 index of the same genome
 and parameters holds, with the same string, flank and coordinates, plus the boundary
@@ -627,9 +631,9 @@ of `a5379e0`:
      2.9.1 rule on one 2.10.0 built would pass a lost `.bin` off as an empty result.
    * **What the wrong rule does.** Measured with `crispritz_bins` of `a5379e0` on a
      synthetic boundary genome (885 contigs; NGG `-bMax 2` indexes built by 2.9.1 and
-     by this branch with `crispritz.py index-genome`), and with a section-3 rule
-     written from section 3.1 put in place of `holds_target` (its site count equals
-     the format-2 leaf count on all 885 contigs):
+     by `feat/engine-boundaries`, before `Q`, with `crispritz.py index-genome`), and
+     with a section-3 rule written from section 3.1 put in place of `holds_target` (its
+     site count equals the format-2 leaf count on all 885 contigs):
      - The 2.9.1 rule on a format-2 index raises no false report: format 2 holds every
        2.9.1 site (on every contig the format-2 leaf count is at least the format-1
        one, which `count_targets` gives exactly). But it misses lost `.bin` files.
@@ -716,13 +720,15 @@ more than 100 reported windows holding one), and it reads `Q` as any base.
 
 ## 10. Cost (measured)
 
-Measured with the build of `feat/engine-boundaries` (`c286bf8`), before `Q`: 2.10.0 writes
-the same bytes for a genome of bases, IUPAC codes and `N`, as hg38's chromosomes are
-(sections 3.1 and 4.1), so the reference-genome numbers stand for it.
+Measured with the `buildTST` of `feat/engine-boundaries` before `Q` (its sources are the
+same from `f36293f` to `c286bf8`): 2.10.0 writes the same bytes for a genome of bases, IUPAC
+codes and `N`, as hg38's chromosomes are (sections 3.1 and 4.1; rebuilt on amd64, the `.bin`
+files of 2.10.0 and `c286bf8` are byte-identical for chr22 NGG and K=8 and chr1 NGG), so
+the reference-genome numbers stand for it.
 
 `crispritz.py index-genome <name> <dir with one chromosome> <PAM file> -bMax 2 -th 8`, hg38
 chromosome FASTA (chr22 md5 319cba9f..., chr1 md5 9465e0f0...), CRISPRitz 2.9.1 (the
-shipped binaries, md5-identical to a compile of tag v2.9.1) against this branch, each
+shipped binaries, md5-identical to a compile of tag v2.9.1) against that build, each
 timed by a wrapper that records wall time, user CPU and the child's peak RSS. arm64:
 Docker on Apple Silicon (24 CPUs, g++ 14.2 -O3), two rounds alternating the versions.
 
@@ -863,7 +869,13 @@ compared for both versions; the other sizes agree to the byte).
    its shadow memory).
 7. **Platforms**: arm64 (Docker on Apple Silicon: g++ 14.2, and `make -f
    Makefile_conda` in `gcc:12`) and amd64 (ml008, g++ 14.2); every test passes on each.
-8. **hg38**: see section 10 for build cost and leaf-level comparison, and:
+8. **hg38**: see section 10 for build cost and leaf-level comparison, and the runs below,
+   made like section 10's with builds of `feat/engine-boundaries` before `Q` (the engine
+   called 2.10.0 in them). Rerun on amd64 with 2.10.0 (chr22, the 50 guides, the NGG
+   `-bMax 2` indexes): it builds `c286bf8`'s format-2 `.bin` files byte for byte, and its
+   rows are 2.9.1's on the format-1 index (5,232,494) and `c286bf8`'s on the format-2 index
+   (5,234,321: the format-1 rows and 1,827 more), byte for byte, and without bulges
+   `searchBruteForce`'s (32,150).
    * the shipped format-1 `NGG_3_hg38` (all 455 contigs, 501 trees, not rebuilt),
      searched with the guides of the 11 contigs that open with a reverse NGG
      (`-mm 0 -bDNA 1 -bRNA 1`, 32 threads): 63,095 rows from both engines; the 11
@@ -896,9 +908,9 @@ compared for both versions; the other sizes agree to the byte).
      the format-1 index 81.5 / 87.4 / 80.7, 2.10.0 on it 70.3 / 82.9 / 78.5 (output
      byte-identical each round), 2.10.0 on the format-2 index 79.6 / 81.3 / 80.3.
    * guide length (section 5.1), chr22, the format-2 NGG `-bMax 2` index (20-nt), the
-     same 50 guides, `-mm 4 -bDNA 1 -bRNA 1`, amd64, this branch against its state
-     before the guide-length fix (`546333f`; the two `buildTST`s build byte-identical
-     `.bin` files):
+     same 50 guides, `-mm 4 -bDNA 1 -bRNA 1`, amd64, `feat/engine-boundaries` with the
+     guide-length fix (`91af82e`) against its state before it (`546333f`; the two
+     `buildTST`s build byte-identical `.bin` files):
      - 20-nt guides: byte-identical output (5,234,321 rows);
      - 21-nt guides (an `A` added at the far end): 3,264,009 rows; `546333f` reported
        1,102 more, and those are exactly its rows that are not chr22's bases at their
