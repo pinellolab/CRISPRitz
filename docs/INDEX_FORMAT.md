@@ -867,8 +867,10 @@ compared for both versions; the other sizes agree to the byte).
 6. **AddressSanitizer**: all three binaries, over every test above, on arm64 and amd64
    (the short-contig test without its `ulimit -v` cap, under which ASan cannot reserve
    its shadow memory).
-7. **Platforms**: arm64 (Docker on Apple Silicon: g++ 14.2, and `make -f
-   Makefile_conda` in `gcc:12`) and amd64 (ml008, g++ 14.2); every test passes on each.
+7. **Platforms**: arm64 (Docker on Apple Silicon: Ubuntu 24.04 with g++ 13.3, as CI sets
+   it up; the CRISPRme 2.8.1 image, g++ 14.2; and `gcc:12`, g++ 12.5, where `make -f
+   Makefile_conda` builds the engine too) and amd64 (ml008, the CRISPRme 2.8.1 image, g++
+   14.2); every test of items 1-5 passes on each.
 8. **hg38**: see section 10 for build cost and leaf-level comparison, and the runs below,
    made like section 10's with builds of `feat/engine-boundaries` before `Q` (the engine
    called 2.10.0 in them). Rerun on amd64 with 2.10.0 (chr22, the 50 guides, the NGG
