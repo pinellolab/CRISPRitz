@@ -133,7 +133,8 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   AF are the more frequent record's, and a merged entry's genotypes use `1` for its ALT (a
   record listing several ALTs is renumbered so). 362 such alleles genome-wide in the
   published panels; on HPRC chr22 the merge puts two ALTs on one haplotype slot for 37
-  sample-positions, which CRISPRme takes as PUTATIVE.
+  sample-positions, which CRISPRme must take as PUTATIVE (owner decision B4; no CRISPRme
+  release does so yet, see below).
 - **A reference `N` stays `N`**: the enriched genome holds an `N` exactly where the
   reference does. A record listing two or three ALTs at a reference `N` (`N>A,C`) was coded
   over it (`M`), making a gap searchable, and merging split records (see Fixed) would have

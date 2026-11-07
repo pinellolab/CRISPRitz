@@ -156,8 +156,9 @@ chr22 of HGDP + 1000 Genomes (section 4). The enricher neither resolves nor drop
 conflict (unit test `test_dict_passes_conflicting_phase_through`, `verify_enricher.sh` case
 30); whatever builds haplotypes from the dictionary has to. For CRISPRme see section 6.3.
 Merging the carriers of an allele on two records can make such conflicts too (on HPRC
-chr22, 37 sample-positions at 38,152,965; section 7, decision 2): CRISPRme resolves them
-with the same rule (owner decision: two ALTs on one haplotype slot are PUTATIVE).
+chr22, 37 sample-positions at 38,152,965; section 7, decision 2): CRISPRme must resolve them
+by the same rule as the others (owner decision B4, section 7: two ALTs on one haplotype
+slot are PUTATIVE), which no CRISPRme release applies yet (section 6.3).
 
 ### 2.4 The indel log and the fake-indel genome
 
@@ -659,20 +660,21 @@ Taken for CRISPRitz 2.10.0 and CRISPRme 2.9.0 (CRISPRme plan, section 3, B1-B4):
    carrier of C only. Such conflicts follow decision 4.
 3. **Records listing several ALTs are left to CRISPRme** (B3): their entries keep their
    multi-index genotypes (`1|2`), which the registry's `alt_index="1"` and the legacy
-   haplotype test mishandle (6.2, 6.3); every CRISPRme reader learns to handle them (store
-   the ALT index per allele) rather than CRISPRitz normalising them, so its output for such
-   inputs stays stable. Only an entry merged from two records (decision 2) is in split form.
-4. **Two ALTs on one haplotype slot are PUTATIVE** (B4), resolved in CRISPRme (6.3), which
-   has the window and every ALT's carriers in hand: the enricher passes them through
-   verbatim (independently phased split records: 672 sample-positions on HGDP + 1000
-   Genomes chr22, none on HPRC chr22), and merging an allele's carriers makes some (decision
-   2: 37 on HPRC chr22). Rejected: writing such a sample's genotypes unphased in the
-   enricher (it rewrites genotypes the VCF states and still needs the PUTATIVE fix of 6.3),
-   and re-phasing each multi-allelic site jointly upstream (a re-phased panel). On the
-   CRISPRme side the phase label is per haplotype set, so a set a downgraded sample shares
-   turns PUTATIVE for all its carriers (6.3: {G} at chr22:10,661,629, 2,126 carriers,
-   through one sample); a phase state per carrier would keep theirs CONFIRMED, at the cost of
-   a report format change.
+   haplotype test mishandle (6.2, 6.3); every CRISPRme reader is to learn to handle them
+   (store the ALT index per allele) rather than CRISPRitz normalising them, so its output
+   for such inputs stays stable. Only an entry merged from two records (decision 2) is in
+   split form.
+4. **Two ALTs on one haplotype slot are PUTATIVE** (B4), to be resolved in CRISPRme (6.3; no
+   CRISPRme release does so yet), which has the window and every ALT's carriers in hand: the
+   enricher passes them through verbatim (independently phased split records: 672
+   sample-positions on HGDP + 1000 Genomes chr22, none on HPRC chr22), and merging an
+   allele's carriers makes some (decision 2: 37 on HPRC chr22). Rejected: writing such a
+   sample's genotypes unphased in the enricher (it rewrites genotypes the VCF states and
+   still needs the PUTATIVE fix of 6.3), and re-phasing each multi-allelic site jointly
+   upstream (a re-phased panel). On the CRISPRme side the phase label is per haplotype set,
+   so a set a downgraded sample shares turns PUTATIVE for all its carriers (6.3: {G} at
+   chr22:10,661,629, 2,126 carriers, through one sample); a phase state per carrier would
+   keep theirs CONFIRMED, at the cost of a report format change.
 
 ## 8. Published indexes and stores to rebuild
 
