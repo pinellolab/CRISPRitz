@@ -1,11 +1,11 @@
 # CRISPRitz index format and target windows (format 2, CRISPRitz 2.10.0)
 
-This document specifies what a CRISPRitz TST index holds, how it is laid out on
-disk, and how the search reads it. It covers the boundary/window fixes of CRISPRitz
-2.10.0 (audit ids IDX-13, IDX-14, IDX-15 and IDX-4), the index-format version stamp
-(B5) that those fixes need, because two of them change what an index holds, and Q,
-the fifth symbol of a SNP position whose reference base and ALTs cover all four bases
-(section 4.1).
+This document specifies what a CRISPRitz TST index holds, how it is laid out on disk,
+and how the search reads it. It covers the boundary/window fixes of CRISPRitz 2.10.0
+(audit ids IDX-13, IDX-14, IDX-15 and IDX-4), the index-format version stamp (B5) that
+those fixes need, because two of them change what an index holds, and Q, the fifth
+symbol, of a SNP position whose ALTs, with its reference base when that is A, C, G or T,
+cover all four bases (section 4.1).
 
 Status: implemented (branches `feat/engine-boundaries` and `feat/multiallelic-enrich`,
 merged into CRISPRitz 2.10.0, which adds Q). Section 10 holds the measurements;
@@ -15,7 +15,7 @@ section 11 the tests.
 |----|-------|--------------------------|-----|-----------------|
 | B1 | IDX-14 | a leaf with index 0 is built as a minus-strand window (3' PAM) but read as plus strand, so a reverse-strand PAM at a contig's first base is reported on the + strand at base `max_bulges` | search side: read index 0 as PAM-left for a 3' PAM; drop the index-0 leaf the builder made from a plus-strand window | no (works on format-1 indexes) |
 | B2 | IDX-15 | a PAM that ends on a contig's last base is never found, by any index or by the brute-force scan | scan bound `nt <= len - pam_limit` on both PAM sides, in `buildTST` and `searchBruteForce` | for indexes yes; brute force no |
-| B3 | IDX-13 | a site whose guide lies within `max_bulges` nt of a contig start/end or an N run is dropped, even a perfect match: the whole pad+guide+PAM window must fit and be free of N | emit a site when its guide+PAM core fits; store the pad positions that are off the contig or on an N as non-consumable | yes (format 2) |
+| B3 | IDX-13 | a site whose guide's far end lies within `max_bulges` nt of a contig start/end or an N run is dropped, even a perfect match: the whole pad+guide+PAM window must fit and be free of N | emit a site when its guide+PAM core fits; store the pad positions that are off the contig or on an N as non-consumable | yes (format 2) |
 | B4 | IDX-4 | `--prune-pam` with flank `K` wider than the PAM `L` loses + strand PAMs with 1..K-L bases to the contig end and - strand PAMs 0..K-L-1 from the start, and reports a - strand PAM exactly K-L from the start on the + strand | store a PAM-less window whose distal flank runs off the contig (flank bases there stored as N); store the window start as a signed coordinate with the strand in its own bit | yes (format 2) |
 | B5 | - | an index does not say what it holds | a header with a magic number, a format version and the build parameters; old indexes keep loading and searching as with 2.9.1 | - |
 
@@ -91,8 +91,8 @@ Defects of format 1 and its builder:
   strand PAM exactly `K-L` from the start lands there too. A window of the other
   shape that starts at 0 -- for a 3' PAM a PAM-right one (a + strand site whose guide
   starts at exactly `mb`), for a 5' PAM a PAM-left one (a + strand PAM at base 0) --
-  is built as the shape index 0 is read as, from the wrong bases: its real site is
-  lost, and the stored artefact can surface as a match whose PAM is not there.
+  is built as the shape the builder gives index 0, from the wrong bases: its real site
+  is lost, and the stored artefact can surface as a match whose PAM is not there.
 * **The scan stops one short (B2, IDX-15).** `pamGenerator.cpp:344` and
   `pam_searching.cpp:570` scan `nt < len - pam_limit`, so a PAM on the last
   `pam_limit` bases is never found. The 5' branches bound on `- pam_len`
@@ -102,8 +102,9 @@ Defects of format 1 and its builder:
   is kept only if `ws >= 0` and a PAM-left one only if `ws + G + K + mb <= len`
   (`pamGenerator.cpp:371`, `:378`, `:414`, `:421`), and `guideRegionHasN`
   (`mainParallel.cpp:68`) discards a window with an N anywhere outside its PAM, pad
-  included. A 0-bulge alignment needs none of the pad, so sites within `mb` nt of a
-  contig end or an N run are lost, and an index with a larger `mb` loses more.
+  included. A 0-bulge alignment needs none of the pad, so sites whose guide's far end
+  lies within `mb` nt of a contig end or an N run are lost, and an index with a larger
+  `mb` loses more.
 * **The flank must fit (B4, IDX-4).** For a PAM-less index the flank is `K` wide but
   a `--prune-pam` search constrains only its `L` proximal bases; the window still
   has to fit, so PAMs within `K-L` nt of the end (+ strand) or the start (- strand)
@@ -130,14 +131,14 @@ Let `n` be the contig length. Positions outside `[0, n)` are **off the contig**.
 * In both cases a window whose **guide region** holds an N is discarded, as in
   2.9.1: the tree has no symbol for N and the core is unusable.
 
-**N is a gap.** A genomic `N`, like a position off the contig, matches nothing: no
-guide base, no PAM letter (not even the search PAM's `N`), and it ends the pad. It is
-never "any base" and the enricher never writes one for a variant: it keeps the
-reference's `N` exactly, even where a VCF lists ALTs at one, and likewise a byte that is
-no base or IUPAC code (read as `N`, below). The base that matches
-everything is `Q` (section 4.1), the symbol of a position where the reference base and
-the SNP ALTs cover A, C, G and T: it counts as a base everywhere above (in the guide
-region, the pad and the flank), and a site, its pad and its PAM may hold it.
+**N is a gap.** A genomic `N`, like a position off the contig, matches nothing: no guide
+base, no PAM letter (not even the search PAM's `N`), and it ends the pad. It is never
+"any base" and the enricher never writes one for a variant: it keeps the reference's `N`
+exactly, even where a VCF lists ALTs at one, and likewise a byte that is no base or
+IUPAC code (read as `N`, below). The base that matches everything is `Q` (section 4.1),
+the symbol of a position whose SNP ALTs, with its reference base when that is A, C, G or
+T, cover all four bases: it counts as a base everywhere above (in the guide region, the
+pad and the flank), and a site, its pad and its PAM may hold it.
 
 A byte of the FASTA that is no base, IUPAC code, `N` or `Q` (such as the `X` RepeatMasker
 `-x` masks with, a `-` or a `.`) is read as `N`, by `buildTST` and `searchBruteForce` alike,
@@ -242,11 +243,11 @@ Notes:
 
 `add-variants` writes `Q` where a position's SNP ALTs, with its reference base when that
 is A, C, G or T, cover all four bases (docs/MULTIALLELIC_ENRICHMENT.md, sections 2.1 and
-2.2; a reference `N` stays `N`). The IUPAC letter of the four would be `N`, which section 3
-reads as a gap, so up to the four-base rule of the multi-allelic work such a position
-removed every target through it from the index.
-`buildTST`, `searchTST` and `searchBruteForce` read `Q` as the mask `1111`: it matches
-every guide base and every PAM letter, so it is never a mismatch.
+2.2; a reference `N` stays `N`). The IUPAC letter of the four would be `N`, which
+section 3 reads as a gap: up to 2.9.1 a record listing three SNP ALTs over an A, C, G or
+T base wrote it, removing every target through the position from the index. `buildTST`,
+`searchTST` and `searchBruteForce` read `Q` as the mask `1111`: it matches every guide
+base and every PAM letter, so it is never a mismatch.
 
 Every 4-bit slot of the tree already uses 15 of its 16 values: a root, lo or hi slot
 holds `0` (no kid) or one of the 14 IUPAC letters (1..14, the letter's A|C|G|T mask),
@@ -260,17 +261,18 @@ int32 leaf index). So `Q` takes the value its slot never uses:
 | a flank nibble (a leaf's stored PAM/flank) | `15` |
 
 Only a file whose header has the `FOUR_ALLELE` flag (bit 2) holds these values; the
-builder sets it on a `.bin` when one of its leaves stores `Q` in its guide region, its pad
-or its flank, and `Q` changes no byte of a `.bin` that does not hold it. A reader that
-knows bit 2 decodes the tree slot by slot (in such a file a `1111` high nibble is not
-always an end of string, and its byte's low nibble is not always padding); a reader that
-does not refuses the file by section 5's rule on reserved bits (the format-2 reader of
-`feat/engine-boundaries`, before `Q`, prints `has a malformed index header (version 2,
-flags 4, ...)`), and CRISPRitz 2.9.1 and earlier refuse every format-2 file. `buildTST`
-prints on stdout how many targets hold `Q` and how many files it flagged (`FOUR-ALLELE
-(Q): ...`), `searchTST` how many of the files it reads are flagged (`INDEX FORMAT: 2 x42
-(40 holding Q, the four-allele symbol)`), and `crispritz.py index-info` reports
-`four_allele` for each file (section 7).
+builder sets it on a `.bin` when one of its leaves stores `Q` in its guide region, its
+pad or its flank, and `Q` changes no byte of a `.bin` that does not hold it. A reader
+that knows bit 2 decodes the tree slot by slot (in such a file a `1111` high nibble is
+not always an end of string, and its byte's low nibble is not always padding); a reader
+that does not refuses the file by section 5's rule on reserved bits (the format-2 reader
+of `feat/engine-boundaries`, before `Q`, prints
+`has a malformed index header (version 2, flags 4, ...)`), and CRISPRitz 2.9.1 refuses
+every format-2 file, on which earlier versions abort (section 6). `buildTST` prints on
+stdout how many targets hold `Q` and how many files it flagged (`FOUR-ALLELE (Q): ...`),
+`searchTST` how many of the files it reads are flagged
+(`INDEX FORMAT: 2 x42 (40 holding Q, the four-allele symbol)`), and
+`crispritz.py index-info` reports `four_allele` for each format-2 file (section 7).
 
 A reference FASTA must not hold `Q`: `add-variants` refuses one, in a chromosome it
 enriches and in one it copies (`ERROR: <chr> holds 'Q' at <pos>: ...`). `buildTST` cannot
@@ -309,8 +311,8 @@ count: as it loads the file):
   a tree of 118,883,584 leaves and the search failed after 22.5 s);
 * and, depending on the search: a search PAM that does not fit the stored PAM width
   (the file name's PAM prefix; for format 2 also `pam_len`): it must be as wide, or
-  under `--prune-pam` a narrower 3' PAM, N-padded to it (section 12); or a PAM side
-  (3'/5') other than the search PAM's.
+  under `--prune-pam` a narrower 3' PAM, N-padded to it (section 12); or, in format 2, a
+  PAM side (3'/5') other than the search PAM's.
 
 `crispritz.py index-info` makes every one of these checks that does not depend on the
 search (section 7). Loading a file, the search also refuses a node count below 1, and
@@ -337,7 +339,7 @@ at most 1 (an index built for 21-nt guides with max_bulges 2 allows 2). See
 docs/INDEX_FORMAT.md, section 5.1.
 ```
 
-Section 5.1 gives the rules and how the rows differ from those of an index built for
+Section 5.1 gives the rules and how the rows can differ from those of an index built for
 `Gs`.
 
 Per leaf the search derives `PAM_LEFT`, `ws`, `pad_valid` and `FLANK_OFF`:
@@ -393,8 +395,8 @@ NNNN index (section 8). The rules, for both formats:
 The rows are therefore exact for what the index holds, and on a format-2 index a
 0-bulge search with a longer guide (`G < Gs <= G + mb`) returns what
 `searchBruteForce` returns (the boundary suite checks both). But they can differ from
-the rows of an index built for `Gs`: not without bulges when `Gs > G`, but with
-bulges, and for a shorter guide at contig ends and N runs. Measured with
+the rows of an index built for `Gs`: not without bulges when `G < Gs <= G + mb`, but
+with bulges, and for a shorter guide at contig ends and N runs. Measured with
 `crispritz.py` on the boundary suite's genome (`test/boundary/make_genome.py`, 346
 contigs a PAM side), rows only in one of the two:
 
@@ -460,13 +462,14 @@ all of whose files are flagged for `Q`): the same refusal and the same abort (SI
 an empty targets file each.
 
 A format-2 index of a genome holds every site the format-1 index of the same genome
-and parameters holds, with the same string, flank and coordinates, plus the boundary
+and parameters holds (but for a window the 2.9.1 builder stored at index 0 from the
+wrong bases, B1), with the same string, flank and coordinates, plus the boundary
 sites (measured on hg38 chr22 and chr1, section 10), when every byte of the genome is
 a base, an IUPAC code or N: a 2.9.1 window holding another byte is now discarded or
 has a shorter pad, and 2.9.1 read every PAM after such a byte one base off (section
 3.1). A 2.10.0 search on it returns every row a 2.10.0 search on the format-1 index
-returns, plus rows at sites whose guide lies within `mb` nt of a contig end or an N
-run (B3, including a + strand 3' site whose guide starts at exactly `mb`), whose PAM
+returns, plus rows at sites whose guide's far end lies within `mb` nt of a contig end or
+an N run (B3, including a + strand 3' site whose guide starts at exactly `mb`), whose PAM
 lies within `K - L` nt of a contig end under `--prune-pam` (B4), or whose PAM ends on
 a contig's last base (B2).
 
@@ -670,7 +673,7 @@ of `a5379e0`:
    length, contig ends included; and of two indexes built for the same `G`, the one
    with the larger `mb` returns a superset of the other's rows. Neither holds across
    guide lengths: the rows of an index built for 20-nt guides, searched with 21-nt
-   guides, are not those of an index built for 21-nt guides once bulges are searched
+   guides, need not be those of an index built for 21-nt guides once bulges are searched
    (section 5.1). Neither holds for format-1 indexes either (the audit's counts for
    hg38 stand for them).
 7. **Guide-length pairing.** `_resolve_index_dir`
@@ -683,7 +686,7 @@ of `a5379e0`:
    (`23bp-TTTN-Cas12a.txt` by a 20-nt TTTN or NNNN one). The engine handles the
    difference (every row is a real
    target and, for a longer guide without bulges, the rows equal the brute force), but
-   with bulges the rows are those of a 20-nt index, which section 5.1 shows differ
+   with bulges the rows are those of a 20-nt index, which section 5.1 shows can differ
    from a 21- or 23-nt index's, at interior sites too, and a shorter guide misses
    targets at contig ends and N runs. CRISPRme must pair the guide length as well:
    read `guide_len` from one `.bin` (section 7; `crispritz.py index-info`) and prefer
@@ -693,20 +696,20 @@ of `a5379e0`:
    index was built for <G>-nt guides ...` line (section 5) marks a run where it was
    not.
 8. **The four-allele symbol Q** (section 4.1). A genome enriched by CRISPRitz 2.10.0
-   holds `Q` where a SNP position's reference base and ALTs cover all four bases, and so
-   do the targets a search reports there (in the DNA column, and in a PAM). Every reader
-   of an enriched genome, a fake-indel genome overlaid from it, or a target must read `Q`
-   as any base, `{A, C, G, T}`, and never as `N` (a gap, which matches nothing): the
-   IUPAC tables of CRISPRme 2.8.1 have no `Q` (`pam_filter._IUPAC`/`_TARGET_IUPAC`,
-   `overlay_indel_snps._IUPAC_AMBIG`,
+   holds `Q` where a SNP position's ALTs, with its reference base when that is A, C, G
+   or T, cover all four bases, and so do the targets a search reports there (in the DNA
+   column, and in a PAM). Every reader of an enriched genome, a fake-indel genome
+   overlaid from it, or a target must read `Q` as any base, `{A, C, G, T}`, and never as
+   `N` (a gap, which matches nothing): the IUPAC tables of CRISPRme 2.8.1 have no `Q`
+   (`pam_filter._IUPAC`/`_TARGET_IUPAC`, `overlay_indel_snps._IUPAC_AMBIG`,
    `new_simple_analysis.iupac_code`/`iupac_code_set`/`iupac_nucleotides`,
    `analisi_indels_NNN.iupac_code`, `twopass_find.IUPAC_TO_SET`, among the ~20 modules
-   that decode IUPAC letters; docs/MULTIALLELIC_ENRICHMENT.md sections 6.3 and 6.4 say what
-   the SNP path and the overlay lose without it), and `crispritz_bins`' site rule must
-   count `Q` as a base, which matches every PAM letter. A header flag says which `.bin`
-   files hold `Q` (`FOUR_ALLELE`, bit 2; `index-info`'s `four_allele`), and a format-2
-   reader must accept that bit. The dictionaries list every ALT of such a position, each in
-   its own entry (docs/MULTIALLELIC_ENRICHMENT.md, section 2.3).
+   that decode IUPAC letters; docs/MULTIALLELIC_ENRICHMENT.md sections 6.3 and 6.4 say
+   what the SNP path and the overlay lose without it), and `crispritz_bins`' site rule
+   must count `Q` as a base, which matches every PAM letter. A header flag says which
+   `.bin` files hold `Q` (`FOUR_ALLELE`, bit 2; `index-info`'s `four_allele`), and a
+   format-2 reader must accept that bit. The dictionaries list every SNP ALT of such a
+   position, each in its own entry (docs/MULTIALLELIC_ENRICHMENT.md, section 2.3).
 
 ## 9. searchBruteForce
 
@@ -864,9 +867,10 @@ compared for both versions; the other sizes agree to the byte).
    boundary site).
    `run_short_contig_test.sh` now also requires a contig exactly one target long to
    be indexed.
-6. **AddressSanitizer**: all three binaries, over every test above, on arm64 and amd64
-   (the short-contig test without its `ulimit -v` cap, under which ASan cannot reserve
-   its shadow memory).
+6. **AddressSanitizer**: all three binaries, over the tests of items 1-4 (the boundary
+   suite with its quick matrix, `QUICK=1`: 72 searches) and `run_minimal_test.sh` (WTN,
+   a DNA bulge) and `run_short_contig_test.sh` of item 5 (without its `ulimit -v` cap,
+   under which ASan cannot reserve its shadow memory), on arm64 and amd64.
 7. **Platforms**: arm64 (Docker on Apple Silicon: Ubuntu 24.04 with g++ 13.3, as CI sets
    it up; the CRISPRme 2.8.1 image, g++ 14.2; and `gcc:12`, g++ 12.5, where `make -f
    Makefile_conda` builds the engine too) and amd64 (ml008, the CRISPRme 2.8.1 image, g++
@@ -931,7 +935,7 @@ compared for both versions; the other sizes agree to the byte).
   that would not reach the N.
 * An index still holds the sites of its own guide length `G` only, so a search guide
   shorter than `G` does not find a target whose far end lies within `G - Gs` nt of a
-  contig end or an N run, and one of another length gets, with bulges, rows that
+  contig end or an N run, and one of another length gets, with bulges, rows that can
   differ from those of an index built for its length (section 5.1). Making an index
   serve every guide length alike would mean storing every PAM whatever its guide
   region holds, with a per-leaf count of usable bases wider than `pad_valid`'s 5
