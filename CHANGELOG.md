@@ -33,7 +33,7 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   2.2). In the tree `Q` takes the value its slot never uses (`1111` in a root, lo or hi slot,
   `0000` in an eq slot, where `1111` ends a string) and in a flank `1111`; an index file
   holding it is flagged in its header (bit 2, `FOUR_ALLELE`), so an engine that cannot read
-  it refuses it, and a file without it is written byte for byte as before. `buildTST` says
+  it refuses it, and `Q` changes no byte of a file that does not hold it. `buildTST` says
   on stdout how many targets and files hold `Q`, `searchTST` how many of the files it reads
   are flagged, and `index-info` reports `four_allele` per file. On HGDP + 1000 Genomes
   chr22, 2,448 positions carry three SNP ALTs.

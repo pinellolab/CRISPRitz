@@ -162,8 +162,8 @@ pad. Pad positions from `pad_valid` on are stored
 in the tree as `A`: no reported alignment can depend on them (an alignment reaching
 them is rejected by the `pad_valid` test at leaf emission), so any symbol serves, and
 the 14 nibble values of the tree's alphabet stay as they are. For every site of 2.9.1
-(window inside the contig, no N outside the PAM), `pad_valid = mb` and the stored
-string is unchanged.
+(window inside the contig, no N outside the PAM) whose window holds no other byte that
+section 3.1 reads as N, `pad_valid = mb` and the stored string is unchanged.
 
 So every base a reported alignment consumes is a base of the contig and not an N:
 the guide region's `G` by the site rule, the pad's by this test. Every reported
@@ -225,11 +225,13 @@ Notes:
 
 * The per-leaf record is the same size as in format 1 (the `lflags` byte takes the
   place of the `'0'`/`'_'` marker), so a format-2 index differs in size from a
-  format-1 index of the same genome only by the sites B2/B3/B4 add and 32 + K bytes
-  of header and trailer per `.bin` (section 10 has the measurement).
+  format-1 index of the same genome (one of bases, IUPAC codes and N, section 3.1)
+  only by the sites B2/B3/B4 add and 32 + K bytes of header and trailer per `.bin`
+  (section 10 has the measurement).
 * The tree serialization, the sort and the leaf chains are unchanged. A contig with
-  no boundary site therefore has the same tree as in 2.9.1 and every search over it
-  returns the same rows in the same order.
+  no boundary site, every byte of which is a base, an IUPAC code or N (section 3.1),
+  therefore has the same tree as in 2.9.1 and every search over it returns the same
+  rows in the same order.
 * `mb` is capped at 31 by the 5-bit `pad_valid`; `buildTST` refuses a larger
   `-bMax` with an error. (The search's guide buffers are 100 characters, so such
   values never worked in practice.)
@@ -258,17 +260,17 @@ int32 leaf index). So `Q` takes the value its slot never uses:
 | a flank nibble (a leaf's stored PAM/flank) | `15` |
 
 Only a file whose header has the `FOUR_ALLELE` flag (bit 2) holds these values; the
-builder sets it on a `.bin` when one of its leaves stores `Q` in its guide region, its
-pad or its flank, and a `.bin` without `Q` is written byte for byte as without the fifth
-symbol. A reader that knows bit 2 decodes the tree slot by slot (in such a file a `1111`
-high nibble is not always an end of string, and its byte's low nibble is not always
-padding); a reader that does not refuses the file by section 5's rule on reserved bits
-(the format-2 reader of `feat/engine-boundaries`, before `Q`, prints `has a malformed
-index header (version 2, flags 4, ...)`), and CRISPRitz 2.9.1 and earlier refuse every
-format-2 file. `buildTST` prints on stdout how many targets hold `Q` and how many files it
-flagged (`FOUR-ALLELE (Q): ...`), `searchTST` how many of the files it reads are flagged
-(`INDEX FORMAT: 2 x42 (40 holding Q, the four-allele symbol)`), and `crispritz.py
-index-info` reports `four_allele` for each file (section 7).
+builder sets it on a `.bin` when one of its leaves stores `Q` in its guide region, its pad
+or its flank, and `Q` changes no byte of a `.bin` that does not hold it. A reader that
+knows bit 2 decodes the tree slot by slot (in such a file a `1111` high nibble is not
+always an end of string, and its byte's low nibble is not always padding); a reader that
+does not refuses the file by section 5's rule on reserved bits (the format-2 reader of
+`feat/engine-boundaries`, before `Q`, prints `has a malformed index header (version 2,
+flags 4, ...)`), and CRISPRitz 2.9.1 and earlier refuse every format-2 file. `buildTST`
+prints on stdout how many targets hold `Q` and how many files it flagged (`FOUR-ALLELE
+(Q): ...`), `searchTST` how many of the files it reads are flagged (`INDEX FORMAT: 2 x42
+(40 holding Q, the four-allele symbol)`), and `crispritz.py index-info` reports
+`four_allele` for each file (section 7).
 
 A reference FASTA must not hold `Q`: `add-variants` refuses one, in a chromosome it
 enriches and in one it copies (`ERROR: <chr> holds 'Q' at <pos>: ...`). `buildTST` cannot
@@ -453,13 +455,16 @@ the repo's fixtures and on indexes built by the 2.9.1 binary (section 11).
 Users' existing indexes keep working unchanged. They keep missing the sites of
 B2-B4 until rebuilt; B1 corrects their index-0 rows at once.
 
-A format-2 index of a genome holds every site the format-1 index of the same
-genome and parameters holds, with the same string, flank and coordinates, plus the
-boundary sites (measured on hg38 chr22 and chr1, section 10). A 2.10.0 search on it
-returns every row a 2.10.0 search on the format-1 index returns, plus rows at sites
-whose guide lies within `mb` nt of a contig end or an N run (B3, including a + strand
-3' site whose guide starts at exactly `mb`), whose PAM lies within `K - L` nt of a
-contig end under `--prune-pam` (B4), or whose PAM ends on a contig's last base (B2).
+A format-2 index of a genome holds every site the format-1 index of the same genome
+and parameters holds, with the same string, flank and coordinates, plus the boundary
+sites (measured on hg38 chr22 and chr1, section 10), when every byte of the genome is
+a base, an IUPAC code or N: a 2.9.1 window holding another byte is now discarded or
+has a shorter pad, and 2.9.1 read every PAM after such a byte one base off (section
+3.1). A 2.10.0 search on it returns every row a 2.10.0 search on the format-1 index
+returns, plus rows at sites whose guide lies within `mb` nt of a contig end or an N
+run (B3, including a + strand 3' site whose guide starts at exactly `mb`), whose PAM
+lies within `K - L` nt of a contig end under `--prune-pam` (B4), or whose PAM ends on
+a contig's last base (B2).
 
 ## 7. Reading the stamp without loading the tree
 
