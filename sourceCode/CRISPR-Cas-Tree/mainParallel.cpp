@@ -12,6 +12,7 @@
 //#include <algorithm>
 #include <unistd.h>
 #include <thread>
+#include <cstring>
 
 /***************************************
  * -18/02/2020
@@ -143,6 +144,14 @@ string complementSeq(const string &target)
 			break;
 		}
 	return tmp;
+}
+
+//Whether a byte of the upper-cased FASTA is a symbol the index stores: A/C/G/T, the IUPAC
+//codes, N (a gap) and Q (all four bases, include/indexFormat.h). main() reads any other
+//byte as N.
+bool genomeSymbol(char c)
+{
+	return c != 0 && strchr("ACGTRYSWKMBDHVNQ", c) != NULL;
 }
 
 //Applies the format-2 rules to a leaf whose guideDNA (the TST string: the guide read
@@ -644,8 +653,24 @@ int main(int argc, char **argv)
 		chrSeq += line;
 	}
 	__gnu_parallel::transform(chrSeq.begin(), chrSeq.end(), chrSeq.begin(), ::toupper); // parallelized to uppercase
+	// a byte that is no base, IUPAC code, N or Q (such as the X of RepeatMasker -x) is a
+	// gap, as the PAM scan reads it: it becomes an N, so a site holding one in its guide
+	// region is discarded, a pad ends at it and a flank stores it as 0000. Up to 2.9.1 it
+	// was stored in the tree as the nibble 0 (and reported on stderr), which the search
+	// reads as an empty slot, losing the sites after it, and which in an eq slot of a
+	// file holding Q stands for Q
+	long other_bytes = 0;
+	for (size_t k = 0; k < chrSeq.size(); k++)
+		if (!genomeSymbol(chrSeq[k]))
+		{
+			chrSeq[k] = 'N';
+			other_bytes++;
+		}
 	end = omp_get_wtime();
 	cout << end - start << "\n";
+	if (other_bytes)
+		cout << "NOTE: " << other_bytes << " byte(s) of " << chrName << " are no base, IUPAC code, N or Q; "
+			 << "each is read as N, a gap (docs/INDEX_FORMAT.md section 3.1)\n";
 
 	// ------------------- GENERATE ALL POSSIBLE PAM -------------------
 	getline(pamfile, line);

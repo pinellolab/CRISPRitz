@@ -16,7 +16,9 @@ What counts as a target follows docs/INDEX_FORMAT.md section 3 (index format 2):
   --prune-pam off a PAM-less index alike; without --prune-pam on a PAM-less (all-N)
   index of width K the K flank bases must lie inside the contig, whatever they hold;
 * the pad, the mb bases beyond the guide's far end, may only be consumed up to the
-  first base that is off the contig or N.
+  first base that is off the contig or N;
+* a byte of the FASTA that is no base, IUPAC code, N or Q (such as RepeatMasker's X) is
+  read as N.
 
 The guide region of a site is the index's: Gi bases, Gi = the guide length of the PAM
 file the index was built with. The search guide has Gs bases (its own PAM file's), and
@@ -73,7 +75,7 @@ def read_contigs(genome_dir):
         with open(os.path.join(genome_dir, name)) as fh:
             head = fh.readline().strip()[1:].split()[0]
             seq = "".join(line.strip() for line in fh).upper()
-        yield head, seq
+        yield head, "".join(c if c in BITS else "N" for c in seq)
 
 
 def pam_ok(bases, pattern):

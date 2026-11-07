@@ -33,9 +33,15 @@
 #                used to cost) reports no window with an N in its guide, as an index
 #                never holds one, though the genome holds NGG windows with exactly one
 #                N there (the planted guide with one N, on both strands).
-#   5. BYTES   : a genome byte that is no base, IUPAC code, N or Q is a gap too: the PAM
-#                scans of buildTST and searchBruteForce used to skip it, reading every
-#                later PAM one base off, so a perfect site after it was lost.
+#   5. BYTES   : a genome byte that is no base, IUPAC code, N or Q ('X', '.', '-') is
+#                read as N, a gap: a guide region holding one is no target, a pad ends at
+#                it, a PAM-less flank stores it as 0000, and buildTST writes nothing to
+#                stderr; on a contig holding such bytes and Q every search equals the
+#                oracle, every 0-bulge one searchBruteForce, and exactly the planted
+#                perfect sites are found. The PAM scans of buildTST and searchBruteForce
+#                used to skip such a byte, reading every later PAM one base off, and
+#                buildTST stored it in the tree (on stderr), whose reader then lost the
+#                sites after it, or, in a file holding Q, read it as Q.
 #
 # Any stage writing to stderr fails the test (stderr is fatal to a CRISPRme stage).
 #
@@ -161,9 +167,10 @@ printf 'NNNN%s\nNNNN%s\n' "${GUIDE}" "${GUIDE2}" > "${WORK}/guides5.txt"
 
 echo "########## 2. INDEX ##########"
 LIB="${WORK}/lib"; mkdir -p "${LIB}"
+GDIR="${GE}"  # the genome index() and search() build and search (step 5 sets another)
 idxdir() { ls -d "${LIB}/genome_library/"*"_$2_$1"; }  # <name> <mb>
-index() {  # <name> <pam> <mb>
-  ( cd "${LIB}" && "${PYTHON}" "${CZ}" index-genome "$1" "${GE}/" "${PAMS}/$2.txt" -bMax "$3" -th 1 \
+index() {  # <name> <pam> <mb> [<contigs flagged four_allele, at least>]
+  ( cd "${LIB}" && "${PYTHON}" "${CZ}" index-genome "$1" "${GDIR}/" "${PAMS}/$2.txt" -bMax "$3" -th 1 \
       > "${WORK}/$1.index.log" 2> "${WORK}/$1.index.err" ) || fail "index-genome $1: $(tail -3 "${WORK}/$1.index.err")"
   quiet "index-genome $1" "${WORK}/$1.index.log" "${WORK}/$1.index.err"
   grep -q "^FOUR-ALLELE (Q): [0-9]* target(s) hold Q" "${WORK}/$1.index.log" \
@@ -173,10 +180,11 @@ index() {  # <name> <pam> <mb>
   quiet "index-info $1" "${WORK}/$1.info.json" "${WORK}/$1.info.err"
   # a .bin is flagged exactly when one of its leaves stores Q: its guide region, the pad
   # bases before the first one off the contig or on an N, or its flank (the sites of
-  # docs/INDEX_FORMAT.md section 3.1, enumerated here from the FASTA)
-  "${PYTHON}" - "${WORK}/$1.info.json" "${GE}" "${PAMS}/$2.txt" "$3" <<'PY' || fail "index-info $1: the four-allele flags are wrong"
+  # docs/INDEX_FORMAT.md section 3.1, enumerated here from the FASTA, a byte that is no
+  # base, IUPAC code, N or Q read as N)
+  "${PYTHON}" - "${WORK}/$1.info.json" "${GDIR}" "${PAMS}/$2.txt" "$3" "${4:-20}" <<'PY' || fail "index-info $1: the four-allele flags are wrong"
 import json, os, sys
-info, genome, pam_file, mb = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
+info, genome, pam_file, mb, least = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]), int(sys.argv[5])
 BITS = {"A": 1, "C": 2, "G": 4, "T": 8, "R": 5, "Y": 10, "S": 6, "W": 9, "K": 12, "M": 3,
         "B": 14, "D": 13, "H": 11, "V": 7, "N": 15, "Q": 15}
 COMP = {"A": "T", "C": "G", "G": "C", "T": "A", "R": "Y", "Y": "R", "S": "S", "W": "W", "K": "M",
@@ -191,7 +199,7 @@ want = {}
 for name in os.listdir(genome):
     with open(os.path.join(genome, name)) as fh:
         chrom = fh.readline()[1:].split()[0]
-        seq = "".join(l.strip() for l in fh)
+        seq = "".join(c if c in BITS else "N" for c in "".join(l.strip() for l in fh))
     n, holds = len(seq), False
     for T in (seq, "".join(COMP[c] for c in reversed(seq))):
         at = lambda x: T[x] if 0 <= x < n else None
@@ -228,7 +236,7 @@ for name, f in files.items():
     got[chrom] = got.get(chrom, False) or f["four_allele"]
 bad = [c for c in got if got[c] != want[c]]
 assert not bad, [(c, got[c], want[c]) for c in bad]
-assert sum(got.values()) >= 20 and not got.get("chr4actlp", False) and not got.get("chr4aQnp", False), got
+assert sum(got.values()) >= least and not got.get("chr4actlp", False) and not got.get("chr4aQnp", False), got
 print("    %d contigs' .bin flagged four_allele, %d not, each as its leaves hold Q or not"
       % (sum(got.values()), len(got) - sum(got.values())))
 PY
@@ -259,12 +267,12 @@ search() {  # <index name> <index pam> <mb> <search pam> <prune 0|1> <mm> <bDNA>
   quiet "${tag}" "${WORK}/${tag}.log" "${WORK}/${tag}.err"
   grep -q "^INDEX FORMAT: 2 x[0-9]* ([0-9]* holding Q, the four-allele symbol)" "${WORK}/${tag}.log" \
     || fail "${tag}: searchTST did not report the files holding Q"
-  "${PYTHON}" "${SCRIPT_DIR}/boundary/oracle.py" --genome "${GE}" --guides "${WORK}/guides${side}.txt" \
+  "${PYTHON}" "${SCRIPT_DIR}/boundary/oracle.py" --genome "${GDIR}" --guides "${WORK}/guides${side}.txt" \
     --pam "${PAMS}/${spam}.txt" --index-pam "${PAMS}/${ipam}.txt" --mb "${mb}" \
     --mm "${mm}" --bdna "${bd}" --brna "${br}" ${oflag} > "${WORK}/${tag}.oracle"
   diff <(body "${WORK}/${tag}.targets.txt") "${WORK}/${tag}.oracle" > "${WORK}/${tag}.diff" \
     || { head -12 "${WORK}/${tag}.diff"; fail "${tag}: indexed search != oracle ($(grep -c '^<' "${WORK}/${tag}.diff" || true) extra, $(grep -c '^>' "${WORK}/${tag}.diff" || true) missing)"; }
-  "${PYTHON}" "${SCRIPT_DIR}/boundary/check_rows.py" "${GE}" "${WORK}/${tag}.targets.txt" > "${WORK}/${tag}.chk" \
+  "${PYTHON}" "${SCRIPT_DIR}/boundary/check_rows.py" "${GDIR}" "${WORK}/${tag}.targets.txt" > "${WORK}/${tag}.chk" \
     || { head -5 "${WORK}/${tag}.chk"; fail "${tag}: $(tail -1 "${WORK}/${tag}.chk")"; }
   [ "$(with_n "${WORK}/${tag}.targets.txt")" = 0 ] || fail "${tag}: $(with_n "${WORK}/${tag}.targets.txt") rows hold an N"
   local rows; rows="$(wc -l < "${WORK}/${tag}.oracle" | tr -d ' ')"
@@ -272,8 +280,8 @@ search() {  # <index name> <index pam> <mb> <search pam> <prune 0|1> <mm> <bDNA>
   n_cmp=$((n_cmp + 1)); n_rows=$((n_rows + rows))
   n_q_rows=$((n_q_rows + $(tail -n +2 "${WORK}/${tag}.targets.txt" | cut -f3 | grep -c Q || true)))
   if [ "${bd}" = 0 ] && [ "${br}" = 0 ]; then
-    # every target the brute-force scan finds on the enriched FASTA, searchTST finds
-    ( cd "${WORK}" && "${PYTHON}" "${CZ}" search "${GE}/" "${PAMS}/${spam}.txt" "${WORK}/guides${side}.txt" "${tag}.bf" \
+    # every target the brute-force scan finds on the FASTA, searchTST finds
+    ( cd "${WORK}" && "${PYTHON}" "${CZ}" search "${GDIR}/" "${PAMS}/${spam}.txt" "${WORK}/guides${side}.txt" "${tag}.bf" \
         -mm "${mm}" -th 1 -r > "${tag}.bf.log" 2> "${tag}.bf.err" ) || fail "${tag}: brute-force search failed"
     quiet "${tag}: brute force" "${WORK}/${tag}.bf.log" "${WORK}/${tag}.bf.err"
     diff <(body "${WORK}/${tag}.targets.txt") <(body "${WORK}/${tag}.bf.targets.txt") > "${WORK}/${tag}.bf.diff" \
@@ -353,31 +361,66 @@ rows="$(tail -n +2 "${WORK}/gaps.targets.txt" | wc -l | tr -d ' ')"
 echo "  ok: searchBruteForce at -mm 120: ${rows} rows, none with an N in its guide, of ${one_n} NGG windows with one there"
 
 echo "########## 5. OTHER BYTES in the genome ##########"
-# an 'X' amid A/T (no PAM within reach, so no stored window holds it), then a perfect site
-mkdir -p "${WORK}/gx"
-"${PYTHON}" - "${WORK}/gx/chrX1.fa" "${GUIDE}" <<'PY'
+# one contig: an 'X' amid A/T, out of reach of every NGG, then a perfect site; a guide region
+# holding an 'X' (+ strand) and one holding a '.' (- strand), each a perfect match were the
+# byte read as any base; perfect sites whose pad (-bMax 1) is an 'X' (+) or a '-' (-); and
+# a site with Q in its guide region, so that the contig's .bin is flagged four_allele, in
+# which the nibble 0 a stored byte got stands for Q. The PAM-less K=8 index holds such
+# bytes in its flanks too.
+GX="${WORK}/gx"; mkdir -p "${GX}"
+"${PYTHON}" - "${GX}/chrX1.fa" "${GUIDE}" "${WORK}/gx.sites" <<'PY'
 import random, sys
+fa, G, sites_path = sys.argv[1:]
 random.seed(3)
-seq = "".join(random.choice("ACGT") for _ in range(60)) + "AT" * 20 + "X" + "TA" * 20
-seq += "TTTTT" + sys.argv[2] + "TGG" + "".join(random.choice("ACGT") for _ in range(60))
-open(sys.argv[1], "w").write(">chrX1\n%s\n" % seq)
-print(seq.index(sys.argv[2]), file=open(sys.argv[1] + ".site", "w"))
+COMP = {"A": "T", "C": "G", "G": "C", "T": "A", "Q": "Q", "X": "X", ".": ".", "-": "-"}
+rc = lambda s: "".join(COMP[c] for c in reversed(s))
+bg = lambda n: "".join(random.choice("ACGT") for _ in range(n))
+seq = bg(60) + "AT" * 20 + "X" + "TA" * 20 + "TTTTT"
+sites = []  # the planted perfect sites: DNA, strand, Position
+def plant(text, dna=None, strand=None, at=0):
+    global seq
+    if dna:
+        sites.append((dna, strand, len(seq) + at))
+    seq += text + bg(30)
+plant(G + "TGG", G + "TGG", "+")
+plant(G[:6] + "X" + G[7:] + "TGG")
+plant(rc(G[:9] + "." + G[10:] + "AGG"))
+plant("X" + G + "AGG", G + "AGG", "+", 1)
+plant(rc("-" + G + "CGG"), G + "CGG", "-")
+q = G[:12] + "Q" + G[13:]
+plant(q + "TGG", q + "TGG", "+")
+open(fa, "w").write(">chrX1\n%s\n" % seq)
+open(sites_path, "w").write("".join("%s\t%s\t%d\n" % s for s in sites))
 PY
-site="$(cat "${WORK}/gx/chrX1.fa.site")"; rm "${WORK}/gx/chrX1.fa.site"
-( cd "${LIB}" && "${PYTHON}" "${CZ}" index-genome gx "${WORK}/gx/" "${PAMS}/NGG.txt" -bMax 1 -th 1 > "${WORK}/gx.index.log" 2> "${WORK}/gx.index.err" ) \
-  || fail "index-genome gx: $(tail -3 "${WORK}/gx.index.err")"
-quiet "index-genome gx" "${WORK}/gx.index.log" "${WORK}/gx.index.err"
-( cd "${WORK}" && "${PYTHON}" "${CZ}" search "$(idxdir gx 1)/" "${PAMS}/NGG.txt" "${WORK}/guides3.txt" gx \
-    -mm 0 -bDNA 0 -bRNA 0 -th 1 -r > gx.log 2> gx.err ) || fail "search gx: $(tail -3 "${WORK}/gx.err")"
-quiet "search gx" "${WORK}/gx.log" "${WORK}/gx.err"
-( cd "${WORK}" && "${PYTHON}" "${CZ}" search "${WORK}/gx/" "${PAMS}/NGG.txt" "${WORK}/guides3.txt" gx.bf \
-    -mm 0 -th 1 -r > gx.bf.log 2> gx.bf.err ) || fail "brute force gx: $(tail -3 "${WORK}/gx.bf.err")"
-quiet "brute force gx" "${WORK}/gx.bf.log" "${WORK}/gx.bf.err"
-for f in gx gx.bf; do
-  got="$(tail -n +2 "${WORK}/${f}.targets.txt" | awk -F'\t' '$3 == "'"${GUIDE}"'TGG" {print $5 $7}')"
-  [ "${got}" = "${site}+" ] || fail "${f}: the perfect site at ${site} after the 'X' was not found there (got '${got}')"
+GDIR="${GX}"
+index gx1 NGG 1 1
+index gx8 N8 1 1
+for f in gx1 gx8; do
+  grep -q "^NOTE: 5 byte(s) of chrX1 are no base, IUPAC code, N or Q; each is read as N, a gap" "${WORK}/${f}.index.log" \
+    || fail "index-genome ${f}: no stdout note on the 5 bytes read as N"
 done
-echo "  ok: a perfect site after an 'X' in the genome is found at its position, indexed and by brute force"
+n_cmp=0; n_rows=0; n_bf=0
+for s in "0 0 0" "4 0 0" "1 1 1"; do search gx1 NGG 1 NGG 0 ${s}; search gx8 N8 1 NGG 1 ${s}; done
+for s in mm0.b00 mm4.b00 mm1.b11; do
+  cmp -s <(body "${WORK}/gx8.NGG.p1.${s}.targets.txt") <(body "${WORK}/gx1.NGG.p0.${s}.targets.txt") \
+    || fail "--prune-pam NGG off the K=8 index of gx != its NGG index at ${s}"
+done
+# exactly the planted perfect sites, indexed and by brute force: the one after the
+# out-of-reach X, the two whose pad is such a byte and the one through Q; not the guide
+# regions holding one
+"${PYTHON}" - "${GUIDE}" "${WORK}/gx.sites" "${WORK}/gx1.NGG.p0.mm0.b00.targets.txt" \
+    "${WORK}/gx1.NGG.p0.mm0.b00.bf.targets.txt" "${WORK}/gx8.NGG.p1.mm0.b00.targets.txt" <<'PY' \
+  || fail "the perfect matches on gx are not the planted perfect sites"
+import sys
+guide, sites, paths = sys.argv[1], sys.argv[2], sys.argv[3:]
+want = sorted(tuple(l.rstrip("\n").split("\t")) for l in open(sites))
+assert len(want) == 4, want
+for path in paths:
+    rows = [l.rstrip("\n").split("\t") for l in open(path) if not l.startswith("#")]
+    got = sorted((c[2], c[6], c[4]) for c in rows if c[1] == guide + "NNN" and c[7] == "0" and c[8] == "0")
+    assert got == want, (path, got, want)
+PY
+echo "  ok: ${n_cmp} searches on a contig holding 'X', '.', '-' and Q == oracle (${n_rows} rows, none holding N); ${n_bf} 0-bulge searches == searchBruteForce; buildTST silent on stderr, --prune-pam == the dedicated index, exactly the 4 planted perfect sites found"
 
 echo ""
 echo "four-allele test: PASSED"

@@ -88,7 +88,10 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   row holds an `N`, a `.bin` is flagged exactly when it holds `Q`, and the brute force at
   `-mm 120` reports no window with an `N` in its guide, where a guide with one `N` is planted
   beside a PAM (an `N` cost 101 mismatches: 2.9.1's `searchBruteForce` reports it). The
-  engine before `Q` fails it.
+  engine before `Q` fails it. Last, a contig holding `X`, `.` and `-` in guide regions, pads
+  and PAM-less flanks, beside `Q`: `buildTST` writes nothing to stderr, every search equals
+  the oracle and, without bulges, `searchBruteForce`, and exactly the planted perfect sites
+  are found.
 - `test/test_enricher_multiallelic.py`: 24 unit tests run against both ports (48), with exact
   expected outputs (every ALT, `Q`, the N-count invariant, merged carriers, each record's AF,
   a reference holding `Q`); 44 of them fail on 2.9.1. In CI with `verify_enricher.sh`, which
@@ -232,9 +235,18 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   README, `.DS_Store` or `.fai` listed first gave its extension to every chromosome without
   a VCF, none of which was then copied (exit 0). Only the `.fa` and `.fasta` files not
   hidden are chromosomes now, and a folder holding none is refused.
-- `buildTST` and `searchBruteForce` skipped a genome byte other than A/C/G/T, N and the IUPAC
-  codes when they scanned for PAMs, so every later PAM position of the contig was read one
-  base off and a site after it lost; such a byte is now a gap (`0000`).
+- **A genome byte that is no base, IUPAC code, `N` or `Q`** (such as the `X` RepeatMasker
+  `-x` masks with) **broke the index around it.** The PAM scans of `buildTST` and
+  `searchBruteForce` skipped it, so every later PAM position of the contig was read one base
+  off and a site after it lost, and `buildTST` stored it in the guide region, pad or flank of
+  every site whose window held it, with a message on stderr (which fails a CRISPRme stage),
+  as the nibble `0`, which the search reads as an empty slot of the tree: the sites after it
+  were lost, and rows the contig does not hold were reported. Such a byte is now read as
+  `N`, a gap, by both: a guide region holding one is no target, a pad ends at it and a flank
+  stores it as `0000`; `buildTST` says on stdout how many bytes of a chromosome it read so.
+  On 20 random 400-bp contigs with 1 % of `X`, `-` and `.` and 80 planted guide sites, the
+  2.9.1 `buildTST` wrote 297 lines to stderr and its index gave 17 rows of a 3-mismatch search
+  without bulges; it now writes none and gives 58, the rows of `searchBruteForce`.
 - **A SNP outside the chromosome** (POS 0 or past the end, e.g. a VCF of another assembly)
   now fails with an error naming the position, in both ports: `enricher.py` raised an
   `IndexError` past the end and coded the last base for POS 0, `enricher.cpp` read and wrote

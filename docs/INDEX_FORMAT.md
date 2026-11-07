@@ -138,6 +138,14 @@ everything is `Q` (section 4.1), the symbol of a position where the reference ba
 the SNP ALTs cover A, C, G and T: it counts as a base everywhere above (in the guide
 region, the pad and the flank), and a site, its pad and its PAM may hold it.
 
+A byte of the FASTA that is no base, IUPAC code, `N` or `Q` (such as the `X` RepeatMasker
+`-x` masks with, a `-` or a `.`) is read as `N`, by `buildTST` and `searchBruteForce` alike,
+and `buildTST` says on stdout how many bytes of a chromosome it read so (`NOTE: <n> byte(s)
+of <chr> are no base, IUPAC code, N or Q; ...`). Up to 2.9.1 their PAM scans skipped such a
+byte, reading every later PAM one base off, and `buildTST` stored it in the tree as the
+nibble 0, which the search reads as an empty slot (and which, in an eq slot of a file holding
+`Q`, stands for `Q`).
+
 ### 3.2 The pad
 
 `pad_valid` (0..`mb`) is the number of pad positions, counted from the guide
@@ -831,7 +839,13 @@ compared for both versions; the other sizes agree to the byte).
    which counted an `N` as 101 mismatches, reports 12 rows through them. The pre-`Q`
    engine (`d75c603`) fails it:
    its `buildTST` writes to stderr on `Q`, its `searchBruteForce` reads `Q` as a gap
-   (109 rows only the index finds), and its enricher writes no `Q`.
+   (109 rows only the index finds), and its enricher writes no `Q`. Last, a contig holding
+   `X`, `.` and `-` (section 3.1) in two guide regions, two pads and the flanks of a
+   PAM-less K=8 index, beside a site through `Q`: `buildTST` writes nothing to stderr, 6
+   searches equal the oracle (868 rows), the 4 without bulges `searchBruteForce`, and
+   exactly the 4 planted perfect sites are found; the `buildTST` of `2d1f57b`, before this
+   rule, wrote 13 lines to stderr for its NGG index, on which `searchTST` then crashed
+   (SIGSEGV).
 5. **Existing tests** (`run_golden_test.sh`, `run_minimal_test.sh`,
    `run_pam_filter_test.sh`, `run_flank_n_test.sh`, `run_short_contig_test.sh`) pass;
    the golden outputs are byte-identical (their genome holds no boundary site).

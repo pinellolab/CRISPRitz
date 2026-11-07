@@ -43,7 +43,7 @@ def main():
                     continue
                 ref = seq[pos:pos + len(bases)]
                 if strand == "-":
-                    ref = "".join(COMP[c] for c in reversed(ref))
+                    ref = "".join(COMP.get(c, c) for c in reversed(ref))
                 if ref != bases:
                     bad.append("%s: the contig holds %s there: %s" % (path, ref, line.strip()))
     if bad:
