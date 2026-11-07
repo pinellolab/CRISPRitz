@@ -209,7 +209,7 @@ body (from header_len)
   numLeaves x {
       int32  ws           window start, signed (may be < 0 for a window whose pad
                           or flank runs off the contig start)
-      ceil(K/2) bytes     flank nibbles, as format 1
+      ceil(K/2) bytes     flank nibbles, as format 1, plus Q (section 4.1)
       uint8  lflags       bit 7 HAS_NEXT, bit 6 PAM_LEFT, bit 5 FLANK_OFF,
                           bits 0-4 pad_valid (0..31)
       int32  next         present iff HAS_NEXT: -(i+1) of the next leaf with the
