@@ -63,9 +63,10 @@ ambiguity code the reference FASTA already holds.
 
 The IUPAC letter for {A, C, G, T} is `N`, and `N` is what `buildTST` and `searchTST` treat
 as an assembly gap, not as "any base": `buildTST` discards every target with an `N` in its
-guide region (`guideRegionHasN`, `mainParallel.cpp`), the PAM scan matches nothing at an `N`
-(`pamGenerator.cpp`, `0000`), and the tree has no encoding for it. Writing `N` therefore
-removes **every** target through the position from the index, the reference one included.
+guide region (`finishLeaf`, `mainParallel.cpp`; `guideRegionHasN` up to 2.9.1), the PAM scan
+matches nothing at an `N` (`pamGenerator.cpp`, `0000`), and the tree has no encoding for it.
+Writing `N` therefore removes **every** target through the position from the index, the
+reference one included.
 Demonstrated through the real CLI (`add-variants` → `index-genome` → `search`, NGG, 2
 mismatches) on a synthetic chromosome with a perfect target and a reference-`A` site in its
 guide carrying ALTs C, G, T:
@@ -107,9 +108,10 @@ matches any guide base): CRISPRme's ambiguity budget has to count it as four bas
 Measured with 2.10.0 on that chromosome, through `crispritz.py` in the CRISPRme 2.8.1
 SIF on ml008 (amd64), the new engine first on `PATH`: `add-variants` (compiled port, dict
 mode) on hg38 chr22 and the published `hgdp1kgp.chr22.norm.vcf.gz` (1,998,332 records)
-took 979 s and 7.16 GB, wrote nothing to stderr, and coded 2,448 positions `Q`; the
-enriched genome holds 11,658,691 `N`, at exactly the reference's positions, and its
-sequence is byte-identical to the fifth-symbol prototype's. `index-genome` with NRG and
+took 979 s and a peak RSS of 6.83 GB (every memory figure in this document is in GB of
+2^30 bytes), wrote nothing to stderr, and coded 2,448 positions `Q`; the enriched genome
+holds 11,658,691 `N`, at exactly the reference's positions, and its sequence is
+byte-identical to the fifth-symbol prototype's. `index-genome` with NRG and
 `-bMax 1` (18 s) stored 18,314 targets holding `Q` and flagged all 3 of its files. Five
 guides (CTAACAGTTGCTTTTATCAC, ACTGAAATCTGTAAGCAGGC, CTCTCAGCTGGTACACGGCA,
 GAGTCCGAGCAGAAGAAGAA, GGTGAGTGAGTGTGTGCGTG) at 4 mismatches without bulges gave 9,311 rows,
@@ -298,7 +300,7 @@ one):
 | SNP dict | same 1,711,938 keys in the same order; **43,389 values change, exactly the multi-SNP positions**; each equals the bcftools reconstruction — after: every record's entry in file order (43,389/43,389), before: the last record's entry (43,389/43,389); 45,837 entries added |
 | indel log, fake-indel FASTA, `change_version.txt` | byte-identical (md5 `4197a2d0…`, `34ed6062…`, `a824c4b2…`) |
 | CRISPRme overlay (`overlay_indel_snps.overlay_fake_chromosome`, a5379e0) | same length (13,693,118), 686,631 flank bases coded in each; **50,253 differ**, every one at a multi-SNP position and equal to its new code; on the 2.10.0 enrichment this overlay codes 15,471 fewer, those at the four-allele positions, until it learns `Q` (6.4) |
-| cost, compiled port | 986 s → 1,004 s wall; peak RSS 6.72 → 6.86 GB |
+| cost, compiled port | 986 s → 1,004 s wall; peak RSS 6.72 → 6.86 GB (2.10.0: 6.83 GB, section 2.2) |
 
 **The two ports at full scale:** `enricher.py` through the same CLI (1,789 s, peak RSS
 3.66 GB) gives the same five files, md5 for md5 (enriched genome `21903a97…`, dict

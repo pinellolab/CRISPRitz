@@ -33,9 +33,10 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   2.2). In the tree `Q` takes the value its slot never uses (`1111` in a root, lo or hi slot,
   `0000` in an eq slot, where `1111` ends a string) and in a flank `1111`; an index file
   holding it is flagged in its header (bit 2, `FOUR_ALLELE`), so an engine that cannot read
-  it refuses it, and a file without it is written byte for byte as before. `buildTST` and
-  `searchTST` say on stdout how many targets and files hold `Q`, and `index-info` reports
-  `four_allele` per file. On HGDP + 1000 Genomes chr22, 2,448 positions carry three SNP ALTs.
+  it refuses it, and a file without it is written byte for byte as before. `buildTST` says
+  on stdout how many targets and files hold `Q`, `searchTST` how many of the files it reads
+  are flagged, and `index-info` reports `four_allele` per file. On HGDP + 1000 Genomes
+  chr22, 2,448 positions carry three SNP ALTs.
 - **Index format 2** ([docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md)). Every `.bin` built by
   this version starts with a header -- the magic bytes `CZI\xfe`, the format version, and the
   build parameters (PAM side, all-N PAM, guide length, PAM length, max bulges, the PAM) -- and
@@ -119,8 +120,9 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
 - **Indexes built with 2.9.1 or earlier from a normalised panel lack the earlier ALTs of every
   split site; rebuild them**, with their dicts and Tier-0/Tier-1 stores, from one 2.10.0
   enrichment (`docs/MULTIALLELIC_ENRICHMENT.md` §8 lists the published ones). Cost of the fix:
-  one byte per base; on chr22, 986 s → 1,004 s and 6.72 → 6.86 GB (measured with the
-  four-base rule `Q` replaced, which kept ~17 bytes more per SNP ALT).
+  one byte per base; on chr22, 986 s → 1,004 s and 6.72 → 6.86 GB (2^30 bytes; measured
+  with the four-base rule `Q` replaced, which kept ~17 bytes more per SNP ALT; 2.10.0 peaks
+  at 6.83 GB).
 - **One allele on two records (the same `REF>ALT` twice) is one dict entry with the
   carriers of both**, where the later record's entry replaced the earlier one: a sample
   listed by both, phased alike, carries the ALT on every slot where either record puts it
