@@ -92,8 +92,8 @@ vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal 
 		}
 		else if (genome[i] == 'Q')
 		{
-			//all four bases: a SNP position whose reference base and ALTs cover A, C,
-			//G and T (the enricher writes Q there). Not N, which stays the 0000 gap.
+			//all four bases: a SNP position whose ALTs, with an A/C/G/T reference base,
+			//cover A, C, G and T (the enricher writes Q there). Not N, which stays the 0000 gap.
 			genomeBit.push_back(bitset<4>(string("1111")));
 		}
 		else

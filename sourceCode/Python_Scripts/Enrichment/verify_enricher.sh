@@ -367,8 +367,9 @@ lines.append(row(p, "rs1706", b(p), "A,C", "AC=1,1;AF=0.1,0.1", ["0|1","0|2","0|
 # genotypes recoded so 1 is that record's ALT. Each record must ADD its ALT to the
 # position's code and dict entry (2.9.1 and earlier rebuilt the code from the
 # reference base and overwrote the entry, so the last record won). A position whose
-# reference and ALTs cover all four bases is Q, which the search reads as any base
-# (N, the IUPAC letter for the four, is a gap to buildTST and searchTST).
+# reference base (A, C, G or T) and ALTs cover all four bases is Q, which the search
+# reads as any base (N, the IUPAC letter for the four, is a gap to buildTST and
+# searchTST).
 import itertools
 G1 = ["0|1","0|0","0|0","0|0","0|0"]
 
@@ -749,7 +750,7 @@ for port in py cpp; do
         > "$QDIR/$port.out" 2> "$QDIR/$port.err"
     echo $? > "$QDIR/$port.rc"
 done
-QMSG="ERROR: chrTest holds 'Q' at 71: the reference FASTA must hold A/C/G/T, N and IUPAC codes only (Q is reserved for four-allele SNP positions)"
+QMSG="ERROR: chrTest holds 'Q' at 71: a reference FASTA must not hold Q, which is reserved for four-allele SNP positions"
 if [ "$(cat "$QDIR/py.rc")" = 1 ] && [ "$(cat "$QDIR/cpp.rc")" = 1 ] \
    && [ "$(cat "$QDIR/py.err")" = "$QMSG" ] && [ "$(cat "$QDIR/cpp.err")" = "$QMSG" ]; then
     echo "  OK   : a reference holding 'q' is refused by both ports (exit 1, the same message)"

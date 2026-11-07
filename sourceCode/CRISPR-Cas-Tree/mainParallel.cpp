@@ -810,9 +810,9 @@ int main(int argc, char **argv)
 	}
 
 	if (num_quad_bins)
-		cout << "FOUR-ALLELE (Q): " << num_quad_targets << " target(s) hold Q, the symbol of a position "
-			 << "whose reference base and SNP ALTs cover all four bases; " << num_quad_bins
-			 << " index file(s) flagged for it (docs/INDEX_FORMAT.md)\n";
+		cout << "FOUR-ALLELE (Q): " << num_quad_targets << " target(s) hold Q, the four-allele symbol, "
+			 << "which the search reads as any base; " << num_quad_bins
+			 << " index file(s) flagged for it (docs/INDEX_FORMAT.md section 4.1)\n";
 	globalend = omp_get_wtime(); // end global time
 	cout << "-----------------------"
 		 << "\n";

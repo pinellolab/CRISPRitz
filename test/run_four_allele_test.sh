@@ -3,11 +3,11 @@
 # The four-allele symbol Q, end to end through crispritz.py (docs/INDEX_FORMAT.md
 # section 4, docs/MULTIALLELIC_ENRICHMENT.md section 2.2).
 #
-# add-variants writes Q where a position's reference base and SNP ALTs cover A, C, G
-# and T, and buildTST, searchTST and searchBruteForce read it as any base (1111); N
-# stays a gap (0000) that matches nothing. Until the fifth symbol, such a position was
-# written N (a record listing three SNP ALTs: every target through it lost) or, after
-# the four-base rule, without its rarest ALT.
+# add-variants writes Q where a position's SNP ALTs, with its reference base when that
+# is A, C, G or T, cover all four bases, and buildTST, searchTST and searchBruteForce
+# read it as any base (1111); N stays a gap (0000) that matches nothing. Until the fifth
+# symbol, such a position was written N (a record listing three SNP ALTs: every target
+# through it lost) or, after the four-base rule, without its rarest ALT.
 #
 # four_allele/make_genome.py writes contigs and VCFs whose split and multi-ALT SNP
 # records put Q in guide regions (making a reference mismatch a match), in PAMs (a
@@ -17,8 +17,8 @@
 # one N beside a PAM. Then:
 #
 #   1. ENRICH  : add-variants with each enricher port; the two enriched genomes are
-#                identical, Q exactly where the reference base and ALTs cover four
-#                bases, and an N exactly where the reference has one.
+#                identical, Q exactly where the ALTs, with an A/C/G/T reference base,
+#                cover four bases, and an N exactly where the reference has one.
 #   2. INDEX   : index-genome (NGG at -bMax 0 and 2, NRG, a PAM-less K=8 flank, 5'
 #                TTTV and a 5' PAM-less K=4 flank); a .bin holding Q is flagged
 #                four_allele in its header (index-info), the variant-free contig's is
@@ -115,7 +115,7 @@ mv "${WORK}/enricher.moved" "${ENR}"
 GE="${WORK}/enr_cpp/variants_genome/SNPs_genome/ref_enriched"
 diff -r "${GE}" "${WORK}/enr_py/variants_genome/SNPs_genome/ref_enriched" > /dev/null \
   || fail "the two enricher ports wrote different enriched genomes"
-grep -q "each is coded Q, which the search reads as any base" "${WORK}/enr_cpp/add.log" \
+grep -q "are coded Q, the four-allele symbol, which the search reads as any base" "${WORK}/enr_cpp/add.log" \
   || fail "add-variants printed no four-allele note"
 "${PYTHON}" - "${G}/ref" "${G}/vcf" "${GE}" <<'PY' || fail "the enriched genome is not the expected one"
 import gzip, os, sys
@@ -148,8 +148,8 @@ for name in sorted(os.listdir(ref_dir)):
     assert [i for i, c in enumerate(got) if c == "N"] == [i for i, c in enumerate(seq) if c == "N"], chrom
     n_q += got.count("Q"); n_n += got.count("N"); n_seq += 1
 assert n_q > 1000, n_q
-print("  ok: %d contigs enriched alike by both ports: %d Q, exactly where the reference base and "
-      "ALTs cover four bases; %d N, exactly the reference's" % (n_seq, n_q, n_n))
+print("  ok: %d contigs enriched alike by both ports: %d Q, exactly where the ALTs, with an "
+      "A/C/G/T reference base, cover four bases; %d N, exactly the reference's" % (n_seq, n_q, n_n))
 PY
 
 # --- PAM files

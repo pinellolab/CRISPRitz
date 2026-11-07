@@ -468,10 +468,10 @@ def _enricher_command():
 
 def _first_q(fasta):
     """The 1-based position of the first 'Q' (either case) in the sequence of the
-    one-sequence FASTA ``fasta``, else 0. The enricher writes Q where a position's
-    reference base and SNP ALTs cover all four bases, and the search reads it as any
-    base, so a reference must not hold one: the enricher refuses it in the
-    chromosomes it enriches, and add-variants in those it copies."""
+    one-sequence FASTA ``fasta``, else 0. The enricher writes Q where a position's SNP
+    ALTs, with its reference base when that is A, C, G or T, cover all four bases, and
+    the search reads it as any base, so a reference must not hold one: the enricher
+    refuses it in the chromosomes it enriches, and add-variants in those it copies."""
     seen = 0
     with open(fasta, "rb") as fh:
         fh.readline()  # the header
@@ -605,8 +605,8 @@ def genomeEnrichment():
         q = _first_q(join(dirGenome, f)) if chrom in chr_wihtout_vcf else 0
         if q:
             sys.stderr.write(
-                "ERROR: %s holds 'Q' at %d: the reference FASTA must hold A/C/G/T, N and IUPAC "
-                "codes only (Q is reserved for four-allele SNP positions)\n" % (chrom, q)
+                "ERROR: %s holds 'Q' at %d: a reference FASTA must not hold Q, which is reserved "
+                "for four-allele SNP positions\n" % (chrom, q)
             )
             sys.exit(1)
 
@@ -845,12 +845,12 @@ def indexInfo():
             "crispritz.py index-info <index_dir>\n"
             "\nPrints, as JSON, the index format of each .bin of a TST index (1: built by "
             "CRISPRitz <= 2.9.1; 2: built by 2.10.0 or later, see docs/INDEX_FORMAT.md), "
-            "for format 2 the parameters it was built with (four_allele: the file holds Q, "
-            "the symbol of a position whose reference base and SNP ALTs cover all four "
-            "bases), and, as writes_format, the format this CRISPRitz builds. Reads only "
-            "each file's header, the start of its body and its last bytes. Exits 1 if the "
-            "directory holds no .bin, a .bin that searchTST would refuse (its \"error\" "
-            "entry says why), or .bin files named for more than one PAM (pams)."
+            "for format 2 the parameters it was built with and whether it holds Q, the "
+            "four-allele symbol (four_allele), and, as writes_format, the format this "
+            "CRISPRitz builds. Reads only each file's first bytes, its last bytes and its "
+            "size. Exits 1 if the directory holds no .bin, a .bin that searchTST refuses "
+            "whatever the search for what those show (its \"error\" entry says why), or .bin "
+            "files named for more than one PAM (pams)."
         )
         sys.exit()
     index_dir = os.path.realpath(sys.argv[2])
@@ -878,8 +878,8 @@ def indexInfo():
             ["%s: %s" % (n, files[n]["error"]) for n in bad[:5]]
             + (["and %d more" % (len(bad) - 5)] if len(bad) > 5 else [])))
     if len(pams) > 1:
-        why.append("the .bin files are named for more than one PAM (%s): searchTST reads "
-                   "them all as an index of the PAM of the first it lists"
+        why.append("the .bin files are named for more than one PAM (%s), which searchTST "
+                   "refuses: an index directory holds the .bin files of one index only"
                    % ", ".join("'%s'" % p for p in pams))
     if why:
         sys.stderr.write("ERROR: %s\n" % "; ".join(why))

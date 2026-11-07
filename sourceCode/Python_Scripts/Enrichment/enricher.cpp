@@ -848,8 +848,8 @@ int main(int argc, char **argv) {
         size_t q = genomeStr.find('Q');
         if (q != std::string::npos) {
             fprintf(stderr,
-                    "ERROR: %s holds 'Q' at %ld: the reference FASTA must hold A/C/G/T, N "
-                    "and IUPAC codes only (Q is reserved for four-allele SNP positions)\n",
+                    "ERROR: %s holds 'Q' at %ld: a reference FASTA must not hold Q, which is "
+                    "reserved for four-allele SNP positions\n",
                     currentChr.c_str(), (long)q + 1);
             return 1;
         }
@@ -911,9 +911,8 @@ int main(int argc, char **argv) {
         SNPsProcess(line);
     }
     if (fourBaseCount)
-        printf("NOTE: %ld position(s) of %s carry all four bases between the reference and the "
-               "SNP ALTs; each is coded Q, which the search reads as any base (N stays a gap)\n",
-               fourBaseCount, currentChr.c_str());
+        printf("NOTE: %ld position(s) of %s are coded Q, the four-allele symbol, which the search "
+               "reads as any base (N stays a gap)\n", fourBaseCount, currentChr.c_str());
 
     // --- chromosomeSave(): os.chdir("./SNPs_genome/") then write ---
     if (chdir("./SNPs_genome") != 0) {

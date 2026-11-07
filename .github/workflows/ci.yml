@@ -127,8 +127,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends g++ libgomp1 zlib1g-dev python3-pandas
 
-      # A position whose reference base and SNP ALTs cover A, C, G and T is written Q,
-      # which buildTST, searchTST and searchBruteForce read as any base (N stays a gap).
+      # A position whose SNP ALTs, with an A/C/G/T reference base, cover all four bases is
+      # written Q, which buildTST, searchTST and searchBruteForce read as any base (N
+      # stays a gap).
       # Synthetic contigs put Q in guides, in PAMs that exist only through it, in the
       # pad, beside N runs and on contig ends; through crispritz.py add-variants (both
       # ports), index-genome (3' and 5', dedicated and PAM-less) and search, every

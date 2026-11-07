@@ -23,9 +23,9 @@ static const int CZI_FLAG_PAMLESS = 1 << 1;      // the build PAM is all N
 static const int CZI_FLAG_FOUR_ALLELE = 1 << 2;  // the tree and the flanks hold Q (below)
 static const int CZI_FLAG_KNOWN = CZI_FLAG_PAM_AT_START | CZI_FLAG_PAMLESS | CZI_FLAG_FOUR_ALLELE;
 
-// Q, the fifth symbol: a position whose reference base and SNP ALTs cover A, C, G
-// and T (written by the enricher), matched as any base (1111), where N stays a gap
-// (0000) that matches nothing. Each 4-bit slot of the tree already uses 15 of its 16
+// Q, the fifth symbol: a position whose SNP ALTs, with its reference base when that is
+// A, C, G or T, cover all four bases (written by the enricher), matched as any base
+// (1111), where N stays a gap (0000) that matches nothing. Each 4-bit slot of the tree already uses 15 of its 16
 // values -- a root, lo or hi slot: 0 = no kid and the 14 IUPAC letters; an eq slot:
 // the 14 letters and 15 = end of string -- so Q takes the value its slot never uses:
 // 15 in a root, lo or hi slot (its A|C|G|T mask), 0 in an eq slot. A flank nibble Q

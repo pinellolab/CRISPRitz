@@ -45,8 +45,8 @@ import sys
 
 # N is 15 in a PAM or guide pattern ("any base"); in the genome an N is a gap, which
 # matches nothing (it never reaches BITS there: an N ends a site, its pad or its PAM).
-# Q, the four-allele symbol an enriched genome holds where a SNP position's reference
-# base and ALTs cover A, C, G and T, is any base.
+# Q, the four-allele symbol an enriched genome holds where a SNP position's ALTs, with
+# an A/C/G/T reference base, cover A, C, G and T, is any base.
 BITS = {"A": 1, "C": 2, "G": 4, "T": 8, "R": 5, "Y": 10, "S": 6, "W": 9, "K": 12,
         "M": 3, "B": 14, "D": 13, "H": 11, "V": 7, "N": 15, "Q": 15}
 COMP = {"A": "T", "C": "G", "G": "C", "T": "A", "R": "Y", "Y": "R", "S": "S", "W": "W",

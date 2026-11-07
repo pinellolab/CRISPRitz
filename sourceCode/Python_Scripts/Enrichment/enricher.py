@@ -34,12 +34,13 @@ genomeStr = inGenomeFile.read()
 genomeStr = genomeStr.replace('\n', '')
 genomeStr = genomeStr.upper()
 
-# Q is the symbol written where a position's reference base and SNP ALTs cover all four
-# bases (SNPsProcess), and buildTST, searchTST and searchBruteForce read it as any base:
-# a FASTA that already holds one would pass a base of its own off as such a position.
+# Q is the symbol written where a position's SNP ALTs, with its reference base when that
+# is A, C, G or T, cover all four bases (SNPsProcess), and buildTST, searchTST and
+# searchBruteForce read it as any base: a FASTA that already holds one would pass a base
+# of its own off as such a position.
 if 'Q' in genomeStr:
-    sys.stderr.write("ERROR: %s holds 'Q' at %d: the reference FASTA must hold A/C/G/T, N "
-                     "and IUPAC codes only (Q is reserved for four-allele SNP positions)\n"
+    sys.stderr.write("ERROR: %s holds 'Q' at %d: a reference FASTA must not hold Q, which is "
+                     "reserved for four-allele SNP positions\n"
                      % (currentChr, genomeStr.index('Q') + 1))
     sys.exit(1)
 
@@ -599,9 +600,8 @@ for line in inAltFile:
 
 
 if four_base_count:
-    print("NOTE: %d position(s) of %s carry all four bases between the reference and the "
-          "SNP ALTs; each is coded Q, which the search reads as any base (N stays a gap)"
-          % (four_base_count, currentChr))
+    print("NOTE: %d position(s) of %s are coded Q, the four-allele symbol, which the search "
+          "reads as any base (N stays a gap)" % (four_base_count, currentChr))
 #saving chr after enrichment with snps
 chromosomeSave()
 if sys.argv[4] == 'yes':

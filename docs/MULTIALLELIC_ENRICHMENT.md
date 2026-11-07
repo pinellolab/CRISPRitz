@@ -93,16 +93,15 @@ alleles are searchable (CRISPRme plan, decision B1). The left-out ALT's bookkeep
 gone: nothing is ranked, so no AF is read for the code. The decision is taken as each
 record is read (a position that holds four bases holds them whatever comes later), so mode
 `no` (genome only) codes exactly what mode `yes` codes. One line on **stdout** counts these
-positions per chromosome (`NOTE: <n> position(s) of <chr> carry all four bases ...; each is
-coded Q, ...`; stderr is fatal to a CRISPRme stage).
+positions per chromosome (`NOTE: <n> position(s) of <chr> are coded Q, the four-allele
+symbol, ...`; stderr is fatal to a CRISPRme stage).
 
 `Q` is also what a record listing three SNP ALTs now gets, where 2.9.1 wrote `N`; a reference
 `N` never becomes `Q` (section 2.8); a reference IUPAC base adds no base of its own (2.1),
 so `Q` there needs ALTs covering all four bases. A reference FASTA must not hold `Q` (it
 would pass a base of its own off as a four-allele position): both ports, and `add-variants`
-for a chromosome it copies, refuse one with `ERROR: <chr> holds 'Q' at <pos>: the reference
-FASTA must hold A/C/G/T, N and IUPAC codes only (Q is reserved for four-allele SNP
-positions)` and exit status 1.
+for a chromosome it copies, refuse one with `ERROR: <chr> holds 'Q' at <pos>: a reference
+FASTA must not hold Q, which is reserved for four-allele SNP positions` and exit status 1.
 
 On chr22 of HGDP + 1000 Genomes, 2,448 positions carry three SNP ALTs (section 4): the
 four-base rule left out an ALT at each (AC = 1 at 1,193 of them, AC ≥ 41 at 3); `Q` codes

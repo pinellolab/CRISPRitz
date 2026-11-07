@@ -9,8 +9,8 @@ tests pin the merged behaviour on small synthetic inputs, with exact expected ou
 
   * every ALT of a split site is coded, in any record order, and the code equals the
     one the same site gets written as a single record listing every ALT;
-  * a position whose reference and ALTs cover all four bases is coded Q, which the
-    search reads as any base (N is a gap to the search, not "any base"), and a
+  * a position whose reference base (A, C, G or T) and ALTs cover all four bases is
+    coded Q, which the search reads as any base (N is a gap to the search, not "any base"), and a
     reference N stays N: the enriched genome holds exactly the reference's N;
   * the dict lists every ALT, each entry with its own record's carriers, genotypes,
     rsID and AF, joined by '$' like a multi-ALT record's value; the same REF>ALT on two
@@ -195,8 +195,9 @@ class EnricherMultiallelicTests(object):
                 self.assertEqual(got.genome, joined.genome, "order %s" % [o.split("\t")[4] for o in order])
 
     def test_four_bases_coded_Q(self):
-        """A position whose reference base and ALTs cover all four bases is Q, in every
-        record order and whatever the ALTs' AFs, and the dict lists all three ALTs."""
+        """A position whose reference base (A, C, G or T) and ALTs cover all four bases is
+        Q, in every record order and whatever the ALTs' AFs, and the dict lists all three
+        ALTs."""
         p = 80
         a, b, c = others(p)
         afs = {a: "0.05", b: "0.0001", c: "0.3"}
@@ -205,8 +206,8 @@ class EnricherMultiallelicTests(object):
         for order in itertools.permutations(split):
             r = self.run_enricher(list(order))
             self.assertEqual(r.base(p), "Q")
-            self.assertEqual(r.stdout.count("NOTE: 1 position(s) of %s carry all four bases" % CHROM), 1)
-            self.assertIn("each is coded Q, which the search reads as any base", r.stdout)
+            self.assertEqual(r.stdout.count("NOTE: 1 position(s) of %s are coded Q, the four-allele "
+                                            "symbol, which the search reads as any base" % CHROM), 1)
             # the dict still lists all three, in file order
             self.assertEqual([e.split(";")[1] for e in r.entries(p)],
                              [ref1(p) + "," + o.split("\t")[4] for o in order])
@@ -253,9 +254,8 @@ class EnricherMultiallelicTests(object):
                                    ["0|1", "0|0", "0|0", "0|0"])], fasta=fasta)
             self.addCleanup(r.cleanup)
             self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
-            self.assertIn("ERROR: %s holds 'Q' at %d: the reference FASTA must hold A/C/G/T, N "
-                          "and IUPAC codes only (Q is reserved for four-allele SNP positions)"
-                          % (CHROM, k), r.stderr)
+            self.assertIn("ERROR: %s holds 'Q' at %d: a reference FASTA must not hold Q, which is "
+                          "reserved for four-allele SNP positions" % (CHROM, k), r.stderr)
             self.assertFalse(os.path.exists(r.path("SNPs_genome", "res_enriched")))
 
     def test_reference_N_and_reference_iupac(self):

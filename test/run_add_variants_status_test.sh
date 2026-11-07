@@ -136,7 +136,7 @@ PY
 run q "$SHIPPED" "$WORK/genome_q"
 hung && fail "add-variants hung on a reference holding q (timeout)"
 [ "$RC" = 1 ] || fail "a copied chromosome holds a 'q' but add-variants exited $RC: $ERR"
-case "$ERR" in *"ERROR: chrC holds 'Q' at 150: the reference FASTA must hold A/C/G/T, N and IUPAC codes only"*) ;;
+case "$ERR" in *"ERROR: chrC holds 'Q' at 150: a reference FASTA must not hold Q, which is reserved for four-allele SNP positions"*) ;;
     *) fail "the ERROR line does not name chrC and position 150: $ERR" ;; esac
 [ ! -e "$WORK/run_q/variants_genome" ] || fail "add-variants enriched before refusing chrC"
 echo "  ok  a copied chromosome holds a 'q' -> exit 1 before any enrichment, chrC and 150 named"
