@@ -734,7 +734,7 @@ are affected.
 | `NRR_3_hg38+hg38_mega` | yes | as NRG mega |
 | `NRG_3_hg38+hg38_HPRC`, `NRR_3_hg38+hg38_HPRC` | yes | as NRG HGDP1kGP, and `Dictionaries/log_indels_hg38_HPRC` (its chrY log, below) |
 | `genotypes_hg38_HPRC` | yes | the Tier-1 store |
-| `SHA256SUMS` | yes | every replaced archive |
+| `SHA256SUMS` | yes | every rebuilt archive |
 
 `lucapinello/crisprme-data-general-index`, `indexes/`: `NNNNNNNN_3_hg38+hg38_HGDP1kGP` and
 its `genotypes_hg38_HGDP1kGP` (the same companion), and `SHA256SUMS`.
