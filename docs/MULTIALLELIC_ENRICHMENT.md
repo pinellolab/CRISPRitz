@@ -50,17 +50,17 @@ byte (verified, section 5).
 ### 2.1 The enriched genome
 
 The code at a position is the IUPAC letter of **{reference base} ∪ {its SNP ALTs}**, its SNP
-ALTs being every ALT that is one upper-case base, A, C, G or T, of every record at the
-position whose REF is one base and whose FILTER is `PASS` or `.`, whatever the order and
-adjacency of those records — the code the same site gets when written as one record listing
-every ALT. A record adds its SNP ALTs to what earlier records coded; it no longer starts
-from the reference base. Two exceptions are new in 2.10.0: a set of all four bases is
-written `Q`, not its IUPAC letter `N` (section 2.2), and a reference `N`, like any reference
-byte that is no base or IUPAC code, stays as it is whatever the records at it list (section
-2.8; 2.9.1 coded a record listing two or three SNP ALTs over it). The rest of the rule is
-that of 2.9.1: an ALT that is not A/C/G/T (`*`, `N`, a lowercase base) adds nothing, a
-reference IUPAC base adds nothing of its own (the code there is that of the ALTs alone, `Q`
-if they cover all four bases), and a set of one base leaves the FASTA letter in place.
+ALTs being every ALT that is one upper-case base, A, C, G or T, of the position's records
+whose REF is one base and whose FILTER is `PASS` or `.`, whatever the order and adjacency of
+those records — the code the same site gets when written as one record listing every ALT. A
+record adds its SNP ALTs to what earlier records coded; it no longer starts from the
+reference base. Two exceptions are new in 2.10.0: a set of all four bases is written `Q`,
+not its IUPAC letter `N` (section 2.2), and a reference `N`, like any reference byte that is
+no base or IUPAC code, stays as it is whatever the records at it list (section 2.8; 2.9.1
+coded a record listing two or three SNP ALTs over it). The rest of the rule is that of
+2.9.1: an ALT that is not A/C/G/T (`*`, `N`, a lowercase base) adds nothing, a reference
+IUPAC base adds nothing of its own (the code there is that of the ALTs alone, `Q` if they
+cover all four bases), and a set of one base leaves the FASTA letter in place.
 
 The running union is kept in a byte per position beside the genome (`snp_mask` /
 `snpMask`), because a letter in the genome cannot tell a code the enricher wrote from an
