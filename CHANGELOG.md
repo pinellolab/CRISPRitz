@@ -97,11 +97,11 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   a reference holding `Q`); 44 of them fail on 2.9.1. In CI with `verify_enricher.sh`, which
   grows from 17 to 33 cases (split multi-allelic sites in every order, genotype shapes, SNP +
   indel at one position, four bases, two ALTs on one haplotype slot, AF by key, one allele on
-  two records, ALTs on a reference `N`) and now also checks the outputs against what they
-  must be: the enriched genome against an independent reconstruction (with the N-count
-  invariant), the dict where one allele's records merge, AFs are read by key, records sit at
-  a reference `N` and a record lists three SNP ALTs (cases 24 and 31-33), the indel log's AF
-  read by key (case 31), and a reference holding `Q` refused.
+  two records, ALTs on a reference `N`, `X` or `-`) and now also checks the outputs against
+  what they must be: the enriched genome against an independent reconstruction (with the
+  N-count invariant), the dict where one allele's records merge, AFs are read by key,
+  records sit at a reference `N`, `X` or `-` and a record lists three SNP ALTs (cases 24 and
+  31-33), the indel log's AF read by key (case 31), and a reference holding `Q` refused.
 - `docs/MULTIALLELIC_ENRICHMENT.md`: the behaviour, its measurement, what CRISPRme must change
   to use it, the owner's decisions, and the published indexes and stores to rebuild.
 
@@ -137,7 +137,9 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
 - **A reference `N` stays `N`**: the enriched genome holds an `N` exactly where the
   reference does. A record listing two or three ALTs at a reference `N` (`N>A,C`) was coded
   over it (`M`), making a gap searchable, and merging split records (see Fixed) would have
-  coded them over it too. The dict still lists such records.
+  coded them over it too. A reference byte that is no base or IUPAC code (such as the `X`
+  RepeatMasker `-x` masks with), which `index-genome` and `search` read as `N` (see Fixed),
+  stays as it is too. The dict still lists such records.
 - `add-variants` refuses a reference FASTA holding `Q` (in a chromosome it enriches, in both
   enricher ports, and in one it copies), with `ERROR: <chr> holds 'Q' at <pos>: ...` and exit
   status 1: the search would read it as a four-allele position.
@@ -201,11 +203,12 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   positions, mega 16,103. This fix changes nothing where no position holds more than one SNP
   record, but other changes of this release do (docs/MULTIALLELIC_ENRICHMENT.md section
   2.6): a record listing three SNP ALTs is now `Q`, one listing two or three ALTs at a
-  reference `N` leaves the `N`, one listing `AF` at another place in its INFO than the
-  file's first record gets its AF, and a SNP outside the chromosome is an error. So an
-  enrichment of a VCF that keeps a site's ALTs on one record can change too: on chr22 with
-  the raw HPRC vcfwave VCF (no position with two SNP records), the genome differs at 61
-  bases, each `N` → `Q`, and the dict, indel log and fake-indel FASTA are byte-identical.
+  reference `N` (or another byte that is no base or IUPAC code) leaves it, one listing `AF`
+  at another place in its INFO than the file's first record gets its AF, and a SNP outside
+  the chromosome is an error. So an enrichment of a VCF that keeps a site's ALTs on one
+  record can change too: on chr22 with the raw HPRC vcfwave VCF (no position with two SNP
+  records), the genome differs at 61 bases, each `N` → `Q`, and the dict, indel log and
+  fake-indel FASTA are byte-identical.
 - **A record listing three SNP ALTs wrote `N`**, which `index-genome` and `search` read as an
   assembly gap: every target through the position, the reference one included, left the
   index (shown through the CLI: 0 targets found, against 1 with the fix). Merging split

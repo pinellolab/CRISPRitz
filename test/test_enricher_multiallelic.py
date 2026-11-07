@@ -17,8 +17,8 @@ tests pin the merged behaviour on small synthetic inputs, with exact expected ou
     records is one entry with the carriers of both;
   * each record's AF is read by its key, whatever the INFO field's order;
   * non-PASS records, '*', haploid / unphased / missing genotypes, non-adjacent
-    records, an indel at the same position, a reference N or IUPAC base, a reference
-    that already holds Q (refused);
+    records, an indel at the same position, a reference N, IUPAC base or byte that is
+    neither (kept, as an N), a reference that already holds Q (refused);
   * the indel log and fake-indel contigs do not move;
   * a position with one record behaves exactly as before.
 
@@ -262,11 +262,17 @@ class EnricherMultiallelicTests(object):
         fasta = list(REF)
         fasta[119] = "N"   # pos 120
         fasta[129] = "R"   # pos 130 (A/G in the FASTA itself)
+        fasta[139] = "X"   # pos 140: no base, IUPAC code or N (RepeatMasker -x masks with X)
+        fasta[149] = "-"   # pos 150
         fasta = "".join(fasta)
         recs = [rec(120, "n1", "N", "A", "AC=1;AF=0.1", ["0|1", "0|0", "0|0", "0|0"]),
                 rec(120, "n2", "N", "C", "AC=1;AF=0.2", ["0|0", "0|1", "0|0", "0|0"]),
                 rec(130, "y1", "R", "C", "AC=1;AF=0.1", ["0|1", "0|0", "0|0", "0|0"]),
-                rec(130, "y2", "R", "T", "AC=1;AF=0.2", ["0|0", "0|1", "0|0", "0|0"])]
+                rec(130, "y2", "R", "T", "AC=1;AF=0.2", ["0|0", "0|1", "0|0", "0|0"]),
+                rec(140, "x1", ref1(140), others(140)[0], "AC=1;AF=0.1", ["0|1", "0|0", "0|0", "0|0"]),
+                rec(140, "x2", ref1(140), others(140)[1], "AC=1;AF=0.2", ["0|0", "0|1", "0|0", "0|0"]),
+                rec(150, "d1", ref1(150), ",".join(others(150)[:2]), "AC=1,1;AF=0.1,0.2",
+                    ["0|1", "2|0", "0|0", "0|0"])]
         r = self.run_enricher(recs, fasta=fasta)
         # a reference N is a gap and stays one, whatever the ALTs (merged without that rule,
         # these two split records give M; 2.9.1 coded each alone and kept the N); a
@@ -274,6 +280,13 @@ class EnricherMultiallelicTests(object):
         self.assertEqual(r.base(120), "N")
         self.assertEqual(r.base(130), "Y")
         self.assertEqual([e.split(";")[2] for e in r.entries(120)], ["n1", "n2"])
+        # so is a byte that is no base or IUPAC code, which buildTST and searchBruteForce
+        # read as N: merged, the split records at 140 would code it, and up to 2.9.1 the
+        # record listing two ALTs at 150 did
+        self.assertEqual(r.base(140), "X")
+        self.assertEqual(r.base(150), "-")
+        self.assertEqual([e.split(";")[2] for e in r.entries(140)], ["x1", "x2"])
+        self.assertEqual([e.split(";")[2] for e in r.entries(150)], ["d1", "d1"])
         # one record alone leaves a single base -> the FASTA letter stays, as before
         r1 = self.run_enricher(recs[:1] + recs[2:3], fasta=fasta)
         self.assertEqual(r1.base(120), "N")

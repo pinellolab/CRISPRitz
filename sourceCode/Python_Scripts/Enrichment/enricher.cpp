@@ -141,6 +141,13 @@ static inline int baseBit(char c) {
     }
 }
 
+// Whether a reference byte is a letter a SNP is coded over: A/C/G/T and the IUPAC
+// ambiguity codes. N is a gap, and so is any other byte (buildTST and searchBruteForce
+// read it as N); Q is refused when the FASTA is read. enricher.py's _REFERENCE_CODES.
+static inline bool isReferenceCode(char c) {
+    return c != '\0' && strchr("ACGTRYSWKMBDHV", c) != NULL;
+}
+
 // Maps a mask of ACGT bits to the IUPAC letter reproduced by enricher.py.
 static char iupacFromMask(int mask) {
     switch (mask) {
@@ -469,9 +476,10 @@ static void SNPsProcess(std::vector<std::string> &line) {
         exit(1);
     }
 
-    // An N is an assembly gap and stays one: the enriched genome holds exactly the
-    // reference's N (see enricher.py's SNPsProcess). The dict still lists the record.
-    if (genomeStr[pos0] == 'N') return;
+    // An N is an assembly gap and stays one, as does any other byte that is no base or
+    // IUPAC code, which buildTST and searchBruteForce read as N (see enricher.py's
+    // SNPsProcess). The dict still lists the record.
+    if (!isReferenceCode(genomeStr[pos0])) return;
 
     // build the base SET: what earlier records coded here (else the reference base)
     // + each alt allele of length 1. Starting from the reference base alone on each

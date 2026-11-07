@@ -132,8 +132,9 @@ Let `n` be the contig length. Positions outside `[0, n)` are **off the contig**.
 
 **N is a gap.** A genomic `N`, like a position off the contig, matches nothing: no
 guide base, no PAM letter (not even the search PAM's `N`), and it ends the pad. It is
-never "any base" and the enricher never writes one for a variant (it keeps the
-reference's `N` exactly, even where a VCF lists ALTs at one). The base that matches
+never "any base" and the enricher never writes one for a variant: it keeps the
+reference's `N` exactly, even where a VCF lists ALTs at one, and likewise a byte that is
+no base or IUPAC code (read as `N`, below). The base that matches
 everything is `Q` (section 4.1), the symbol of a position where the reference base and
 the SNP ALTs cover A, C, G and T: it counts as a base everywhere above (in the guide
 region, the pad and the flank), and a site, its pad and its PAM may hold it.

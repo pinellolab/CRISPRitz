@@ -24,16 +24,18 @@
 # fields, a reference IUPAC base and N, '*', the chromosome edges, and split records
 # phased so that one haplotype slot holds two ALTs. Cases 31-33 cover each record's
 # INFO/AF read by its key wherever it stands, the same REF>ALT on two records merged
-# into one dict entry, and ALTs on a reference N. Besides the four outputs, the file
+# into one dict entry, and ALTs on a reference N and on reference bytes that are no
+# base or IUPAC code (X, '-'). Besides the four outputs, the file
 # set and the run log (stdout+stderr, e.g. the skip warnings and the four-base note)
 # must match.
 #
 # Agreement is not correctness, so the outputs are also checked against what they
 # must be: the enriched genome against an independent reconstruction from the FASTA
 # and the VCF (all four bases are Q, the search's any-base symbol, and an N stays an
-# N: the enriched genome holds an N exactly where the reference does -- the N-count
-# invariant), the dict at cases 24 and 31-33 (merged carriers, AF by key, the records
-# at a reference N, a record listing three SNP ALTs) and the indel log's AF at case 31.
+# N, as does a byte that is no base or IUPAC code: the enriched genome holds an N
+# exactly where the reference does -- the N-count invariant), the dict at cases 24
+# and 31-33 (merged carriers, AF by key, the records at a reference N, X or '-', a
+# record listing three SNP ALTs) and the indel log's AF at case 31.
 # A reference holding 'Q' must be refused by both ports alike.
 #
 # Prints "BYTE-IDENTICAL: PASS" only if every check passes.
@@ -84,6 +86,9 @@ for i in range(1610, 1621):
 seq[1650 - 1] = 'R'
 # case 26: another reference IUPAC base, for split records
 seq[2200 - 1] = 'Y'
+# case 33: bytes that are no base or IUPAC code (RepeatMasker -x masks with X)
+seq[2420 - 1] = 'X'
+seq[2425 - 1] = '-'
 seq = ''.join(seq)
 with open(sys.argv[1], 'w') as f:
     f.write(">chrTest\n")
@@ -525,12 +530,17 @@ lines.append(row(p, "rs1963", b(p), other(p,0)+","+other(p,1), "AC=1,2;AF=0.1,0.
 lines.append(row(p, "rs1964", b(p), other(p,1), "AC=1;AF=0.05", ["0|0","0|0","1|0","0|0","0|0"]))
 
 # 33) ALTS ON A REFERENCE N (the planted N run 1610-1620): three split ALTs (1612) and
-#     a record listing all four (1616) leave the N; the four-base sites elsewhere are
-#     Q, here one record listing three SNP ALTs (2380).
+#     a record listing all four (1616) leave the N; and on reference bytes that are no
+#     base or IUPAC code, which the search reads as N: two split ALTs (the X at 2420)
+#     and a record listing two (the '-' at 2425) leave them; the four-base sites
+#     elsewhere are Q, here one record listing three SNP ALTs (2380).
 for j, alt in enumerate("ACG"):
     lines.append(row(1612, "rs%d" % (1970 + j), "N", alt, "AC=1;AF=0.1", G1))
 lines.append(row(1616, "rs1973", "N", "A,C,G,T", "AC=1,1,1,1;AF=0.1,0.1,0.1,0.1",
                  ["0|1","2|3","0|4","0|0","0|0"]))
+lines.append(row(2420, "rs1975", "A", "C", "AC=1;AF=0.1", G1))
+lines.append(row(2420, "rs1976", "A", "G", "AC=1;AF=0.2", ["0|0","1|0","0|0","0|0","0|0"]))
+lines.append(row(2425, "rs1977", "A", "C,T", "AC=1,1;AF=0.1,0.2", ["0|1","2|0","0|0","0|0","0|0"]))
 p=2380
 lines.append(row(p, "rs1974", b(p), ",".join(other(p,j) for j in range(3)), "AC=1,1,1;AF=0.1,0.2,0.3",
                  ["0|1","0|2","3|0","0|0","0|0"]))
@@ -646,8 +656,8 @@ ref = "".join(open(fa).read().splitlines()[1:]).upper()
 BIT = {"A": 1, "C": 2, "G": 4, "T": 8}
 CODE = {3: "M", 5: "R", 9: "W", 6: "S", 10: "Y", 12: "K", 14: "B", 13: "D", 11: "H", 7: "V", 15: "Q"}
 # every PASS record with a one-base REF codes its one-character A/C/G/T ALTs at POS,
-# added to the reference base when that is A/C/G/T; a reference N stays N; one base
-# leaves the reference letter
+# added to the reference base when that is A/C/G/T; a reference N, or a byte that is no
+# base or IUPAC code, stays as it is; one base leaves the reference letter
 mask = {}
 for line in open(vcf):
     if line.startswith("#"):
@@ -663,7 +673,7 @@ for line in open(vcf):
     mask[pos] = m
 want = list(ref)
 for pos, m in mask.items():
-    if ref[pos] != "N" and m in CODE:
+    if ref[pos] in "ACGTRYSWKMBDHV" and m in CODE:
         want[pos] = CODE[m]
 want = "".join(want)
 bad = 0
@@ -680,8 +690,10 @@ for port, d in (("enricher.py", pydir), ("enricher.cpp", cppdir)):
              ", at the same positions" if nref == ngot else ""))
     bad += bool(diff) + (nref != ngot)
 assert want.count("Q") >= 12 and "N" not in [want[p] for p in mask if ref[p] != "N"]
+assert [want[2419], want[2424]] == ["X", "-"] and 2419 in mask and 2424 in mask
 # the dict at the cases that pin merged alleles, per-record AF, the records at a
-# reference N and a record listing three SNP ALTs; the indel log's AF read by key
+# reference N, X or '-' and a record listing three SNP ALTs; the indel log's AF read by
+# key
 d = json.load(open("%s/%s" % (pydir, jsn)))
 def entries(p):
     v = d.get("chrTest,%d" % p)
@@ -695,6 +707,8 @@ expect = {
     1616: ("listed at a reference N",
            ["S1:0|1;N,A;rs1973;0.1", "S2:2|3;N,C;rs1973;0.1", "S2:2|3;N,G;rs1973;0.1",
             "S3:0|4;N,T;rs1973;0.1"]),
+    2420: ("listed at a reference X", ["S1:0|1;A,C;rs1975;0.1", "S2:1|0;A,G;rs1976;0.2"]),
+    2425: ("listed at a reference '-'", ["S1:0|1;A,C;rs1977;0.1", "S2:2|0;A,T;rs1977;0.2"]),
     2130: ("carriers merged",
            ["S1:0|1,S3:1|0;%s,%s;rs1892;0.3" % (r(2130), other(2130, 0)),
             "S2:0|1;%s,%s;rs1891;0.2" % (r(2130), other(2130, 1))]),

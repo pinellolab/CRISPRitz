@@ -171,6 +171,10 @@ _BASE_BIT = {'A': 1, 'C': 2, 'G': 4, 'T': 8}
 _IUPAC_BY_MASK = {sum(_BASE_BIT[c] for c in spellings[0]): letter
                   for letter, spellings in iupac_code.items()}
 _IUPAC_BY_MASK[15] = 'Q'
+# the reference letters a SNP is coded over: A/C/G/T and the IUPAC ambiguity codes. N is
+# a gap, and so is any other byte (buildTST and searchBruteForce read it as N); Q is
+# refused when the FASTA is read.
+_REFERENCE_CODES = frozenset('ACGTRYSWKMBDHV')
 
 
 # A plain decimal number (what an AF value is). Spelled out rather than left to float(),
@@ -199,12 +203,14 @@ def SNPsProcess(line):
         sys.exit(1)
     altAlleles = line[4].strip().split(',') #list di tutti gli alleli alternative
     referenceNucleotide = genomeStr[pos] #nucleotide reference preso dalla stringa del fasta
-    if referenceNucleotide == 'N':
+    if referenceNucleotide not in _REFERENCE_CODES:
         # An N is an assembly gap, which buildTST and searchTST match to nothing, and a
         # variant record does not make it a base: the enriched genome holds exactly the
         # reference's N (2.9.1 coded a record listing two or three ALTs over an N, making
-        # a gap searchable, and merging split records would have too). The dict still
-        # lists the record.
+        # a gap searchable, and merging split records would have too). Any other byte
+        # that is no base or IUPAC code (such as the X of RepeatMasker -x) is a gap too,
+        # which buildTST and searchBruteForce read as N, and stays as it is. The dict
+        # still lists the record.
         return
     # The reference base and every single-character ALT, as A/C/G/T bits. A member
     # that is not A/C/G/T -- the '*' of a spanning deletion, an 'N', a lowercase

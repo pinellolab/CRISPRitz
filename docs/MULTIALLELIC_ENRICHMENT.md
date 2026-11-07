@@ -48,8 +48,9 @@ A/C/G/T ALT of every PASS (or `.`) record at that position}**, whatever the orde
 adjacency of those records — the code the same site gets when written as one record listing
 every ALT. A record adds its ALTs to what earlier records coded; it no longer starts from
 the reference base. Two exceptions are new in 2.10.0: a set of all four bases is written
-`Q`, not its IUPAC letter `N` (section 2.2), and a reference `N` stays `N` whatever the
-records at it list (section 2.8; 2.9.1 coded a record listing two or three ALTs over it).
+`Q`, not its IUPAC letter `N` (section 2.2), and a reference `N`, like any reference byte
+that is no base or IUPAC code, stays as it is whatever the records at it list (section 2.8;
+2.9.1 coded a record listing two or three ALTs over it).
 The rest of the rule is that of 2.9.1: an ALT that is not A/C/G/T (`*`, `N`, a lowercase
 base) adds nothing, a reference IUPAC base adds nothing of its own (the code there is that
 of the ALTs alone, `Q` if they cover all four bases), and a set of one base leaves the
@@ -207,8 +208,8 @@ gave identical md5 for all four outputs and the run log. Such an input is still 
 by 2.10.0 as by 2.9.1 wherever
 
 * a record lists three SNP ALTs: `Q`, where 2.9.1 wrote `N` (2.2);
-* a record lists two or three ALTs at a reference `N`: the `N` stays, where 2.9.1 coded it
-  (2.8);
+* a record lists two or three ALTs at a reference `N`, or at another byte that is no base
+  or IUPAC code: the byte stays, where 2.9.1 coded it (2.8);
 * a record lists `AF` at another place in its INFO than the file's first record: it gets
   its AF, in the dictionary and the indel log (2.5);
 * a SNP lies outside the chromosome: an error (2.7), as is a reference holding `Q` (2.2).
@@ -245,6 +246,13 @@ a reference `N` (`N>A,C`) was coded over it (`M`), making a gap searchable, and 
 listing three SNP ALTs wrote `N` over a base. Split records at an `N` were not coded over it,
 as 2.9.1 coded each from the reference base alone, but merging them (section 2.1) would have
 been, as on the branch (`f266eac`). The dictionary still lists a record at an `N`.
+
+The same holds for a reference byte that is no base or IUPAC code, such as the `X`
+RepeatMasker `-x` masks with, a `-` or a `.`: `buildTST` and `searchBruteForce` read it as
+`N` (docs/INDEX_FORMAT.md section 3.1), so the enriched genome keeps it as it is, and the
+dictionary lists the records at it (unit test `test_reference_N_and_reference_iupac`,
+`verify_enricher.sh` case 33). Merged split records were coded over it up to `2d1f57b` (an
+`X` with ALTs C and G became `S`), and up to 2.9.1 a record listing two or three ALTs was.
 
 ## 3. Cost
 
@@ -331,30 +339,30 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
   (48 in all), with exact expected outputs: two and three ALTs in every order, split ==
   joined, four bases coded `Q` (every order, whatever the AF fields, a record listing three
   ALTs, an ALT on two records), a reference holding `Q` refused, reference `N` and IUPAC
-  bases, the N-count invariant (an `N` exactly where the reference has one, in both modes),
-  mode `no` == mode `yes`, the dictionary entries (carriers, rsIDs, AFs, haploid / unphased /
-  missing / `GT:DP` genotypes, records without carriers, two or three ALTs on one haplotype
-  slot passed through verbatim), a non-PASS record, the same allele on two split records
-  and on a split record and a record listing several (merged carriers), each record's AF by
-  its key, a split record beside a multi-ALT record, `*`, non-adjacent records, the indel
-  outputs, a position with one record, and a SNP outside the chromosome. Against the
-  branch's last commit (`f266eac`, the four-base rule) 26 of the 48 fail, against 2.9.1 44
-  (the 4 that pass, mode `no` == mode `yes` and a position with one record, pin what does
-  not change).
+  bases and bytes that are neither (`X`, `-`: kept), the N-count invariant (an `N` exactly
+  where the reference has one, in both modes), mode `no` == mode `yes`, the dictionary
+  entries (carriers, rsIDs, AFs, haploid / unphased / missing / `GT:DP` genotypes, records
+  without carriers, two or three ALTs on one haplotype slot passed through verbatim), a
+  non-PASS record, the same allele on two split records and on a split record and a record
+  listing several (merged carriers), each record's AF by its key, a split record beside a
+  multi-ALT record, `*`, non-adjacent records, the indel outputs, a position with one
+  record, and a SNP outside the chromosome. Against the branch's last commit (`f266eac`, the
+  four-base rule) 26 of the 48 fail, against 2.9.1 44 (the 4 that pass, mode `no` == mode
+  `yes` and a position with one record, pin what does not change).
 * `verify_enricher.sh` — grows from 17 to 33 cases (cases 18-30: split sites in every
   order, the same sites as one record, four bases, non-adjacent records, genotype shapes,
   SNP + indel at one position and in an indel's window, a split record beside a multi-ALT
   record, a non-PASS record, the same allele twice, AF spellings, `AF_<x>` fields, a
   reference IUPAC base and `N`, `*`, the chromosome edges, two and three ALTs on one
   haplotype slot; 31-33: AF read by its key, the same allele on two records merged, ALTs on
-  a reference `N`); both ports byte-identical, with the file set and the run log, and
-  checked against what they must be: the enriched genome against an independent
-  reconstruction from the FASTA and the VCF (with the N-count invariant), the dictionary
-  at cases 24 and 31-33 (merged carriers, AF by key, the records at a reference `N`, a
-  record listing three SNP ALTs), the indel log's AF at case 31, and a reference holding
-  `q` refused by both ports with one message. Earlier, on the branch, also checked against
-  an independent oracle (91 coded positions, 81 dictionary keys, 0 mismatches) and an
-  independent carrier check at the 62 positions whose SNP records each list one ALT, none
+  a reference `N`, `X` or `-`); both ports byte-identical, with the file set and the run
+  log, and checked against what they must be: the enriched genome against an independent
+  reconstruction from the FASTA and the VCF (with the N-count invariant), the dictionary at
+  cases 24 and 31-33 (merged carriers, AF by key, the records at a reference `N`, `X` or
+  `-`, a record listing three SNP ALTs), the indel log's AF at case 31, and a reference
+  holding `q` refused by both ports with one message. Earlier, on the branch, also checked
+  against an independent oracle (91 coded positions, 81 dictionary keys, 0 mismatches) and
+  an independent carrier check at the 62 positions whose SNP records each list one ALT, none
   repeated (each entry lists exactly its record's carriers, genotypes verbatim; 0
   mismatches).
 * `test/run_four_allele_test.sh` — `Q` end to end through `crispritz.py` (`add-variants`

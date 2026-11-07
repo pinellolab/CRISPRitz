@@ -213,7 +213,9 @@ reference base and ALTs cover all four bases is coded `Q`, a fifth symbol `index
 `search` read as any base: its IUPAC letter, `N`, is a gap to them, which matches nothing
 (an index file holding `Q` is flagged so that an engine without it refuses it; a reference
 FASTA must not hold `Q`, and `add-variants` refuses one). A reference `N` stays `N`, whatever
-the VCF lists there. Apply an allele-frequency filter after splitting, so it acts per ALT.
+the VCF lists there, as does a byte that is no base or IUPAC code (such as the `X`
+RepeatMasker `-x` masks with), which `index-genome` and `search` read as `N`. Apply an
+allele-frequency filter after splitting, so it acts per ALT.
 Each record's `INFO/AF` is read by its key (up to 2.9.1 its place came from the file's
 first record). Each dictionary entry keeps its own record's genotypes verbatim, and one
 allele on two records is one entry with the carriers of both: split records phased one by
