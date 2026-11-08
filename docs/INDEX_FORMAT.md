@@ -183,7 +183,7 @@ a site whose real PAM runs off the contig is rejected exactly as a dedicated ind
 never stores it. Without `--prune-pam`, a PAM-less index's flank is not tested at
 all (2.9.1 semantics: a genomic N in the flank does not drop the site), but a leaf
 flagged `FLANK_OFF` is skipped, so a non-pruning search returns the windows 2.9.1
-could hold, plus the B2/B3 sites, and never a coordinate before base 0.
+could hold, plus the B1, B2 and B3 sites, and never a coordinate before base 0.
 
 ## 4. Format 2 on disk
 
@@ -675,7 +675,7 @@ of `a5379e0`:
    assume `mb` (or `K`) bases exist beyond the target. The target itself (guide +
    PAM as reported) always lies inside the contig and holds no N in its guide, at
    any search guide length (section 3.2; the boundary suite checks every row).
-6. **Equivalence claims.** With B2-B4, a `--prune-pam` search of a format-2 PAM-less
+6. **Equivalence claims.** With B1-B4, a `--prune-pam` search of a format-2 PAM-less
    index of flank `K` returns the same rows as a dedicated format-2 index **built for
    the same guide length `G` and `mb`**, for any 3' PAM `L <= K` and any search guide
    length, contig ends included; and of two indexes built for the same `G`, the one
