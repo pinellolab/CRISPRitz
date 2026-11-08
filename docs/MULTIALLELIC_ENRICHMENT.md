@@ -25,10 +25,12 @@ the ALTs of the record in hand and overwrote the position, and keyed its SNP dic
 `chr,pos` and overwrote that too. So of the records at one position only the **last in file
 order** survived, in the enriched genome (hence the search index) and in the dictionary
 (hence CRISPRme's Tier-0 registry and Tier-1 genotype store, which are compiled from it). A
-record listing several ALTs on one line was coded correctly (except with three SNP ALTs,
-section 2.2, or with two or three at a reference `N`, section 2.8), but no published panel
-enriches one: they are normalised first (0 of 1,998,332 chr22 records of HGDP + 1000 Genomes
-carry a comma in ALT).
+record listing several ALTs on one line was coded correctly, except that one listing three
+SNP ALTs over an A, C, G or T base, or four over a reference IUPAC code, wrote `N` (section
+2.2), and one listing two or three at a reference `N`, or two or more at another byte that
+is no base or IUPAC code, wrote their code over it (section 2.8; section 2.6 lists both). No
+published panel enriches such a record: they are normalised first (0 of 1,998,332 chr22
+records of HGDP + 1000 Genomes carry a comma in ALT).
 
 **From 2.10.0 every SNP ALT is enriched** (section 2.1), in any record order. A position
 whose SNP ALTs, with its reference base when that is A, C, G or T, cover all four bases is
@@ -108,13 +110,13 @@ record is read (a position that holds four bases holds them whatever comes later
 positions per chromosome (`NOTE: <n> position(s) of <chr> are coded Q, the four-allele
 symbol, ...`; stderr is fatal to a CRISPRme stage).
 
-`Q` is also what a record listing three SNP ALTs over an A, C, G or T base now gets, where
-2.9.1 wrote `N`; a reference `N` never becomes `Q` (section 2.8); a reference IUPAC base
-adds no base of its own (2.1), so `Q` there needs ALTs covering all four bases. A reference
-FASTA must not hold `Q`, in either case (it would pass a base of its own off as a
-four-allele position): both ports, and `add-variants` for a chromosome it copies, refuse one
-with `ERROR: <chr> holds 'Q' at <pos>: a reference FASTA must not hold Q, which is reserved
-for four-allele SNP positions` and exit status 1.
+`Q` is also what a record listing three SNP ALTs over an A, C, G or T base, or four over a
+reference IUPAC code, now gets, where 2.9.1 wrote `N`; a reference `N` never becomes `Q`
+(section 2.8); a reference IUPAC base adds no base of its own (2.1), so `Q` there needs ALTs
+covering all four bases. A reference FASTA must not hold `Q`, in either case (it would pass
+a base of its own off as a four-allele position): both ports, and `add-variants` for a
+chromosome it copies, refuse one with `ERROR: <chr> holds 'Q' at <pos>: a reference FASTA
+must not hold Q, which is reserved for four-allele SNP positions` and exit status 1.
 
 On chr22 of HGDP + 1000 Genomes, 2,448 positions carry three SNP ALTs (section 4): the
 four-base rule left out an ALT at each (AC = 1 at 1,193 of them, AC ≥ 41 at 3); `Q` codes
@@ -260,10 +262,11 @@ An `N` in the reference is a gap, and no VCF record makes it a base: the enriche
 holds an `N` exactly where the reference does, so its N count is the reference's (unit test
 `test_enriched_genome_keeps_the_references_N` and the reconstruction check of
 `verify_enricher.sh`). Up to 2.9.1 a record listing two or three SNP ALTs at a reference `N`
-(`N>A,C`) was coded over it (`M`), making a gap searchable, and a record listing three SNP
-ALTs wrote `N` over a base. Split records at an `N` were not coded over it, as 2.9.1 coded
-each from the reference base alone, but merging them (section 2.1) would have been, as on
-the branch (`f266eac`). The dictionary still lists a record at an `N`.
+(`N>A,C`) was coded over it (`M`), making a gap searchable, and one listing three SNP ALTs
+over an A, C, G or T base, or four over a reference IUPAC code, wrote `N` there (section
+2.2). Split records at an `N` were not coded over it, as 2.9.1 coded each from the reference
+base alone, but merging them (section 2.1) would have been, as on the branch (`f266eac`).
+The dictionary still lists a record at an `N`.
 
 The same holds for a reference byte that is no base or IUPAC code, such as the `X`
 RepeatMasker `-x` masks with, a `-` or a `.`: `buildTST` and `searchBruteForce` read it as
@@ -729,12 +732,13 @@ Taken for CRISPRitz 2.10.0 and CRISPRme 2.10.0 (CRISPRme plan, section 3, B1-B4)
 ## 8. Published indexes and stores to rebuild
 
 Every variant index built from a panel VCF holding more than one SNP record at a position,
-or a record that section 2.6 lists (three SNP ALTs, SNP ALTs at a reference `N`, `AF` at
-another place in its INFO than in the first record), and everything derived from its
-enrichment. Reference-only indexes (`NRG_3_hg38`, `NRR_3_hg38`, `NGG_3_hg38`, `NNN_3_hg38`,
-`NNNNNNNN_3_hg38`) are not affected by the enricher, but are rebuilt too, in index format 2
-(docs/INDEX_FORMAT.md; owner decision C1: one format on the Hub, and the sites at contig
-ends and N runs format 2 adds).
+or a record that section 2.6 lists (three SNP ALTs over an A, C, G or T base or four over a
+reference IUPAC code; two or three at a reference `N` or two or more at another byte that is
+no base or IUPAC code; `AF` at another place in its INFO than in the first record; a SNP
+outside the chromosome), and everything derived from its enrichment. Reference-only indexes
+(`NRG_3_hg38`, `NRR_3_hg38`, `NGG_3_hg38`, `NNN_3_hg38`, `NNNNNNNN_3_hg38`) are not affected
+by the enricher, but are rebuilt too, in index format 2 (docs/INDEX_FORMAT.md; owner
+decision C1: one format on the Hub, and the sites at contig ends and N runs format 2 adds).
 
 Panels, each measured on its published chr22 source VCF (`vcfs/<panel>/` of
 `lucapinello/crisprme-data`): **HGDP + 1000 Genomes** (`hg38_HGDP1kGP`) — 43,389 positions

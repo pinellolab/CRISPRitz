@@ -143,12 +143,12 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   sample-positions, which CRISPRme must take as PUTATIVE (owner decision B4; no CRISPRme
   release does so yet, see below).
 - **A reference `N` stays `N`**: the enriched genome holds an `N` exactly where the
-  reference does. A record listing two or three ALTs at a reference `N` (`N>A,C`) was coded
-  over it (`M`), making a gap searchable, and merging split records (see Fixed) would have
-  coded them over it too. A reference byte that is no base or IUPAC code (such as the `X`
-  RepeatMasker `-x` masks with), which `index-genome` and `search` read as `N` (see Fixed),
-  is no longer coded over either (a record listing two or more SNP ALTs was, `N` for all
-  four). The dict still lists such records. (As before, the enricher reads the reference
+  reference does. A record listing two or three SNP ALTs at a reference `N` (`N>A,C`) was
+  coded over it (`M`), making a gap searchable, and merging split records (see Fixed) would
+  have coded them over it too. A reference byte that is no base or IUPAC code (such as the
+  `X` RepeatMasker `-x` masks with), which `index-genome` and `search` read as `N` (see
+  Fixed), is no longer coded over either (a record listing two or more SNP ALTs was, `N` for
+  all four). The dict still lists such records. (As before, the enricher reads the reference
   upper-cased, a soft-masked base being a base, and writes each chromosome it enriches in
   upper case; `add-variants` copies a chromosome without a VCF as it is.)
 - `add-variants` refuses a reference FASTA holding `Q`, in either case (in a chromosome it
@@ -231,13 +231,14 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   one record can change too: on chr22 with the raw HPRC vcfwave VCF (no position with two
   SNP records), the genome differs at 61 bases, each `N` → `Q`, and the dict, indel log and
   fake-indel FASTA are byte-identical.
-- **A record listing three SNP ALTs over an A, C, G or T base wrote `N`**, which
-  `index-genome` and `search` read as an assembly gap: every target through the position,
-  the reference one included, left the index (shown through the CLI: 0 targets found,
-  against 1 with the fix). Merging split records would have made it common (2,448 chr22
-  positions). A position whose ALTs, with its reference base when that is A, C, G or T,
-  cover all four bases, at a reference base or IUPAC code, is now `Q` (see Added): no ALT is
-  left out, the dict lists all three, and one stdout line counts such positions.
+- **A record listing three SNP ALTs over an A, C, G or T base, or four over a reference
+  IUPAC code, wrote `N`**, which `index-genome` and `search` read as an assembly gap: every
+  target through the position, the reference one included, left the index (shown through
+  the CLI: 0 targets found, against 1 with the fix). Merging split records would have made
+  it common (2,448 chr22 positions). A position whose ALTs, with its reference base when
+  that is A, C, G or T, cover all four bases, at a reference base or IUPAC code, is now `Q`
+  (see Added): no ALT is left out, the dict lists them all, and one stdout line counts such
+  positions.
 - **`add-variants` read each record's `INFO/AF` at the place it had in the file's first
   record**, so a record whose INFO held `AF` at another place (every record, if the first
   had no `AF`) got no AF, in the dict and the indel log: the retired 1000G2021_HGDP index (a

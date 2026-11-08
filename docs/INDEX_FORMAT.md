@@ -248,10 +248,10 @@ Notes:
 A, C, G or T, cover all four bases (docs/MULTIALLELIC_ENRICHMENT.md, sections 2.1 and 2.2),
 unless the reference holds an `N` or another byte that is no base or IUPAC code there, which
 stays as it is (section 3.1). The IUPAC letter of the four would be `N`, which section 3
-reads as a gap: up to 2.9.1 a record listing three SNP ALTs over an A, C, G or T base wrote
-it, removing every target through the position from the index. `buildTST`, `searchTST` and
-`searchBruteForce` read `Q` as the mask `1111`: it matches every guide base and every PAM
-letter, so it is never a mismatch.
+reads as a gap: up to 2.9.1 a record listing three SNP ALTs over an A, C, G or T base, or
+four over a reference IUPAC code, wrote it, removing every target through the position from
+the index. `buildTST`, `searchTST` and `searchBruteForce` read `Q` as the mask `1111`: it
+matches every guide base and every PAM letter, so it is never a mismatch.
 
 Every 4-bit slot of the tree already uses 15 of its 16 values: a root, lo or hi slot
 holds `0` (no kid) or one of the 14 IUPAC letters (1..14, the letter's A|C|G|T mask),
