@@ -229,8 +229,8 @@ Notes:
 * The per-leaf record is the same size as in format 1 (the `lflags` byte takes the
   place of the `'0'`/`'_'` marker), so a format-2 index differs in size from a
   format-1 index of the same genome (one of bases, IUPAC codes and N, section 3.1)
-  only by the sites B2/B3/B4 add and 32 + K bytes of header and trailer per `.bin`
-  (section 10 has the measurement).
+  only by the sites B2/B3/B4 add, the sites at index 0 that the 2.9.1 builder lost (B1),
+  and 32 + K bytes of header and trailer per `.bin` (section 10 has the measurement).
 * The tree serialization (but for `Q`, section 4.1), the sort and the leaf chains are
   unchanged. A contig with no boundary site and no window starting at its first base
   (B1), every byte of which is a base, an IUPAC code or N (section 3.1), therefore has
@@ -469,16 +469,16 @@ empty targets file each.
 
 A format-2 index of a genome holds every site the format-1 index of the same genome and
 parameters holds (but for a window the 2.9.1 builder stored at index 0 from the wrong bases,
-B1), with the same string, flank and coordinates, plus the boundary sites (measured on hg38
-chr22 and chr1, section 10), when every byte of the genome is a base, an IUPAC code or N: a
-2.9.1 window holding another byte is now discarded or has a shorter pad, and 2.9.1 read
-every PAM after such a byte one base off (section 3.1). A 2.10.0 search on it returns every
-row a 2.10.0 search on the format-1 index returns, plus rows at sites whose guide's far end
-lies within `mb` nt of a contig end or an N run (B3), whose PAM lies within `K - L` nt of a
-contig end under `--prune-pam` (B4), or whose PAM ends on a contig's last base (B2), and at
-a site whose window starts at the contig's first base where the 2.9.1 builder stored another
-window from the wrong bases (B1: a + strand 3' site whose guide starts at exactly `mb`,
-a + strand 5' PAM at base 0).
+B1, where it holds the real site), with the same string, flank and coordinates, plus the
+boundary sites (measured on hg38 chr22 and chr1, section 10), when every byte of the genome
+is a base, an IUPAC code or N: a 2.9.1 window holding another byte is now discarded or has a
+shorter pad, and 2.9.1 read every PAM after such a byte one base off (section 3.1). A 2.10.0
+search on it returns every row a 2.10.0 search on the format-1 index returns, plus rows at
+sites whose guide's far end lies within `mb` nt of a contig end or an N run (B3), whose PAM
+lies within `K - L` nt of a contig end under `--prune-pam` (B4), or whose PAM ends on a
+contig's last base (B2), and at a site whose window starts at the contig's first base where
+the 2.9.1 builder stored another window from the wrong bases (B1: a + strand 3' site whose
+guide starts at exactly `mb`, a + strand 5' PAM at base 0).
 
 ## 7. Reading the stamp without loading the tree
 
