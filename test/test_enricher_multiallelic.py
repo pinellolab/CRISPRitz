@@ -301,6 +301,13 @@ class EnricherMultiallelicTests(object):
         # four ALTs on a reference IUPAC base: they cover every base, so Q
         recs4 = [rec(130, "y" + x, "R", x, "AC=1;AF=0.1", ["0|1", "0|0", "0|0", "0|0"]) for x in "ACGT"]
         self.assertEqual(self.run_enricher(recs4, fasta=fasta).base(130), "Q")
+        # one record listing all four bases, which 2.9.1 coded N at both: Q over the
+        # reference IUPAC base, and the byte that is no base or IUPAC code stays
+        gt4 = ["0|1", "2|3", "0|4", "0|0"]
+        joined4 = [rec(130, "yJ", "R", "A,C,G,T", "AC=1,1,1,1;AF=0.1,0.1,0.1,0.1", gt4),
+                   rec(140, "xJ", ref1(140), "A,C,G,T", "AC=1,1,1,1;AF=0.1,0.1,0.1,0.1", gt4)]
+        r4 = self.run_enricher(joined4, fasta=fasta)
+        self.assertEqual([r4.base(130), r4.base(140)], ["Q", "X"])
 
     def test_enriched_genome_keeps_the_references_N(self):
         """The N-count invariant: whatever the records, the enriched genome holds an N

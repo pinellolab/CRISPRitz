@@ -26,7 +26,8 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
 
 ### Added
 - **`Q`, the four-allele symbol.** A position whose SNP ALTs, with its reference base when
-  that is A, C, G or T, cover all four bases is written `Q` in the enriched genome, and
+  that is A, C, G or T, cover all four bases is written `Q` in the enriched genome (but a
+  reference `N`, or another byte that is no base or IUPAC code, stays: see Changed), and
   `buildTST`, `searchTST` and `searchBruteForce` read it as any base (`1111`): it matches
   every guide base and every PAM letter. `N` stays a gap that matches nothing
   ([docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md) section 4.1,
@@ -35,9 +36,10 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   an eq slot, where `1111` ends a string) and in a flank `1111`; an index file holding it is
   flagged in its header (bit 2, `FOUR_ALLELE`), so that no engine that cannot read it
   searches it, and `Q` changes no byte of a file that does not hold it. `buildTST` says on
-  stdout how many targets and files hold `Q`, `searchTST` how many of the files it reads are
-  flagged, and `index-info` reports `four_allele` per format-2 file. On HGDP + 1000 Genomes
-  chr22, 2,448 positions carry three SNP ALTs.
+  stdout how many of its targets (the sites it stores, with `Q` in the guide region, pad or
+  flank) and files hold `Q`, `searchTST` how many of the files it reads are flagged, and
+  `index-info` reports `four_allele` per format-2 file. On HGDP + 1000 Genomes chr22, 2,448
+  positions carry three SNP ALTs.
 - **Index format 2** ([docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md)). Every `.bin` built by
   this version starts with a header -- the magic bytes `CZI\xfe`, the format version, and
   the build parameters (PAM side, all-N PAM, guide length, PAM length, max bulges, the PAM)
@@ -96,24 +98,25 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   and PAM-less flanks, beside `Q`: `buildTST` writes nothing to stderr, every search equals
   the oracle and, without bulges, `searchBruteForce`, and exactly the planted perfect sites
   are found.
-- `test/test_enricher_multiallelic.py`: 24 unit tests run against both ports (48), with exact
-  expected outputs (every ALT, `Q`, the N-count invariant, merged carriers, each record's AF,
-  a reference holding `Q`); 44 of them fail on 2.9.1. In CI with `verify_enricher.sh`, which
-  grows from 17 to 33 cases (split multi-allelic sites in every order, genotype shapes, SNP +
-  indel at one position, four bases, two ALTs on one haplotype slot, AF by key, one allele on
-  two records, ALTs on a reference `N`, `X` or `-`) and now also checks the outputs against
-  what they must be: the enriched genome against an independent reconstruction (with the
-  N-count invariant), the dict where one allele's records merge, AFs are read by key,
-  records sit at a reference `N`, `X` or `-` and a record lists three SNP ALTs (cases 24 and
-  31-33), the indel log's AF read by key (case 31), and a reference holding `Q` refused.
+- `test/test_enricher_multiallelic.py`: 24 unit tests run against both ports (48), with
+  exact expected outputs (every ALT, `Q`, the N-count invariant, merged carriers, each
+  record's AF, a reference holding `Q` or `q`); 44 of them fail on 2.9.1. In CI with
+  `verify_enricher.sh`, which grows from 17 to 33 cases (split multi-allelic sites in every
+  order, genotype shapes, SNP + indel at one position, four bases, two ALTs on one haplotype
+  slot, AF by key, one allele on two records, ALTs on a reference `N`, `X` or `-`) and now
+  also checks the outputs against what they must be: the enriched genome against an
+  independent reconstruction (with the N-count invariant), the dict where one allele's
+  records merge, AFs are read by key, records sit at a reference `N`, `X` or `-` and a
+  record lists three SNP ALTs (cases 24 and 31-33), the indel log's AF read by key (case
+  31), and a reference holding `q` refused.
 - `docs/MULTIALLELIC_ENRICHMENT.md`: the behaviour, its measurement, what CRISPRme must change
   to use it, the owner's decisions, and the published indexes and stores to rebuild.
 
 ### Changed
 - **New indexes are format 2, which CRISPRitz 2.9.1 and earlier cannot search** (2.9.1
   refuses one: `not a valid CRISPRitz index (.bin) file (numLeaves=-28747197)`). Indexes
-  built by earlier versions keep working (see Fixed, IDX-14) but lack the sites B2-B4 add
-  until rebuilt.
+  built by earlier versions keep working (see Fixed, IDX-14) but lack, until rebuilt, the
+  sites B2-B4 add and the sites behind the index-0 leaves IDX-14 drops.
 - **A search guide of another length than the index was built for** (e.g. CRISPRme's 21-nt
   SaCas9 or 23-nt Cas12a guides off a 20-nt index) is still searched, now with a `NOTE:` on
   stdout naming both lengths and what that limits; its rows are exact for what the index
@@ -144,10 +147,14 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   over it (`M`), making a gap searchable, and merging split records (see Fixed) would have
   coded them over it too. A reference byte that is no base or IUPAC code (such as the `X`
   RepeatMasker `-x` masks with), which `index-genome` and `search` read as `N` (see Fixed),
-  stays as it is too. The dict still lists such records.
-- `add-variants` refuses a reference FASTA holding `Q` (in a chromosome it enriches, in both
-  enricher ports, and in one it copies), with `ERROR: <chr> holds 'Q' at <pos>: ...` and exit
-  status 1: the search would read it as a four-allele position.
+  is no longer coded over either (a record listing two or more SNP ALTs was, `N` for all
+  four). The dict still lists such records. (As before, the enricher reads the reference
+  upper-cased, a soft-masked base being a base, and writes each chromosome it enriches in
+  upper case; `add-variants` copies a chromosome without a VCF as it is.)
+- `add-variants` refuses a reference FASTA holding `Q`, in either case (in a chromosome it
+  enriches, in both enricher ports, and in one it copies), with
+  `ERROR: <chr> holds 'Q' at <pos>: ...` and exit status 1: the search would read it as a
+  four-allele position.
 - **The dict now shows the phase of split records as it was phased, conflicts included.**
   Each entry keeps its own record's genotypes verbatim (a merged one, above, the union of
   its records'), and records phased one by one can put two ALTs of a position on one
@@ -187,8 +194,10 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   the builder wrote leaf index 0 as minus strand for a 3' PAM, the search read it as plus.
   The search now reads it as written, so existing indexes report it correctly with no
   rebuild; a leaf the 2.9.1 builder stored at index 0 from the wrong bases (a `+` window
-  starting at 0), which could surface as a match without a PAM, is dropped. Every other row on
-  a format-1 index is byte-identical to 2.9.1's.
+  starting at 0), which could surface as a match without a PAM, is dropped, and the site it
+  stood for (on the `+` strand, a 5' PAM at base 0 or a 3' site whose guide starts at base
+  `max_bulges`) is found once the index is rebuilt. Every other row on a format-1 index is
+  byte-identical to 2.9.1's.
 - `searchBruteForce` segfaulted on a header-only FASTA (exit 139): its unsigned scan bound
   wrapped. It now returns at once on a contig shorter than one target.
 - `searchBruteForce` wrote and read past its per-guide profile table for a PAM longer than
@@ -214,10 +223,11 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   merge): HPRC (normalised as CRISPRme builds it) 4,765 multi-record positions, mega 16,103.
   This fix changes nothing where no position holds more than one SNP record, but other
   changes of this release do (docs/MULTIALLELIC_ENRICHMENT.md section 2.6): a record listing
-  three SNP ALTs over an A, C, G or T base is now `Q`, one listing two or three SNP ALTs at
-  a reference `N` (or another byte that is no base or IUPAC code) leaves it, one listing
-  `AF` at another place in its INFO than the file's first record gets its AF, and a SNP
-  outside the chromosome is an error. So an enrichment of a VCF that keeps a site's ALTs on
+  three SNP ALTs over an A, C, G or T base, or four over a reference IUPAC code, is now `Q`,
+  one listing two or three SNP ALTs at a reference `N` (or two or more at another byte that
+  is no base or IUPAC code) leaves it, one listing `AF` at another place in its INFO than
+  the file's first record gets its AF, a SNP outside the chromosome is an error, and a
+  reference holding `Q` is refused. So an enrichment of a VCF that keeps a site's ALTs on
   one record can change too: on chr22 with the raw HPRC vcfwave VCF (no position with two
   SNP records), the genome differs at 61 bases, each `N` → `Q`, and the dict, indel log and
   fake-indel FASTA are byte-identical.
@@ -226,8 +236,8 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   the reference one included, left the index (shown through the CLI: 0 targets found,
   against 1 with the fix). Merging split records would have made it common (2,448 chr22
   positions). A position whose ALTs, with its reference base when that is A, C, G or T,
-  cover all four bases is now `Q` (see Added): no ALT is left out, the dict lists all three,
-  and one stdout line counts such positions.
+  cover all four bases, at a reference base or IUPAC code, is now `Q` (see Added): no ALT is
+  left out, the dict lists all three, and one stdout line counts such positions.
 - **`add-variants` read each record's `INFO/AF` at the place it had in the file's first
   record**, so a record whose INFO held `AF` at another place (every record, if the first
   had no `AF`) got no AF, in the dict and the indel log: the retired 1000G2021_HGDP index (a
@@ -251,18 +261,19 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   README, `.DS_Store` or `.fai` listed first gave its extension to every chromosome without
   a VCF, none of which was then copied (exit 0). Only the `.fa` and `.fasta` files not
   hidden are chromosomes now, and a folder holding none is refused.
-- **A genome byte that is no base, IUPAC code, `N` or `Q`** (such as the `X` RepeatMasker
-  `-x` masks with) **broke the index around it.** The PAM scans of `buildTST` and
-  `searchBruteForce` skipped it, so every later PAM position of the contig was read one base
-  off and a site after it lost, and `buildTST` stored it in the guide region, pad or flank of
-  every site whose window held it, with a message on stderr (which fails a CRISPRme stage),
-  as the nibble `0`, which the search reads as an empty slot of the tree: the sites after it
-  were lost, and rows the contig does not hold were reported. Such a byte is now read as
-  `N`, a gap, by both: a guide region holding one is no target, a pad ends at it and a flank
-  stores it as `0000`; `buildTST` says on stdout how many bytes of a chromosome it read so.
-  On 20 random 400-bp contigs with 1 % of `X`, `-` and `.` and 80 planted guide sites, the
-  2.9.1 `buildTST` wrote 297 lines to stderr and its index gave 17 rows of a 3-mismatch search
-  without bulges; it now writes none and gives 58, the rows of `searchBruteForce`.
+- **A genome byte that is no base, IUPAC code, `N` or `Q`**, in either case (such as the `X`
+  RepeatMasker `-x` masks with), **broke the index around it.** The PAM scans of `buildTST`
+  and `searchBruteForce` skipped it, so every later PAM position of the contig was read one
+  base off and a site after it lost, and `buildTST` stored it in the guide region, pad or
+  flank of every site whose window held it, with a message on stderr (which fails a CRISPRme
+  stage), as the nibble `0`, which the search reads as an empty slot of the tree: the sites
+  after it were lost, and rows the contig does not hold were reported. Such a byte is now
+  read as `N`, a gap, by both: a guide region holding one is no target, a pad ends at it and
+  a flank stores it as `0000`; `buildTST` says on stdout how many bytes of a chromosome it
+  read so. On 20 random 400-bp contigs with 1 % of `X`, `-` and `.` and 80 planted guide
+  sites, the 2.9.1 `buildTST` wrote 297 lines to stderr and its index gave 17 rows of a
+  3-mismatch search without bulges; it now writes none and gives 58, the rows of
+  `searchBruteForce`.
 - **A SNP outside the chromosome** (POS 0 or past the end, e.g. a VCF of another assembly)
   now fails with an error naming the position, in both ports: `enricher.py` raised an
   `IndexError` past the end and coded the last base for POS 0, `enricher.cpp` read and wrote

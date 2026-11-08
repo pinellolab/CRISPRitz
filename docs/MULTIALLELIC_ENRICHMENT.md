@@ -33,14 +33,15 @@ carry a comma in ALT).
 **From 2.10.0 every SNP ALT is enriched** (section 2.1), in any record order. A position
 whose SNP ALTs, with its reference base when that is A, C, G or T, cover all four bases is
 written `Q`, a fifth symbol the search engine reads as any base (section 2.2; the IUPAC
-letter `N` would be read as a gap). The dictionary lists every ALT of one character, each
-with its own record's genotypes as they were phased (an allele on two records with the
-carriers of both, section 2.3). On HGDP + 1000 Genomes that includes 672 chr22
-sample-positions with two ALTs on one haplotype slot, which CRISPRme's per-sample analysis
-turns into a CONFIRMED haplotype holding both (measured through the CLI on the enrichment of
-`feat/multiallelic-enrich`, whose dictionary 2.10.0 writes byte for byte, indexed by
-CRISPRitz 2.9.1, as no CRISPRme release reads a 2.10.0 index yet): CRISPRme must handle them
-before it uses a 2.10.0 index (section 6.3).
+letter `N` would be read as a gap), and a reference `N`, like any reference byte that is no
+base or IUPAC code, stays as it is (section 2.8). The dictionary lists every ALT of one
+character, each with its own record's genotypes as they were phased (an allele on two
+records with the carriers of both, section 2.3). On HGDP + 1000 Genomes that includes 672
+chr22 sample-positions with two ALTs on one haplotype slot, which CRISPRme's per-sample
+analysis turns into a CONFIRMED haplotype holding both (measured through the CLI on the
+enrichment of `feat/multiallelic-enrich`, whose dictionary 2.10.0 writes byte for byte,
+indexed by CRISPRitz 2.9.1, as no CRISPRme release reads a 2.10.0 index yet): CRISPRme must
+handle them before it uses a 2.10.0 index (section 6.3).
 
 ## 2. What the enricher does now
 
@@ -57,10 +58,18 @@ record adds its SNP ALTs to what earlier records coded; it no longer starts from
 reference base. Two exceptions are new in 2.10.0: a set of all four bases is written `Q`,
 not its IUPAC letter `N` (section 2.2), and a reference `N`, like any reference byte that is
 no base or IUPAC code, stays as it is whatever the records at it list (section 2.8; 2.9.1
-coded a record listing two or three SNP ALTs over it). The rest of the rule is that of
-2.9.1: an ALT that is not A/C/G/T (`*`, `N`, a lowercase base) adds nothing, a reference
-IUPAC base adds nothing of its own (the code there is that of the ALTs alone, `Q` if they
-cover all four bases), and a set of one base leaves the FASTA letter in place.
+wrote over it the code of a record listing two or more SNP ALTs, `N` for all four). The rest
+of the rule is that of 2.9.1: an ALT that is not A/C/G/T (`*`, `N`, a lowercase base) adds
+nothing, a reference IUPAC base adds nothing of its own (the code there is that of the ALTs
+alone, `Q` if they cover all four bases), and a set of one base leaves the FASTA letter in
+place.
+
+Both ports read the reference FASTA upper-cased and write the enriched chromosome in upper
+case, as 2.9.1 did: a soft-masked (lower-case) reference base is that base, and the
+reference base, the FASTA letter and a byte that stays as it is, here and below, are the
+upper-cased ones (`verify_enricher.sh`'s chromosome is mixed case; its reconstruction
+upper-cases the FASTA). `add-variants` copies a chromosome without a VCF as it is. The VCF
+is not upper-cased: a lower-case ALT is not a SNP ALT.
 
 The running union is kept in a byte per position beside the genome (`snp_mask` /
 `snpMask`), because a letter in the genome cannot tell a code the enricher wrote from an
@@ -102,10 +111,10 @@ symbol, ...`; stderr is fatal to a CRISPRme stage).
 `Q` is also what a record listing three SNP ALTs over an A, C, G or T base now gets, where
 2.9.1 wrote `N`; a reference `N` never becomes `Q` (section 2.8); a reference IUPAC base
 adds no base of its own (2.1), so `Q` there needs ALTs covering all four bases. A reference
-FASTA must not hold `Q` (it would pass a base of its own off as a four-allele position):
-both ports, and `add-variants` for a chromosome it copies, refuse one with `ERROR: <chr>
-holds 'Q' at <pos>: a reference FASTA must not hold Q, which is reserved for four-allele SNP
-positions` and exit status 1.
+FASTA must not hold `Q`, in either case (it would pass a base of its own off as a
+four-allele position): both ports, and `add-variants` for a chromosome it copies, refuse one
+with `ERROR: <chr> holds 'Q' at <pos>: a reference FASTA must not hold Q, which is reserved
+for four-allele SNP positions` and exit status 1.
 
 On chr22 of HGDP + 1000 Genomes, 2,448 positions carry three SNP ALTs (section 4): the
 four-base rule left out an ALT at each (AC = 1 at 1,193 of them, AC ≥ 41 at 3); `Q` codes
@@ -214,9 +223,11 @@ with its two split sites reduced to one record each, both ports of 2.9.1 and of 
 gave identical md5 for all four outputs and the run log. Such an input is still not enriched
 by 2.10.0 as by 2.9.1 wherever
 
-* a record lists three SNP ALTs over an A, C, G or T base: `Q`, where 2.9.1 wrote `N` (2.2);
-* a record lists two or three SNP ALTs at a reference `N`, or at another byte that is no
-  base or IUPAC code: the byte stays, where 2.9.1 coded it (2.8);
+* a record lists three SNP ALTs over an A, C, G or T base, or four over a reference IUPAC
+  code: `Q`, where 2.9.1 wrote `N` (2.2);
+* a record lists two or three SNP ALTs at a reference `N`, or two or more at another byte
+  that is no base or IUPAC code: the byte stays, where 2.9.1 wrote their code (`N` for all
+  four) over it (2.8);
 * a record lists `AF` at another place in its INFO than the file's first record: it gets
   its AF, in the dictionary and the indel log (2.5);
 * a SNP lies outside the chromosome: an error (2.7), as is a reference holding `Q` (2.2).
@@ -259,8 +270,8 @@ RepeatMasker `-x` masks with, a `-` or a `.`: `buildTST` and `searchBruteForce` 
 `N` (docs/INDEX_FORMAT.md section 3.1), so the enriched genome keeps it as it is, and the
 dictionary lists the records at it (unit test `test_reference_N_and_reference_iupac`,
 `verify_enricher.sh` case 33). Merged split records were coded over it up to `2d1f57b` (an
-`X` with ALTs C and G became `S`), and up to 2.9.1 a record listing two or three SNP ALTs
-was.
+`X` with ALTs C and G became `S`), and up to 2.9.1 a record listing two or more SNP ALTs was
+(`N` for all four).
 
 ## 3. Cost
 
@@ -356,20 +367,21 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
 
 ## 5. Tests
 
-* `test/test_enricher_multiallelic.py` — 24 unit tests, each run against **both** ports
-  (48 in all), with exact expected outputs: two and three ALTs in every order, split ==
-  joined, four bases coded `Q` (every order, whatever the AF fields, a record listing three
-  ALTs, an ALT on two records), a reference holding `Q` refused, reference `N` and IUPAC
-  bases and bytes that are neither (`X`, `-`: kept), the N-count invariant (an `N` exactly
-  where the reference has one, in both modes), mode `no` == mode `yes`, the dictionary
-  entries (carriers, rsIDs, AFs, haploid / unphased / missing / `GT:DP` genotypes, records
-  without carriers, two or three ALTs on one haplotype slot passed through verbatim), a
-  non-PASS record, the same allele on two split records and on a split record and a record
-  listing several (merged carriers), each record's AF by its key, a split record beside a
-  multi-ALT record, `*`, non-adjacent records, the indel outputs, a position with one
-  record, and a SNP outside the chromosome. Against the branch's last commit (`f266eac`, the
-  four-base rule) 26 of the 48 fail, against 2.9.1 44 (the 4 that pass, mode `no` == mode
-  `yes` and a position with one record, pin what does not change).
+* `test/test_enricher_multiallelic.py` — 24 unit tests, each run against **both** ports (48
+  in all), with exact expected outputs: two and three ALTs in every order, split == joined,
+  four bases coded `Q` (every order, whatever the AF fields, a record listing three ALTs, an
+  ALT on two records), a reference holding `Q` or `q` refused, reference `N` and IUPAC bases
+  and bytes that are neither (`X`, `-`: kept) under split records and records listing
+  several ALTs, all four bases among them, the N-count invariant (an `N` exactly where the
+  reference has one, in both modes), mode `no` == mode `yes`, the dictionary entries
+  (carriers, rsIDs, AFs, haploid / unphased / missing / `GT:DP` genotypes, records without
+  carriers, two or three ALTs on one haplotype slot passed through verbatim), a non-PASS
+  record, the same allele on two split records and on a split record and a record listing
+  several (merged carriers), each record's AF by its key, a split record beside a multi-ALT
+  record, `*`, non-adjacent records, the indel outputs, a position with one record, and a
+  SNP outside the chromosome. Against the branch's last commit (`f266eac`, the four-base
+  rule) 26 of the 48 fail, against 2.9.1 44 (the 4 that pass, mode `no` == mode `yes` and a
+  position with one record, pin what does not change).
 * `verify_enricher.sh` — grows from 17 to 33 cases (cases 18-30: split sites in every
   order, the same sites as one record, four bases, non-adjacent records, genotype shapes,
   SNP + indel at one position and in an indel's window, a split record beside a multi-ALT
@@ -605,9 +617,11 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
   bases: every code the enricher writes over such a base holds it, as the position's mask
   starts from its bit (section 2.1). A reference IUPAC code adds no base of its own (section
   2.1), so a code written over one, its ALTs' alone, need not hold the reference's bases;
-  the hg38 of CRISPRme's install holds no IUPAC code (its 455 contigs hold no byte but A, C,
-  G, T and N). Its `resolve_carriers` (`indel_snp_cis.py`, lines 534-665 at `r281f-indel`
-  e61a761) already refuses a slot holding two ALTs of one column as a haplotype (line 629:
+  the hg38 of CRISPRme's install holds no IUPAC code (its 455 contigs hold no letter but A,
+  C, G, T and N, in upper or lower case: the FASTA is soft-masked, and the column test reads
+  it upper-cased, its `analisi_indels_NNN.py:664`, as the enricher does, section 2.1). Its
+  `resolve_carriers` (`indel_snp_cis.py`, lines 534-665 at `r281f-indel` e61a761) already
+  refuses a slot holding two ALTs of one column as a haplotype (line 629:
   `slots = None  # two alts on one slot: not a haplotype`) and resolves that sample PUTATIVE
   on the alleles it carries (lines 643-665), which is what 6.3 asks of the SNP path.
 * **Must change — `overlay_indel_snps.py`** (the same in CRISPRme 2.8.1, `0b8943e`). It

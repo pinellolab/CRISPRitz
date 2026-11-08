@@ -5,7 +5,7 @@ and how the search reads it. It covers the boundary/window fixes of CRISPRitz 2.
 (audit ids IDX-13, IDX-14, IDX-15 and IDX-4), the index-format version stamp (B5) that
 those fixes need, because two of them change what an index holds, and Q, the fifth
 symbol, of a SNP position whose ALTs, with its reference base when that is A, C, G or T,
-cover all four bases (section 4.1).
+cover all four bases, at a reference base or IUPAC code (section 4.1).
 
 Status: implemented (branches `feat/engine-boundaries` and `feat/multiallelic-enrich`,
 merged into CRISPRitz 2.10.0, which adds Q). Section 10 holds the measurements;
@@ -140,13 +140,15 @@ the symbol of a position whose SNP ALTs, with its reference base when that is A,
 T, cover all four bases: it counts as a base everywhere above (in the guide region, the
 pad and the flank), and a site, its pad and its PAM may hold it.
 
-A byte of the FASTA that is no base, IUPAC code, `N` or `Q` (such as the `X` RepeatMasker
-`-x` masks with, a `-` or a `.`) is read as `N`, by `buildTST` and `searchBruteForce` alike,
-and `buildTST` says on stdout how many bytes of a chromosome it read so (`NOTE: <n> byte(s)
-of <chr> are no base, IUPAC code, N or Q; ...`). Up to 2.9.1 their PAM scans skipped such a
+`buildTST` and `searchBruteForce` read the FASTA upper-cased, as 2.9.1 did, so a
+soft-masked (lower-case) base or IUPAC code is that base or code, and a `q` is `Q`. A byte
+of the FASTA that is no base, IUPAC code, `N` or `Q`, in either case (such as the `X`
+RepeatMasker `-x` masks with, a `-` or a `.`), is read as `N`, by both alike, and
+`buildTST` says on stdout how many bytes of a chromosome it read so (`NOTE: <n> byte(s) of
+<chr> are no base, IUPAC code, N or Q; ...`). Up to 2.9.1 their PAM scans skipped such a
 byte, reading every later PAM one base off, and `buildTST` stored it in the tree as the
-nibble 0, which the search reads as an empty slot (and which, in an eq slot of a file holding
-`Q`, stands for `Q`).
+nibble 0, which the search reads as an empty slot (and which, in an eq slot of a file
+holding `Q`, stands for `Q`).
 
 ### 3.2 The pad
 
@@ -230,9 +232,10 @@ Notes:
   only by the sites B2/B3/B4 add and 32 + K bytes of header and trailer per `.bin`
   (section 10 has the measurement).
 * The tree serialization (but for `Q`, section 4.1), the sort and the leaf chains are
-  unchanged. A contig with no boundary site, every byte of which is a base, an IUPAC
-  code or N (section 3.1), therefore has the same tree as in 2.9.1 and every search
-  over it returns the same rows in the same order.
+  unchanged. A contig with no boundary site and no window starting at its first base
+  (B1), every byte of which is a base, an IUPAC code or N (section 3.1), therefore has
+  the same tree as in 2.9.1 and every search over it returns the same rows in the same
+  order.
 * `mb` is capped at 31 by the 5-bit `pad_valid`; `buildTST` refuses a larger
   `-bMax` with an error. (The search's guide buffers are 100 characters, so such
   values never worked in practice.)
@@ -241,13 +244,14 @@ Notes:
 
 ### 4.1 Q, the four-allele symbol
 
-`add-variants` writes `Q` where a position's SNP ALTs, with its reference base when that
-is A, C, G or T, cover all four bases (docs/MULTIALLELIC_ENRICHMENT.md, sections 2.1 and
-2.2; a reference `N` stays `N`). The IUPAC letter of the four would be `N`, which
-section 3 reads as a gap: up to 2.9.1 a record listing three SNP ALTs over an A, C, G or
-T base wrote it, removing every target through the position from the index. `buildTST`,
-`searchTST` and `searchBruteForce` read `Q` as the mask `1111`: it matches every guide
-base and every PAM letter, so it is never a mismatch.
+`add-variants` writes `Q` where a position's SNP ALTs, with its reference base when that is
+A, C, G or T, cover all four bases (docs/MULTIALLELIC_ENRICHMENT.md, sections 2.1 and 2.2),
+unless the reference holds an `N` or another byte that is no base or IUPAC code there, which
+stays as it is (section 3.1). The IUPAC letter of the four would be `N`, which section 3
+reads as a gap: up to 2.9.1 a record listing three SNP ALTs over an A, C, G or T base wrote
+it, removing every target through the position from the index. `buildTST`, `searchTST` and
+`searchBruteForce` read `Q` as the mask `1111`: it matches every guide base and every PAM
+letter, so it is never a mismatch.
 
 Every 4-bit slot of the tree already uses 15 of its 16 values: a root, lo or hi slot
 holds `0` (no kid) or one of the 14 IUPAC letters (1..14, the letter's A|C|G|T mask),
@@ -269,14 +273,16 @@ that does not refuses the file by section 5's rule on reserved bits (the format-
 of `feat/engine-boundaries`, before `Q`, prints
 `has a malformed index header (version 2, flags 4, ...)`), and CRISPRitz 2.9.1 refuses
 every format-2 file, on which earlier versions abort (section 6). `buildTST` prints on
-stdout how many targets hold `Q` and how many files it flagged (`FOUR-ALLELE (Q): ...`),
-`searchTST` how many of the files it reads are flagged
+stdout how many of its targets (the sites it stores) hold `Q`, in the guide region, the pad
+or the flank, and how many files it flagged (`FOUR-ALLELE (Q): ...`), `searchTST` how many
+of the files it reads are flagged
 (`INDEX FORMAT: 2 x42 (40 holding Q, the four-allele symbol)`), and
 `crispritz.py index-info` reports `four_allele` for each format-2 file (section 7).
 
-A reference FASTA must not hold `Q`: `add-variants` refuses one, in a chromosome it
-enriches and in one it copies (`ERROR: <chr> holds 'Q' at <pos>: ...`). `buildTST` cannot
-tell a reference from an enriched genome and indexes a `Q` wherever it finds one.
+A reference FASTA must not hold `Q`, in either case: `add-variants` refuses one, in a
+chromosome it enriches and in one it copies (`ERROR: <chr> holds 'Q' at <pos>: ...`).
+`buildTST` cannot tell a reference from an enriched genome and indexes a `Q` (or `q`,
+section 3.1) wherever it finds one.
 
 ## 5. How the search reads an index
 
@@ -452,26 +458,27 @@ it: `index-genome` with the search's PAM file (its N's are the guide length).
 | CRISPRitz 2.10.0 searchTST | byte-identical to 2.9.1 except index-0 rows (B1) | full B1-B4 semantics, and `Q` (section 4.1) |
 | CRISPRitz 2.10.0 searchBruteForce | - (no index) | - ; B2 applies at once |
 
-Byte-identical means the same `.targets.txt` bytes, row order included; tested on
-the repo's fixtures and on indexes built by the 2.9.1 binary (section 11).
-Users' existing indexes keep working unchanged. They keep missing the sites of
-B2-B4 until rebuilt; B1 corrects their index-0 rows at once. The two older engines'
-cells for a format-2 index were tested with the build of `feat/engine-boundaries`, and
-again on indexes 2.10.0 built (hg38 chr22 NGG, and the NRG index of an enriched chr22,
-all of whose files are flagged for `Q`): the same refusal and the same abort (SIGABRT),
-an empty targets file each.
+Byte-identical means the same `.targets.txt` bytes, row order included; tested on the repo's
+fixtures and on indexes built by the 2.9.1 binary (section 11). Users' existing indexes keep
+working unchanged. They keep missing the sites of B2-B4, and the site behind an index-0 leaf
+that B1 drops, until rebuilt; B1 corrects their other index-0 rows at once. The two older
+engines' cells for a format-2 index were tested with the build of `feat/engine-boundaries`,
+and again on indexes 2.10.0 built (hg38 chr22 NGG, and the NRG index of an enriched chr22,
+all of whose files are flagged for `Q`): the same refusal and the same abort (SIGABRT), an
+empty targets file each.
 
-A format-2 index of a genome holds every site the format-1 index of the same genome
-and parameters holds (but for a window the 2.9.1 builder stored at index 0 from the
-wrong bases, B1), with the same string, flank and coordinates, plus the boundary
-sites (measured on hg38 chr22 and chr1, section 10), when every byte of the genome is
-a base, an IUPAC code or N: a 2.9.1 window holding another byte is now discarded or
-has a shorter pad, and 2.9.1 read every PAM after such a byte one base off (section
-3.1). A 2.10.0 search on it returns every row a 2.10.0 search on the format-1 index
-returns, plus rows at sites whose guide's far end lies within `mb` nt of a contig end or
-an N run (B3, including a + strand 3' site whose guide starts at exactly `mb`), whose PAM
-lies within `K - L` nt of a contig end under `--prune-pam` (B4), or whose PAM ends on
-a contig's last base (B2).
+A format-2 index of a genome holds every site the format-1 index of the same genome and
+parameters holds (but for a window the 2.9.1 builder stored at index 0 from the wrong bases,
+B1), with the same string, flank and coordinates, plus the boundary sites (measured on hg38
+chr22 and chr1, section 10), when every byte of the genome is a base, an IUPAC code or N: a
+2.9.1 window holding another byte is now discarded or has a shorter pad, and 2.9.1 read
+every PAM after such a byte one base off (section 3.1). A 2.10.0 search on it returns every
+row a 2.10.0 search on the format-1 index returns, plus rows at sites whose guide's far end
+lies within `mb` nt of a contig end or an N run (B3), whose PAM lies within `K - L` nt of a
+contig end under `--prune-pam` (B4), or whose PAM ends on a contig's last base (B2), and at
+a site whose window starts at the contig's first base where the 2.9.1 builder stored another
+window from the wrong bases (B1: a + strand 3' site whose guide starts at exactly `mb`,
+a + strand 5' PAM at base 0).
 
 ## 7. Reading the stamp without loading the tree
 
@@ -487,7 +494,7 @@ of a directory as JSON (`four_allele`: the file holds `Q`, section 4.1), with
 a `.bin` with an `error` entry, or `.bin` files named for more than one PAM, which
 `searchTST` refuses too (section 5). A macOS `._` (AppleDouble) file copied along with an
 index is one: its first int, read as a format-1 leaf count, is positive, but it is named
-for `.`, and its 118,883,584 leaves cannot fit in its 163 bytes.
+for `.`, and its 118,883,584 leaves cannot fit in it (163 bytes, the one tested).
 
 An `error` entry means `searchTST` refuses the file whatever the search: the function
 makes every check of section 5 that does not depend on the search, in `searchTST`'s order,
@@ -611,8 +618,9 @@ of `a5379e0`:
    never runs.
 3. **`holds_target` / `count_targets`** implement 2.9.1's site rule (window inside
    the contig, no N outside the PAM, index 0 as minus strand, the short scan bound).
-   A format-2 index holds more sites (section 3: B2-B4), so `missing_bins` must apply
-   the rule of the format the index was built in:
+   A format-2 index holds more sites (section 3: B2-B4, and the sites at index 0 that
+   the 2.9.1 builder lost, B1), so `missing_bins` must apply the rule of the format the
+   index was built in:
    * **Per index, from the header of its `.bin` files** (section 7; `crispritz.py
      index-info`): format 1, the 2.9.1 rule; format 2, section 3's rule. Not from
      `crispritz.py version`: that is the installed engine, not the one that built an
@@ -695,21 +703,22 @@ of `a5379e0`:
    report which guide length the index was built for. `searchTST`'s stdout `NOTE: the
    index was built for <G>-nt guides ...` line (section 5) marks a run where it was
    not.
-8. **The four-allele symbol Q** (section 4.1). A genome enriched by CRISPRitz 2.10.0
-   holds `Q` where a SNP position's ALTs, with its reference base when that is A, C, G
-   or T, cover all four bases, and so do the targets a search reports there (in the DNA
-   column, and in a PAM). Every reader of an enriched genome, a fake-indel genome
-   overlaid from it, or a target must read `Q` as any base, `{A, C, G, T}`, and never as
-   `N` (a gap, which matches nothing): the IUPAC tables of CRISPRme 2.8.1 have no `Q`
-   (`pam_filter._IUPAC`/`_TARGET_IUPAC`, `overlay_indel_snps._IUPAC_AMBIG`,
+8. **The four-allele symbol Q** (section 4.1). A genome enriched by CRISPRitz 2.10.0 holds
+   `Q` where a SNP position's ALTs, with its reference base when that is A, C, G or T, cover
+   all four bases (at a reference base or IUPAC code), and so do the targets a search
+   reports there (in the DNA column, and in a PAM). Every reader of an enriched genome, a
+   fake-indel genome overlaid from it, or a target must read `Q` as any base,
+   `{A, C, G, T}`, and never as `N` (a gap, which matches nothing): the IUPAC tables of
+   CRISPRme 2.8.1 have no `Q` (`pam_filter._IUPAC`/`_TARGET_IUPAC`,
+   `overlay_indel_snps._IUPAC_AMBIG`,
    `new_simple_analysis.iupac_code`/`iupac_code_set`/`iupac_nucleotides`,
-   `analisi_indels_NNN.iupac_code`, `twopass_find.IUPAC_TO_SET`, among the ~20 modules
-   that decode IUPAC letters; docs/MULTIALLELIC_ENRICHMENT.md sections 6.3 and 6.4 say
-   what the SNP path and the overlay lose without it), and `crispritz_bins`' site rule
-   must count `Q` as a base, which matches every PAM letter. A header flag says which
-   `.bin` files hold `Q` (`FOUR_ALLELE`, bit 2; `index-info`'s `four_allele`), and a
-   format-2 reader must accept that bit. The dictionaries list every SNP ALT of such a
-   position, each in its own entry (docs/MULTIALLELIC_ENRICHMENT.md, section 2.3).
+   `analisi_indels_NNN.iupac_code`, `twopass_find.IUPAC_TO_SET`, among the ~20 modules that
+   decode IUPAC letters; docs/MULTIALLELIC_ENRICHMENT.md sections 6.3 and 6.4 say what the
+   SNP path and the overlay lose without it), and `crispritz_bins`' site rule must count `Q`
+   as a base, which matches every PAM letter. A header flag says which `.bin` files hold `Q`
+   (`FOUR_ALLELE`, bit 2; `index-info`'s `four_allele`), and a format-2 reader must accept
+   that bit. The dictionaries list every SNP ALT of such a position, each in its own entry
+   (docs/MULTIALLELIC_ENRICHMENT.md, section 2.3).
 
 ## 9. searchBruteForce
 

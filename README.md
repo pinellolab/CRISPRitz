@@ -205,27 +205,28 @@ Detailed input:
 `hg19_1000genomeproject_vcf/` is the directory containing the vcf files.  
 `hg19_ref/` is the directory containing the fasta files.
 
-Multi-allelic sites: a site may be one VCF record listing several ALTs or one record per
-ALT (as `bcftools norm -m -any` writes it). Since 2.10.0, either way, the code of a position
-is the IUPAC letter of its reference base and of every ALT that is one upper-case base
-(`A`, `C`, `G` or `T`) of its records whose FILTER is `PASS` or `.` and whose REF is one
-base, in any record order, and its SNP dictionary entry lists every ALT of one character of
-those records (a `*`, an `N` or a lower-case base too, which add nothing to the code); up to
-2.9.1 a split site kept only its last record's ALT. A reference IUPAC code adds no base of
-its own, and a single base leaves the reference letter in place; a reference `N` stays `N`,
-whatever the VCF lists there, as does a byte that is no base or IUPAC code (such as the `X`
-RepeatMasker `-x` masks with), which `index-genome` and `search` read as `N`; and a position
-whose ALTs, with its reference base when that is A, C, G or T, cover all four bases is coded
-`Q`, a fifth symbol `index-genome` and `search` read as any base: its IUPAC letter, `N`, is a
-gap to them, which matches nothing (an index file holding `Q` is flagged in its header, so
-that no engine that cannot read it searches it; a reference FASTA must not hold `Q`, and
-`add-variants` refuses one). Apply an allele-frequency filter after splitting, so it acts
-per ALT. Each record's `INFO/AF` is read by its key (up to 2.9.1 its place came from the
-file's first record). Each dictionary entry keeps its own record's genotypes verbatim, but
-one allele on two records is one entry with the carriers of both: split records phased one
-by one can put two ALTs of a position on one haplotype slot (`0|1` under each), and whatever
-builds haplotypes from the dictionary has to resolve that. Details:
-[`docs/MULTIALLELIC_ENRICHMENT.md`](docs/MULTIALLELIC_ENRICHMENT.md).
+Multi-allelic sites: a site may be one VCF record listing several ALTs or one record per ALT
+(as `bcftools norm -m -any` writes it). Since 2.10.0, either way, the code of a position is
+the IUPAC letter of its reference base (the reference is read upper-cased, as before, so a
+soft-masked base is a base, and a chromosome with a VCF is written in upper case) and of
+every ALT that is one upper-case base (`A`, `C`, `G` or `T`) of its records whose FILTER is
+`PASS` or `.` and whose REF is one base, in any record order, and its SNP dictionary entry
+lists every ALT of one character of those records (a `*`, an `N` or a lower-case base too,
+which add nothing to the code); up to 2.9.1 a split site kept only its last record's ALT. A
+reference IUPAC code adds no base of its own, and a single base leaves the reference letter
+in place; a reference `N` stays `N`, whatever the VCF lists there, as does a byte that is no
+base or IUPAC code (such as the `X` RepeatMasker `-x` masks with), which `index-genome` and
+`search` read as `N`; and a position whose ALTs, with its reference base when that is A, C,
+G or T, cover all four bases is coded `Q`, a fifth symbol `index-genome` and `search` read
+as any base: its IUPAC letter, `N`, is a gap to them, which matches nothing (an index file
+holding `Q` is flagged in its header, so that no engine that cannot read it searches it; a
+reference FASTA must not hold `Q`, in either case, and `add-variants` refuses one). Apply an
+allele-frequency filter after splitting, so it acts per ALT. Each record's `INFO/AF` is read
+by its key (up to 2.9.1 its place came from the file's first record). Each dictionary entry
+keeps its own record's genotypes verbatim, but one allele on two records is one entry with
+the carriers of both: split records phased one by one can put two ALTs of a position on one
+haplotype slot (`0|1` under each), and whatever builds haplotypes from the dictionary has to
+resolve that. Details: [`docs/MULTIALLELIC_ENRICHMENT.md`](docs/MULTIALLELIC_ENRICHMENT.md).
 
 
 **<a name="Index-Genome">3.2</a> CRISPRitz Index-Genome Tool**  
@@ -272,16 +273,16 @@ with max 2 RNA bulges and 2 DNA bulges; at most 31)
 An index built by CRISPRitz 2.10.0 or later is in *index format 2*, specified in
 [docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md). It holds every target whose guide region (of
 the length the index was built for) and PAM fit in the sequence, with no `N` in the guide
-region, including targets next to a contig end or a run of `N`: the extra bases a DNA
-bulge, or a longer search guide, needs beyond the guide (`-bMax` of them) no longer have to
-exist, they are simply not available to an alignment that would need them. Up to 2.9.1 a
-target whose guide ended within `-bMax` nt of a contig end or an `N` run, on its side away
-from the PAM, was dropped, even a perfect match; a PAM on a contig's last bases was never
-indexed, and a reverse-strand PAM at a contig's first base was reported on the `+` strand.
-Each `.bin` now starts with a header naming its format and build parameters, which
-`crispritz.py index-info` prints without loading the index (it exits 1, naming the file and
-the reason, on a `.bin` whose first and last bytes or size show that any search would refuse
-it):
+region, including targets next to a contig end or a run of `N`: the extra bases a DNA bulge,
+or a longer search guide, needs beyond the guide (`-bMax` of them) no longer have to exist,
+they are simply not available to an alignment that would need them. Up to 2.9.1 a target
+whose guide ended within `-bMax` nt of a contig end or an `N` run, on its side away from the
+PAM, was dropped, even a perfect match; a PAM on a contig's last bases was never indexed,
+nor a 5′ PAM on the `+` strand at a contig's first base, and a reverse-strand PAM at a
+contig's first base was reported on the `+` strand. Each `.bin` now starts with a header
+naming its format and build parameters, which `crispritz.py index-info` prints without
+loading the index (it exits 1, naming the file and the reason, on a `.bin` whose first and
+last bytes or size show that any search would refuse it):
 
 ```
 crispritz.py index-info genome_library/NGG_2_hg19_ref/
