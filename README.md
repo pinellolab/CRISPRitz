@@ -191,6 +191,19 @@ single chromosome files with added SNPs in IUPAC notation
 - Directory containing a duplicate of the original genome in fasta format, separated into
 single chromosome files with added INDELs.
 
+Each indel allele (an indel or a multi-base record such as an MNV, of a record whose FILTER is
+`PASS` or `.` and that some sample carries) is written as a contig of its own, its fake-indel
+window: since 2.10.0, 30 reference bases, the record's REF (from POS on) with the ALT in its
+place, then 30 reference bases (fewer where the chromosome ends), one `N` between two
+contigs; up to 2.9.1, 25 bases before and 27 after. A target of L bases (guide and PAM) with
+b DNA bulges holds a record's change on its window only where L + b <= 31 (L + b <= 27, 26
+at an MNV, up to 2.9.1). The indel log (`log<chr>.txt`) records each window: its `CHR` field,
+`<chr>_<start>-<end>_<id>`, holds the window's 0-based start and end (the end exclusive and
+not cut at the chromosome's end), so a reader takes its left flank as `POS - 1 - start` and
+reads the windows of either release; `crispritz.py`'s `INDEL_LEFT` and `INDEL_RIGHT` state
+the window an enrichment not made yet will have. An indel less than 31 bases from the
+chromosome start (POS 30 or less) is skipped, with a `WARNING` on stdout.
+
 Example call:
 - Conda
     ```

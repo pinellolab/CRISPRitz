@@ -20,9 +20,9 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 Not yet tagged: the date is set when it is. Released together with rebuilt indexes and the
 CRISPRme release that pins it (CRISPRme 2.10.0): the IDX-13, IDX-4 and IDX-15 fixes below
 change what an index holds, and every allele of a split multi-allelic site, the
-four-allele symbol `Q` and the merged carriers change what an enrichment holds, so they
-take effect only on genomes enriched and indexes built by this version (the brute-force
-scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
+four-allele symbol `Q`, the merged carriers and the wider fake-indel window change what an
+enrichment holds, so they take effect only on genomes enriched and indexes built by this
+version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
 
 ### Added
 - **`Q`, the four-allele symbol.** A position whose SNP ALTs, with its reference base when
@@ -133,6 +133,36 @@ scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
   Cost of the fix: one byte per base; on chr22, 986 s → 1,004 s and 6.72 → 6.86 GB (2^30
   bytes; measured with the four-base rule `Q` replaced, which kept ~17 bytes more per SNP
   ALT; 2.10.0 peaks at 6.83 GB).
+- **The fake-indel window is 30 reference bases on each side of an indel (25 before and 27
+  after up to 2.9.1).** `add-variants` writes each indel allele's contig as 30 reference
+  bases, the record's REF (from POS on) with the ALT in its place, then 30 reference bases
+  (fewer where the chromosome ends), in both enricher ports (`INDEL_LEFT`, `INDEL_RIGHT`;
+  `crispritz.py` states them, for a reader that must know the window of an enrichment not
+  made yet). A target of L bases (guide and PAM) with b DNA bulges holds a record's change on
+  its window only where L + b <= LEFT + 2 and L + b <= RIGHT + 1 (LEFT + 1 for a record
+  whose REF and ALT differ at their first base, an MNV or complex record): up to 2.9.1
+  L + b <= 27 (26 at an MNV), which a 27-nt site (SaCas9's 21-nt guide and `NNGRRT`,
+  Cas12a's 23-nt guide and `TTTV`) with a DNA bulge, and a 28-nt one (CEP290's 22-nt
+  SaCas9 guide) at any budget, exceeded, whatever the index; now L + b <= 31: LEFT = RIGHT =
+  Lmax - 1 + bmax, with Lmax = 29 (a 21-nt guide and a PAM of 8 nt, the longest the general
+  K=8 index serves) and bmax = 2 (the most DNA bulges CRISPRme's web offers). The log's `CHR` field records each window's
+  start and end as before, so a reader that takes the left flank as `POS - 1 - start`
+  (CRISPRme 2.10.0) reads the windows of either release. Measured on hg38 chr22 with
+  `add-variants` (compiled port; against the 881f761 build, whose 25/27 log and fake-indel
+  FASTA are 2.9.1's byte for byte): on HGDP + 1000 Genomes the same 240,557 log rows in the
+  same order with the same carriers, rsID and AF, each `CHR` start 5 less and end 3 more,
+  each contig the 25/27 one with the 5 reference bases before it and the 3 after it (0
+  exceptions, none cut by the chromosome's end), `refseq` the reference from the new start,
+  one `N` between contigs; the fake-indel FASTA 14,174,243 -> 16,098,699 bytes (+13.6%, 8
+  bases a window); the enriched genome, the dict and `change_version.txt` byte-identical;
+  `enricher.py` gives the compiled port's five files and run log. On HPRC (195,813 rows) the
+  same, +1.6% (its windows hold long ALTs). An indel at POS 30 or
+  less is now skipped (up to POS 25 before), with the stdout `WARNING` naming 31 bases.
+  Every `_INDELS` index is built from these windows, so it is rebuilt with the rest, and its
+  log with it (`docs/MULTIALLELIC_ENRICHMENT.md` §2.4, §8). `verify_enricher.sh` checks every
+  window of its fixture against the reference (its `CHR` field, contig, `FAKEPOS`, `refseq`
+  and the skips at the chromosome's start), and `test/test_enricher_multiallelic.py` both
+  ports' windows and `crispritz.py`'s `INDEL_LEFT`/`INDEL_RIGHT`; both fail on 2.9.1's.
 - **One allele on two records (the same `REF>ALT` twice) is one dict entry with the
   carriers of both**, where the later record's entry replaced the earlier one: a sample
   listed by both, phased alike, carries the ALT on every slot where either record puts it

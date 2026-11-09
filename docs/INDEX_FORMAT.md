@@ -719,6 +719,30 @@ of `a5379e0`:
    (`FOUR_ALLELE`, bit 2; `index-info`'s `four_allele`), and a format-2 reader must accept
    that bit. The dictionaries list every SNP ALT of such a position, each in its own entry
    (docs/MULTIALLELIC_ENRICHMENT.md, section 2.3).
+9. **The fake-indel window.** `add-variants` writes each indel allele's contig (its window)
+   as LEFT reference bases, the record's REF (from POS on) with the ALT in its place, and
+   RIGHT reference bases (fewer where the chromosome ends), one `N` between two contigs:
+   LEFT = RIGHT = 30 since 2.10.0 (`crispritz.py`'s `INDEL_LEFT`, `INDEL_RIGHT`), 25 and 27
+   up to 2.9.1. Every index of a fake-indel genome is a format-2 index like any other
+   (section 3: a site whose guide region runs into the separator `N` is not stored, and its
+   pad may run into it), so a target of L bases (guide and PAM) with b DNA bulges holds a
+   record's change only where L + b <= LEFT + 2 and L + b <= RIGHT + 1 (LEFT + 1 where the
+   record's REF and ALT differ at their first base, an MNV or complex record): 31 with
+   2.10.0's window, 27 (26) with 2.9.1's, whatever the index. The indel log's `CHR` field,
+   `<chr>_<start>-<end>_<id>`, holds each window's 0-based start and end (the end exclusive
+   and not cut at the chromosome's end). So CRISPRme must:
+   * take a window's left flank from its log row, `POS - 1 - start`, wherever it maps a
+     fake-indel coordinate to the reference (a SNP overlay, an indel row's place, its REF
+     text), never as a constant: a reader that took 2.10.0's 30 bases for 2.9.1's 25 would
+     place every flank base, SNP code and row of a window five bases off, and a published
+     index of either release must stay readable;
+   * record the window of the fake-indel genome an `_INDELS` index is built from with the
+     index, and refuse a search of it beside an indel log of another width (the two come
+     from two enrichments); an index of format 1 was built by 2.9.1 or earlier, whose
+     windows were 25/27;
+   * say, when a search's guide, PAM and DNA bulges need more bases than its windows hold,
+     that the indel off-targets of such targets are not reported.
+   CRISPRme 2.10.0 does all three (its METHODS, section 4).
 
 ## 9. searchBruteForce
 

@@ -183,7 +183,25 @@ Unchanged by the merge and by `Q`: `indel_to_fasta` cuts every contig from the p
 reference (`genomeStr`), never from the enriched genome, so a merged SNP code next to or at
 an indel does not reach a contig, its log row or its FAKEPOS (unit test
 `test_indel_outputs_unmoved_by_split_snps`; `verify_enricher.sh` cases 19, 21, 28;
-byte-identical on chr22 of all three panels, section 4, and with 2.10.0 too). The log's AF
+byte-identical on chr22 of all three panels, section 4, between 2.9.1 and the branch, whose
+windows are 2.9.1's). 2.10.0 widens the window, which changes both: each contig is 30
+reference bases, the REF with the ALT in its place, and 30 reference bases (25 and 27 up to
+2.9.1; CHANGELOG, Changed), so a target of guide, PAM and DNA bulges up to 31 bases holds
+its record's change (27 up to 2.9.1, 26 at an MNV). Measured through `add-variants` on hg38
+chr22 against the 881f761 build (2.10.0 at 2.9.1's window): on HGDP + 1000 Genomes the same
+240,557 log rows, in the same order, with the same carriers, rsID and AF; each `CHR` field's
+start 5 less and end 3 more (`POS - 31`, `POS - 1 + len(REF) + 30`); each contig the 25/27
+one with the 5 reference bases before it and the 3 after it (none cut by the chromosome's
+end), `refseq` the reference from the new start, one `N` between contigs (0 exceptions);
+the log 376,085,436 -> 378,058,600 bytes (md5 `4197a2d0…` -> `e077dad9…`), the fake-indel
+FASTA 14,174,243 -> 16,098,699 (`34ed6062…` -> `18c22ff0…`, +13.6%: 8 bases a window), the
+enriched genome (`b62bc9fb…`), the dict (`16fd0e8c…`) and `change_version.txt` byte-identical;
+`enricher.py` through the same CLI (1,715 s) gives the compiled port's five files, md5 for
+md5, and the same run log but for its timings; on HPRC chr22 the same checks hold on 195,813
+rows (the fake-indel FASTA +1.6%). A reader
+takes each window's left flank from its log row (`POS - 1 - start`), never as a constant
+(unit test `test_indel_window_is_30_bases_on_each_side`; `verify_enricher.sh` checks every
+window of its fixture against the reference). The log's AF
 column changes where a record lists `AF` at another place in its INFO than the file's first
 record, as each record's AF is now read by its key (section 2.5): HPRC's chrY log gains the
 AF of 91,950 of its 102,665 rows, every other column unchanged, so it is rebuilt (section
@@ -234,18 +252,19 @@ by 2.10.0 as by 2.9.1 wherever
   its AF, in the dictionary and the indel log (2.5);
 * a SNP lies outside the chromosome: an error (2.7), as is a reference holding `Q` (2.2).
 
-Measured with 2.10.0 against 2.9.1 (the CRISPRme 2.8.1 SIF's) on ml008. On the reduced
-fixture both ports of each give the same dictionary, indel log, fake-indel genome and run
-log, and genomes that differ at one base, 1,618, where case 17 lists `N>A,C` at a reference
-`N` (`M` in 2.9.1, `N` now). Through `add-variants` (compiled ports) on hg38 chr22 with the
-raw HPRC vcfwave VCF (`ALL.chr22.HPRC.vcfwave.vcf.gz` of `vcfs/hg38_HPRC/`, 623,085
-records, which keep a site's ALTs on one record: 529,585 positions with a SNP record, none
-with two; no record listing two or three ALTs at a reference `N`; `AF` at the same place in
-every record's INFO), the dictionary, indel log and fake-indel FASTA are byte-identical, and
-the genome differs at 61 bases, those of the 61 records listing three SNP ALTs: `N` in 2.9.1
-(11,658,752 `N` against the reference's 11,658,691), `Q` now. So an enrichment of a VCF that
-keeps a site's ALTs on one record changes too wherever one of the above occurs, as on the
-raw HPRC vcfwave VCFs: rebuild it.
+Measured with 2.10.0 against 2.9.1 (the CRISPRme 2.8.1 SIF's) on ml008, before the window of
+section 2.4 was widened (which changes every indel log row and contig, whatever the input).
+On the reduced fixture both ports of each give the same dictionary, indel log, fake-indel
+genome and run log, and genomes that differ at one base, 1,618, where case 17 lists `N>A,C`
+at a reference `N` (`M` in 2.9.1, `N` now). Through `add-variants` (compiled ports) on hg38
+chr22 with the raw HPRC vcfwave VCF (`ALL.chr22.HPRC.vcfwave.vcf.gz` of `vcfs/hg38_HPRC/`,
+623,085 records, which keep a site's ALTs on one record: 529,585 positions with a SNP
+record, none with two; no record listing two or three ALTs at a reference `N`; `AF` at the
+same place in every record's INFO), the dictionary, indel log and fake-indel FASTA are
+byte-identical, and the genome differs at 61 bases, those of the 61 records listing three
+SNP ALTs: `N` in 2.9.1 (11,658,752 `N` against the reference's 11,658,691), `Q` now. So an
+enrichment of a VCF that keeps a site's ALTs on one record changes too wherever one of the
+above occurs, as on the raw HPRC vcfwave VCFs: rebuild it.
 
 ### 2.7 A SNP outside the chromosome
 
@@ -342,7 +361,9 @@ final code (commit `8e36f57`, which added the `AF_*` ranking) gives the same fiv
 **2.10.0 on the same inputs**, both ports through the same CLI (the compiled one is the run
 of section 2.2; `enricher.py` took 1,749 s, peak RSS 3.63 GB): the same five files, md5 for
 md5, and the same run log but for its timings. The dictionary, indel log, fake-indel FASTA
-and `change_version.txt` are the branch's, and the enriched genome (`b62bc9fb…`) differs
+and `change_version.txt` are the branch's (the indel log and fake-indel FASTA at 2.9.1's
+window: 2.10.0's own, 30/30, are section 2.4's, where the two ports give the same five files
+again), and the enriched genome (`b62bc9fb…`) differs
 from the branch's at exactly the 2,448 four-base positions, `Q` where the branch wrote `B`,
 `D`, `H` or `V`. Checked as above, with `Q` in place of the four-base rule: every base
 equals the rule at the 1,770,802 positions; the 43,389 bases that change from 2.9.1 are
@@ -395,8 +416,10 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
   log, and checked against what they must be: the enriched genome against an independent
   reconstruction from the FASTA and the VCF (with the N-count invariant), the dictionary at
   cases 24 and 31-33 (merged carriers, AF by key, the records at a reference `N`, `X` or
-  `-`, a record listing three SNP ALTs), the indel log's AF at case 31, and a reference
-  holding `q` refused by both ports with one message. Earlier, on the branch, also checked
+  `-`, a record listing three SNP ALTs), the indel log's AF at case 31, every fake-indel
+  window against the reference (30 bases on each side of its record, its log row's `CHR`
+  field, `FAKEPOS` and `refseq`, the skips at the chromosome's start; cases 9 and 14 at the
+  window's edges), and a reference holding `q` refused by both ports with one message. Earlier, on the branch, also checked
   against an independent oracle (91 coded positions, 81 dictionary keys, 0 mismatches) and
   an independent carrier check at the 62 positions whose SNP records each list one ALT, none
   repeated (each entry lists exactly its record's carriers, genotypes verbatim; 0
@@ -429,8 +452,10 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
 * Pin CRISPRitz `2.10.0`: `Dockerfile:31` (`ARG crispritz_ref=v2.9.1`), `environment.yml`
   and `install_from_source.sh` (which name 2.9.1), the Bioconda `crisprme` recipe.
 * The enriched genome, its TST index, the fake-indel genome and its `_INDELS` index, the
-  per-sample dictionaries and the Tier-0/Tier-1 stores must all come from **one**
-  enrichment. Mixed, the code and the genotype source disagree at ~2.5 % of SNP positions:
+  per-sample dictionaries, the indel logs and the Tier-0/Tier-1 stores must all come from
+  **one** enrichment (an `_INDELS` index beside the log of another enrichment is mapped by
+  windows it was not built from: CRISPRme 2.10.0 records each sub-index's window and refuses
+  one beside a log of another width, section 2.4). Mixed, the code and the genotype source disagree at ~2.5 % of SNP positions:
   an old dictionary under a new genome has no carriers for a coded ALT (rows needing it are
   not emitted), a new dictionary under an old genome offers ALTs the search never matched. Stamp the enrichment in the tier manifests
   (`registry_<vcf>/reg_<chrom>.idx`, whose manifest `tier0_registry._write_registry`
@@ -772,19 +797,21 @@ its `genotypes_hg38_HGDP1kGP` (the same companion), and `SHA256SUMS`.
 `Genomes/hg38+hg38_<ds>_INDELS/`) and their `.SHA256SUMS`.
 
 Unchanged by the enricher (measured on chr22 or derived from the VCF directly):
-`indel_genotypes_<vcf>/`, `indel_af_hg38_mega/`, `samplesIDs/`, the source VCFs under
-`vcfs/`, and the `log_indels_<vcf>/` logs of HGDP + 1000 Genomes and mega. Not HPRC's: a
-log's AF column changes wherever a record lists `INFO/AF` at another place than its VCF's
-first record, as each record's AF is now read by its key (section 2.5), and of the 24 HPRC
+`indel_genotypes_<vcf>/`, `indel_af_hg38_mega/`, `samplesIDs/` and the source VCFs under
+`vcfs/`. Every `log_indels_<vcf>/` log changes with the wider window (each row's `CHR`
+field, `FAKEPOS` and `refseq`, section 2.4) and is rebuilt with its `_INDELS` index; up to
+that change, the logs of HGDP + 1000 Genomes and mega were unchanged by the merge and `Q`.
+HPRC's changed besides: a log's AF column changes wherever a record lists `INFO/AF` at
+another place than its VCF's first record, as each record's AF is now read by its key (section 2.5), and of the 24 HPRC
 VCFs (the normalised build input) chrY's has such records (96,853 of its 108,023 indel
 records), the 23 others none. With 2.10.0, `log_indels_hg38_HPRC/logchrY` gains the AF of
 91,950 of its 102,665 rows (the published one leaves exactly those empty), every other
 column identical and each AF its record's (0 mismatches against the VCF), and 47,911 of the
 chrY dictionary's 109,033 values change in their AF alone. None of the 23 HGDP + 1000
 Genomes VCFs has such a record, and mega's VCF lists no `AF` key (chr22: only `AF_<panel>`
-and `AF_max`), so their logs keep their AF; on chr22 the logs of all three panels are
-byte-identical to 2.9.1's. Rebuild the logs with the rest rather than carry the published
-ones over. A classic (non-dict-less) publish's
+and `AF_max`), so their logs keep their AF; on chr22 the logs of all three panels were
+byte-identical to 2.9.1's at its window. Rebuild the logs with the rest rather than carry
+the published ones over. A classic (non-dict-less) publish's
 `Dictionaries/dictionaries_<vcf>/` changes and must be rebuilt with the rest.
 
 Then: `docs/INDEX_PROVENANCE.md` and `docs/PRECOMPUTED_INDEXES.md` record the rebuild and the
