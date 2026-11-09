@@ -20,6 +20,10 @@
 
 #include <chrono>
 #include <unordered_set>  
+#include <map>
+#include <set>
+#include <climits>
+#include <iterator>
 
 using namespace std;
 
@@ -64,7 +68,8 @@ typedef struct tleaf
 // a flag; loadTST turns both into these, so the emit path reads one form.
 static const unsigned char LEAF_LEFT = 0x1;      // window = flank|guide|pad (PAM-left)
 static const unsigned char LEAF_FLANK_OFF = 0x2; // part of the flank is off the contig
-static const unsigned char LEAF_SKIP = 0x4;      // a format-1 index-0 artefact (IDX-14)
+static const unsigned char LEAF_SKIP = 0x4;      // never emitted: a format-1 index-0 artefact (IDX-14), or a region hook's
+static const unsigned char LEAF_REGION = 0x8;    // dropped by a region hook (a skip or keep BED, docs/INDEX_FORMAT.md section 13)
 
 // What each thread needs to know about the .bin it is searching, set by loadTST:
 // the index format, the max_bulges its coordinates are decoded with (format 2:
@@ -215,6 +220,344 @@ static inline bool leafSkipped(const Tleaf &leaf, int thr, int dnaUsed, int rnaU
 		return true;
 	return dnaUsed - rnaUsed - idxFacts[thr].offset > (int)leaf.pad_valid;
 }
+
+// ---- Region hooks: a skip BED, a keep BED, the leaf dump (docs/INDEX_FORMAT.md section 13) ----
+// A search may be given a BED of intervals (contig, 0-based start, end exclusive) and
+// SKIP every site whose core meets an interval (crispritz.py search --skip-bed, the 13th
+// argument or CRISPRITZ_SKIP_BED), or KEEP only those sites (--keep-bed, the 14th argument
+// or CRISPRITZ_KEEP_BED). The core of a site is the n = Gs + L bases of its bulge-free
+// alignment: the L bases of the search PAM and the Gs search-guide bases next to them,
+// whatever the index's own guide length G and flank width K. With off = G - Gs (section 1)
+// and pp = K - L for a 3' PAM under --prune-pam (prune_pad; 0 otherwise), a leaf's core is
+//   PAM-left  window [flank K][guide G][pad mb]:  [ws + pp,      ws + pp + n)
+//   PAM-right window [pad mb][guide G][flank K]:  [ws + mb + off, ws + mb + off + n)
+// which is the emit formulas of saveIndices run backwards: every line the leaf emits
+// (Position p, d gaps in its crRNA, r in its DNA, n = its crRNA's length less d) has the
+// core [p, p + n) if it is PAM-left and [p + d - r, p + d - r + n) if it is PAM-right. So
+// a skip drops exactly the lines whose core, read from the line, meets an interval, and a
+// keep keeps exactly those. A dropped leaf is marked LEAF_SKIP | LEAF_REGION when its tree
+// is loaded, so the emit path drops it as it drops a format-1 index-0 artefact; and the
+// traversal enters no subtree that holds no other leaf (two bits a node, computed once the
+// tree is loaded; CRISPRITZ_SKIP_PRUNE=0 turns that off, which changes no output). The leaf
+// dump (--leaf-dump, the 15th argument or CRISPRITZ_LEAF_DUMP) writes the stored letters of
+// every leaf a skip BED drops. With no BED none of this runs: every check is behind
+// regionActive, and the search is the one without the hooks, byte for byte.
+typedef vector<pair<long long, long long>> RegionIntervals;
+static map<string, RegionIntervals> regionIv; // per contig: sorted, merged, non-empty
+static bool regionActive = false;             // a skip or a keep BED is in force
+static bool regionKeep = false;               // the BED is a keep BED
+static bool regionPruneOn = true;             // subtree pruning (CRISPRITZ_SKIP_PRUNE=0: off)
+static bool regionPruneActive = false;        // regionActive && regionPruneOn
+static string leafDumpPath;                   // empty: no leaf dump
+static vector<char> regionTree;               // per thread: the loaded tree holds region-dropped leaves
+static vector<vector<unsigned char>> nodeLive; // per thread, per node: bit 0 a live leaf below it (lo, hi
+											   // or eq), bit 1 a live leaf through its eq kid
+static vector<long long> nRegionSkipped, nRegionKept; // per thread
+struct LeafDumpLine
+{
+	string contig;
+	long long ws;
+	char side; // 'L' PAM-left window, 'R' PAM-right
+	string letters;
+	bool operator<(const LeafDumpLine &o) const
+	{
+		if (contig != o.contig)
+			return contig < o.contig;
+		if (ws != o.ws)
+			return ws < o.ws;
+		if (side != o.side)
+			return side < o.side;
+		return letters < o.letters;
+	}
+};
+static vector<vector<LeafDumpLine>> leafDump; // per thread
+
+// The contig a tree file <PAM>_<contig>_<part>.bin holds (main reads it the same way).
+static string binContig(const string &fileName)
+{
+	size_t first = fileName.find_first_of('_'), last = fileName.find_last_of('_');
+	if (first == string::npos || last == string::npos || last <= first)
+		return string();
+	return fileName.substr(first + 1, last - first - 1);
+}
+
+// The argument at argv[pos] if given and not empty, else the environment variable env.
+static string regionHookArg(int argc, char **argv, int pos, const char *env)
+{
+	if (argc > pos && argv[pos][0] != '\0')
+		return string(argv[pos]);
+	const char *v = getenv(env);
+	return v != nullptr ? string(v) : string();
+}
+
+// Reads a region BED: tab-separated contig, start, end (0-based, end exclusive), more
+// columns ignored, blank lines and lines starting with '#' skipped, a trailing CR
+// dropped. A line that is not that, an end not after its start, or a contig that is
+// not one of the index's (contigs) refuses the whole file: a BED read in part would
+// skip, or keep, part of what it names, silently.
+static bool loadRegionBed(const string &path, const set<string> &contigs, string &err, long long &nIntervals)
+{
+	ifstream f(path);
+	if (!f)
+	{
+		err = "cannot be opened";
+		return false;
+	}
+	string line;
+	long long ln = 0;
+	nIntervals = 0;
+	while (getline(f, line))
+	{
+		ln++;
+		if (!line.empty() && line[line.size() - 1] == '\r')
+			line.erase(line.size() - 1);
+		if (line.empty() || line[0] == '#')
+			continue;
+		vector<string> col;
+		size_t a = 0;
+		while (col.size() < 3)
+		{
+			size_t b = line.find('\t', a);
+			col.push_back(line.substr(a, b == string::npos ? string::npos : b - a));
+			if (b == string::npos)
+				break;
+			a = b + 1;
+		}
+		string where = "line " + to_string(ln) + ": ";
+		if (col.size() < 3)
+		{
+			err = where + "fewer than 3 tab-separated columns (contig, start, end): '" + line.substr(0, 80) + "'";
+			return false;
+		}
+		long long v[2];
+		for (int k = 0; k < 2; k++)
+		{
+			const string &s = col[k + 1];
+			if (s.empty() || s.size() > 18 || s.find_first_not_of("0123456789") != string::npos)
+			{
+				err = where + (k ? "the end" : "the start") + " '" + s.substr(0, 40) + "' is not a non-negative integer";
+				return false;
+			}
+			v[k] = atoll(s.c_str());
+		}
+		if (col[0].empty())
+		{
+			err = where + "an empty contig name";
+			return false;
+		}
+		if (v[1] <= v[0])
+		{
+			err = where + "the end " + to_string(v[1]) + " is not greater than the start " + to_string(v[0]);
+			return false;
+		}
+		if (!contigs.count(col[0]))
+		{
+			string some;
+			int k = 0;
+			for (const string &c : contigs)
+			{
+				if (k++ == 5)
+				{
+					some += ", ...";
+					break;
+				}
+				some += (k > 1 ? ", '" : "'") + c + "'";
+			}
+			err = where + "the contig '" + col[0].substr(0, 80) + "' is not one of the index's (" +
+				  to_string(contigs.size()) + ": " + some + ")";
+			return false;
+		}
+		regionIv[col[0]].push_back(make_pair(v[0], v[1]));
+		nIntervals++;
+	}
+	if (f.bad())
+	{
+		err = "could not be read to its end";
+		return false;
+	}
+	for (auto &kv : regionIv)
+	{
+		RegionIntervals &iv = kv.second, merged;
+		sort(iv.begin(), iv.end());
+		for (const auto &p : iv)
+			if (!merged.empty() && p.first <= merged.back().second)
+				merged.back().second = max(merged.back().second, p.second);
+			else
+				merged.push_back(p);
+		iv.swap(merged);
+	}
+	return true;
+}
+
+// Whether [s, e) meets an interval of iv (sorted, merged).
+static bool regionMeets(const RegionIntervals &iv, long long s, long long e)
+{
+	auto it = upper_bound(iv.begin(), iv.end(), make_pair(s, LLONG_MAX)); // the first interval starting after s
+	if (it != iv.begin() && prev(it)->second > s)
+		return true;
+	return it != iv.end() && it->first < e;
+}
+
+// Marks the leaves of the tree just read (contig ctg) that the BED drops: in a skip, those
+// whose core meets an interval; in a keep, the others. A format-1 index-0 artefact
+// (already LEAF_SKIP, section 5) is no site and is never emitted: it is neither marked nor
+// counted, so the leaves dropped are the sites dumped.
+static void markRegionLeaves(int thr, const string &ctg, int numLeaves)
+{
+	auto f = regionIv.find(ctg);
+	const RegionIntervals *iv = f != regionIv.end() ? &f->second : nullptr;
+	const long long L = (long long)pamRNA.size() - prune_pad; // the search PAM's width
+	const long long n = (long long)len_guide + L;
+	const long long pp = pam_at_start ? 0 : prune_pad;
+	const long long mbx = idxFacts[thr].mb, off = idxFacts[thr].offset;
+	for (int i = 0; i < numLeaves; i++)
+	{
+		Tleaf &leaf = targetOnDNA[thr][i];
+		if (leaf.info & LEAF_SKIP)
+			continue;
+		const long long ws = leaf.guideIndex;
+		const long long cs = (leaf.info & LEAF_LEFT) ? ws + pp : ws + mbx + off;
+		const bool meets = iv != nullptr && regionMeets(*iv, cs, cs + n);
+		if (meets != regionKeep)
+		{
+			leaf.info |= LEAF_SKIP | LEAF_REGION;
+			nRegionSkipped[thr]++;
+			regionTree[thr] = 1;
+		}
+		else
+			nRegionKept[thr]++;
+	}
+}
+
+// Bit 0: a leaf that is not LEAF_SKIP lies below node n (through its lo, hi or eq kid);
+// bit 1: one lies through its eq kid. Bottom-up, once a tree is loaded.
+static unsigned char computeLive(vector<Tnode> &t, vector<unsigned char> &live, const vector<Tleaf> &leaves, int n)
+{
+	const Tnode &p = t[n];
+	unsigned char eq = 0;
+	if (p.eqkid < 0)
+	{
+		for (int idx = (p.eqkid + 1) * -1; idx >= 0; idx = (leaves[idx].next + 1) * -1)
+			if (!(leaves[idx].info & LEAF_SKIP))
+			{
+				eq = 1;
+				break;
+			}
+	}
+	else if (p.eqkid > 0)
+		eq = computeLive(t, live, leaves, p.eqkid) & 1;
+	unsigned char any = eq;
+	if (p.lokid > 0)
+		any |= computeLive(t, live, leaves, p.lokid) & 1;
+	if (p.hikid > 0)
+		any |= computeLive(t, live, leaves, p.hikid) & 1;
+	live[n] = any | (eq << 1);
+	return live[n];
+}
+
+static char iupacComplement(char c)
+{
+	switch (c)
+	{
+	case 'A': return 'T';
+	case 'T': return 'A';
+	case 'C': return 'G';
+	case 'G': return 'C';
+	case 'R': return 'Y';
+	case 'Y': return 'R';
+	case 'K': return 'M';
+	case 'M': return 'K';
+	case 'B': return 'V';
+	case 'V': return 'B';
+	case 'D': return 'H';
+	case 'H': return 'D';
+	default: return c; // S, W, N, Q and '-' are their own complement
+	}
+}
+
+// The leaf dump: walks the tree just loaded, rebuilding each string (the guide region
+// and the pad, read from the PAM outward), and for every leaf a skip dropped writes its
+// window on the + strand from ws, as the search would read it: the flank (in pamRNA
+// order, the order loadTST decodes it in), the guide region and the pad. A pad base
+// beyond pad_valid is written '-': the tree holds a placeholder there that no alignment
+// may consume (section 3.2). So is a flank base off the contig: in a leaf flagged
+// FLANK_OFF, the run of N (nibble 0) at the flank's distal end, which holds every flank
+// base off the contig (section 3.3) and, at most, genomic N next to them, which match
+// nothing. The other letters are the genome's, as the index stores them.
+static void dumpLeaves(int thr, int node, int depth, string &path, const string &ctg)
+{
+	const Tnode &p = albero_glb[thr][node];
+	if (p.lokid > 0)
+		dumpLeaves(thr, p.lokid, depth, path, ctg);
+	if (p.hikid > 0)
+		dumpLeaves(thr, p.hikid, depth, path, ctg);
+	if ((int)path.size() <= depth)
+		path.resize(depth + 1);
+	path[depth] = p.splitchar;
+	if (p.eqkid > 0)
+	{
+		dumpLeaves(thr, p.eqkid, depth + 1, path, ctg);
+		return;
+	}
+	for (int idx = (p.eqkid + 1) * -1; idx >= 0; idx = (targetOnDNA[thr][idx].next + 1) * -1)
+	{
+		const Tleaf &leaf = targetOnDNA[thr][idx];
+		if (!(leaf.info & LEAF_REGION))
+			continue;
+		const int K = (int)pamRNA.size();
+		string g(path, 0, depth + 1), fl(leaf.guideDNA, K), w;
+		// in the guide's orientation: 5' PAM [flank][guide][pad], 3' PAM [pad][guide][flank]
+		if (pam_at_start)
+			w = fl + g;
+		else
+		{
+			reverse(g.begin(), g.end());
+			w = g + fl;
+		}
+		const int padInvalid = idxFacts[thr].mb - (int)leaf.pad_valid; // format 1: negative
+		for (int z = 0; z < padInvalid && z < (int)g.size(); z++)
+			w[pam_at_start ? w.size() - 1 - z : z] = '-';
+		if (leaf.info & LEAF_FLANK_OFF)
+			for (int z = 0; z < K; z++)
+			{
+				size_t at = pam_at_start ? (size_t)z : w.size() - 1 - z; // from the flank's distal end
+				if (w[at] != 'N')
+					break;
+				w[at] = '-';
+			}
+		const bool minus = pam_at_start ? !(leaf.info & LEAF_LEFT) : (leaf.info & LEAF_LEFT);
+		if (minus)
+		{
+			reverse(w.begin(), w.end());
+			for (char &c : w)
+				c = iupacComplement(c);
+		}
+		LeafDumpLine d;
+		d.contig = ctg;
+		d.ws = leaf.guideIndex;
+		d.side = (leaf.info & LEAF_LEFT) ? 'L' : 'R';
+		d.letters = w;
+		leafDump[thr].push_back(d);
+	}
+}
+
+// Once a tree is loaded: its liveness bits, and its leaf dump.
+static void finishRegionTree(int thr, int numNodes, const string &ctg)
+{
+	if (!regionTree[thr])
+		return;
+	if (regionPruneOn)
+	{
+		nodeLive[thr].assign(numNodes, 0);
+		computeLive(albero_glb[thr], nodeLive[thr], targetOnDNA[thr], 0);
+	}
+	if (!leafDumpPath.empty())
+	{
+		string path;
+		dumpLeaves(thr, 0, 0, path, ctg);
+	}
+}
+// ---- END region hooks ----
 
 //Create matrix for profiling //num_thr = number of layers of the matrix. Each thr update his own layer
 vector<vector<vector<int>>> profiling;
@@ -833,6 +1176,15 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 		}
 	}
 
+	// region hooks (a skip or keep BED): mark the leaves the BED drops
+	string regionCtg;
+	if (regionActive)
+	{
+		regionCtg = binContig(path.substr(path.find_last_of('/') + 1));
+		regionTree[thr] = 0;
+		markRegionLeaves(thr, regionCtg, numLeaves);
+	}
+
 	fileTree.read((char *)&numNodes, sizeof(int)); // read number of nodes
 	if (!fileTree || numNodes <= 0)
 	{
@@ -851,6 +1203,8 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 		NibbleReader r = {&fileTree, 0, false};
 		deSerializeQ(r, r.next(), pNode); // the root's slot is no eq slot
 		fileTree.close();
+		if (regionActive)
+			finishRegionTree(thr, numNodes, regionCtg);
 		return;
 	}
 	fileTree.get(in);
@@ -861,6 +1215,8 @@ void loadTST(string path, vector<Tnode> &albero, ifstream &fileTree, int &numNod
 	deSerialize(albero, fileTree, pairNuc_bit, pairNuc, in, flag, pNode); // deserialize TST
 
 	fileTree.close();
+	if (regionActive)
+		finishRegionTree(thr, numNodes, regionCtg);
 }
 
 int bulDNA, bulRNA, mm;
@@ -1292,6 +1648,15 @@ void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool
 	// lo/hi siblings share the same (d,bD,bR), so pruning here is safe and complete.
 	if (max_edits >= 0 && (mm - d) + (bulDNA - bD) + (bulRNA - bR) > max_edits)
 		return;
+	// region hooks: enter no subtree without a leaf the BED keeps (bit 0), and no eq
+	// branch without one (bit 1); the leaves themselves are dropped at emission
+	unsigned char live = 3;
+	if (regionPruneActive && regionTree[thr])
+	{
+		live = nodeLive[thr][p - albero_glb[thr].data()];
+		if (!(live & 1))
+			return;
+	}
 	if (p->lokid > 0 && goToLoHi)
 	{ // go to lokid
 		nearsearch(s, &albero_glb[thr][p->lokid], pos_in_guide, d, bD, bR, true, bulTypeRNA, bulTypeDNA, thr);
@@ -1311,7 +1676,7 @@ void nearsearch(char *s, Tnode *p, int pos_in_guide, int d, int bD, int bR, bool
 		save_function_end = omp_get_wtime();
 		save_function += save_function_end - save_function_start;
 	}
-	else if (p->eqkid > 0)
+	else if (p->eqkid > 0 && (live & 2))
 	{ // go to eqkid
 
 		inGuide[thr][gi[thr]] = *s; // save guide character
@@ -1428,6 +1793,34 @@ int main(int argc, char **argv)
 	// `search --prune-pam`. Kept last so existing 11-arg callers are unaffected.
 	if (argc > 12 && atoi(argv[12]) != 0)
 		PAM_PRUNE = true;
+	// Optional 13th to 15th args, the region hooks (docs/INDEX_FORMAT.md section 13): a
+	// skip BED, a keep BED, a leaf-dump file ("" = none; crispritz.py search --skip-bed,
+	// --keep-bed, --leaf-dump), each taken from CRISPRITZ_SKIP_BED, CRISPRITZ_KEEP_BED or
+	// CRISPRITZ_LEAF_DUMP when its argument is absent or empty. Checked here; the BED is
+	// read once the index's contigs are known, before any output is opened.
+	const string skipBedPath = regionHookArg(argc, argv, 13, "CRISPRITZ_SKIP_BED");
+	const string keepBedPath = regionHookArg(argc, argv, 14, "CRISPRITZ_KEEP_BED");
+	leafDumpPath = regionHookArg(argc, argv, 15, "CRISPRITZ_LEAF_DUMP");
+	if (!skipBedPath.empty() && !keepBedPath.empty())
+	{
+		cerr << "ERROR: a search takes a skip BED or a keep BED, not both (skip '" << skipBedPath
+			 << "', keep '" << keepBedPath << "')." << endl;
+		return 1;
+	}
+	if (!leafDumpPath.empty() && skipBedPath.empty())
+	{
+		cerr << "ERROR: the leaf dump ('" << leafDumpPath << "') writes the leaves a skip BED drops, and this search "
+			 << "has " << (keepBedPath.empty() ? "no skip BED" : "a keep BED, not a skip BED") << "." << endl;
+		return 1;
+	}
+	regionKeep = !keepBedPath.empty();
+	const string regionBedPath = regionKeep ? keepBedPath : skipBedPath;
+	regionActive = !regionBedPath.empty();
+	{
+		const char *sp = getenv("CRISPRITZ_SKIP_PRUNE");
+		regionPruneOn = !(sp != nullptr && strcmp(sp, "0") == 0);
+	}
+	regionPruneActive = regionActive && regionPruneOn;
 	if (omp_get_max_threads() < num_thr)
 		num_thr = omp_get_max_threads();
 
@@ -1829,6 +2222,40 @@ int main(int argc, char **argv)
 		cout << endl;
 	}
 
+	// Region hooks: read the BED against the index's contigs (those its .bin files are
+	// named for), and create the leaf dump, before any output is opened.
+	if (regionActive)
+	{
+		set<string> contigs;
+		for (size_t f = 0; f < file_stats_vec.size(); ++f)
+			contigs.insert(binContig(file_stats_vec[f].file_name));
+		string err;
+		long long nIntervals = 0;
+		if (!loadRegionBed(regionBedPath, contigs, err, nIntervals))
+		{
+			cerr << "ERROR: the " << (regionKeep ? "keep" : "skip") << " BED '" << regionBedPath << "' " << err
+				 << "; the search is refused (docs/INDEX_FORMAT.md section 13)." << endl;
+			return 1;
+		}
+		if (!leafDumpPath.empty())
+		{
+			ofstream df(leafDumpPath, ios::out | ios::trunc);
+			if (!df)
+			{
+				cerr << "ERROR: the leaf dump '" << leafDumpPath << "' cannot be written." << endl;
+				return 1;
+			}
+		}
+		size_t nMerged = 0;
+		for (const auto &kv : regionIv)
+			nMerged += kv.second.size();
+		cout << (regionKeep ? "KEEP BED " : "SKIP BED ") << regionBedPath << ": " << nIntervals << " interval(s), "
+			 << nMerged << " once merged, on " << regionIv.size() << " of the index's " << contigs.size()
+			 << " contig(s); " << (regionKeep ? "only the sites whose core meets one are searched"
+											  : "the sites whose core meets one are skipped")
+			 << " (subtree pruning " << (regionPruneOn ? "on" : "off") << ")" << endl;
+	}
+
 	sort(file_stats_vec.begin(), file_stats_vec.end(), compareBySize);
 
 	//file to save results and profiling
@@ -1905,6 +2332,14 @@ int main(int argc, char **argv)
 	guideI.resize(num_thr);
 	targetOnDNA.resize(num_thr);
 	idxFacts.resize(num_thr);
+	if (regionActive)
+	{
+		regionTree.assign(num_thr, 0);
+		nodeLive.resize(num_thr);
+		nRegionSkipped.assign(num_thr, 0);
+		nRegionKept.assign(num_thr, 0);
+		leafDump.resize(num_thr);
+	}
 	albero_glb.resize(num_thr);
 	ti.resize(num_thr);
 	gi.resize(num_thr);
@@ -2135,6 +2570,39 @@ int main(int argc, char **argv)
 
 	// Remove duplicated lines in targets.txt file
 	removeDuplicatesInPlace(name_result + ".targets.txt");
+
+	// Region hooks: the leaves the BED dropped and kept (CRISPRme requires this line of
+	// a search it gave a BED), and the leaf dump, sorted, one line a leaf.
+	if (regionActive)
+	{
+		long long nSkipped = 0, nKept = 0;
+		for (size_t t = 0; t < nRegionSkipped.size(); t++)
+		{
+			nSkipped += nRegionSkipped[t];
+			nKept += nRegionKept[t];
+		}
+		cout << "SKIPPED LEAVES\t" << nSkipped << "\tKEPT LEAVES\t" << nKept << "\n";
+		if (!leafDumpPath.empty())
+		{
+			vector<LeafDumpLine> all;
+			for (auto &b : leafDump)
+			{
+				all.insert(all.end(), b.begin(), b.end());
+				vector<LeafDumpLine>().swap(b);
+			}
+			sort(all.begin(), all.end()); // one line a dropped leaf (a 2.9.1 PAM-less index holds index 0 twice)
+			ofstream df(leafDumpPath, ios::out | ios::trunc);
+			for (const LeafDumpLine &d : all)
+				df << d.contig << "\t" << d.ws << "\t" << d.letters << "\t" << d.side << "\n";
+			df.close();
+			if (!df)
+			{
+				cerr << "ERROR: the leaf dump '" << leafDumpPath << "' could not be written in full." << endl;
+				return 1;
+			}
+			cout << "LEAF DUMP\t" << all.size() << "\n";
+		}
+	}
 	globalend = omp_get_wtime(); // end global time
 	cout << "-----------------------"
 		 << "\n";

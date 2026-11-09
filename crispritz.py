@@ -18,6 +18,10 @@ origin_path = os.path.dirname(os.path.realpath(__file__))
 conda_path = "opt/crispritz/"
 
 VERSION = "2.10.0"
+# The search-time region hooks of this CRISPRitz (docs/INDEX_FORMAT.md section 13),
+# which `crispritz.py version` lists too: search --skip-bed, --keep-bed and --leaf-dump.
+# Read it from this file as CRISPRme reads VERSION. CRISPRitz before 2.10.0 has none.
+SEARCH_HOOKS = "skip-bed,keep-bed,leaf-dump"
 # The index format this CRISPRitz's buildTST writes: CZI_FORMAT_VERSION in
 # sourceCode/CRISPR-Cas-Tree/include/indexFormat.h (test/run_index_format_test.sh
 # checks they agree). An index's own format is read from its .bin files
@@ -44,6 +48,69 @@ def _run_checked(argv, what):
         sys.stderr.write(
             f"ERROR: {what} failed ({_exit_detail(rc)}). Its output is incomplete or "
             f"absent, so it must not be treated as an empty result.\n"
+        )
+        sys.exit(1)
+
+
+_HOOK_FLAGS = ("--skip-bed", "--keep-bed", "--leaf-dump")
+_HOOK_ENV = ("CRISPRITZ_SKIP_BED", "CRISPRITZ_KEEP_BED", "CRISPRITZ_LEAF_DUMP")
+
+
+def _search_hooks():
+    """The region hooks of a search (docs/INDEX_FORMAT.md section 13), from its flags:
+    {flag: absolute path} for each of --skip-bed <bed>, --keep-bed <bed> and --leaf-dump
+    <file> given. Exits 1, with the reason on stderr, on a flag given twice or without
+    its path, a BED that is not a file, a skip BED with a keep BED, or a leaf dump
+    without a skip BED; searchTST checks the BED's lines against the index."""
+    args = sys.argv[1:]
+    hooks = {}
+    for flag in _HOOK_FLAGS:
+        n = args.count(flag)
+        if n == 0:
+            continue
+        i = args.index(flag)
+        if n > 1 or i + 1 >= len(args) or args[i + 1] == "" or args[i + 1].startswith("-"):
+            sys.stderr.write("ERROR: %s takes one path, given once (%s).\n"
+                             % (flag, "given %d times" % n if n > 1 else "no path after it"))
+            sys.exit(1)
+        hooks[flag] = os.path.realpath(args[i + 1])
+    for flag in ("--skip-bed", "--keep-bed"):
+        if flag in hooks and not isfile(hooks[flag]):
+            sys.stderr.write("ERROR: %s %s: no such file.\n" % (flag, hooks[flag]))
+            sys.exit(1)
+    if "--skip-bed" in hooks and "--keep-bed" in hooks:
+        sys.stderr.write("ERROR: a search takes --skip-bed or --keep-bed, not both.\n")
+        sys.exit(1)
+    if "--leaf-dump" in hooks and "--skip-bed" not in hooks:
+        sys.stderr.write("ERROR: --leaf-dump writes the leaves a --skip-bed BED drops, and needs one.\n")
+        sys.exit(1)
+    return hooks
+
+
+def _run_search_with_hooks(argv, what):
+    """Run searchTST with a skip or keep BED: as _run_checked, streaming its stdout, and
+    FAIL unless it printed its SKIPPED LEAVES line. A searchTST without the hooks (before
+    2.10.0) ignores the arguments that name the BED and searches everything, which would
+    look like a skipped search that skipped nothing."""
+    proc = subprocess.Popen(argv, stdout=subprocess.PIPE, encoding="utf-8", errors="replace", bufsize=1)
+    reported = False
+    for line in proc.stdout:
+        sys.stdout.write(line)
+        if line.startswith("SKIPPED LEAVES\t"):
+            reported = True
+    sys.stdout.flush()
+    rc = proc.wait()
+    if rc != 0:
+        sys.stderr.write(
+            f"ERROR: {what} failed ({_exit_detail(rc)}). Its output is incomplete or "
+            f"absent, so it must not be treated as an empty result.\n"
+        )
+        sys.exit(1)
+    if not reported:
+        sys.stderr.write(
+            f"ERROR: {what} did not apply the region BED: it printed no SKIPPED LEAVES line, "
+            f"so it is a searchTST without the region hooks (CRISPRitz before 2.10.0); its "
+            f"output holds every site.\n"
         )
         sys.exit(1)
 
@@ -178,6 +245,7 @@ def searchTST():
         )
         sys.exit()
 
+    hooks = _search_hooks()
     nameGenome = os.path.realpath(sys.argv[2])
     PAM = os.path.realpath(sys.argv[3])  # save PAM
     fileGuide = os.path.realpath(sys.argv[4])
@@ -319,24 +387,32 @@ def searchTST():
     # a hard error (the index never stored those extra flank bases). See README
     # section 3.3.3.
     prune_pam = 1 if "--prune-pam" in sys.argv[1:] else 0
-    _run_checked(
-        [
-            corrected_origin_path + "searchTST",
-            str(dirTSTgenome),
-            str(fileGuide),
-            str(mm),
-            str(bDNA),
-            str(bRNA),
-            str(PAM),
-            str(nameResult),
-            str(r),
-            str(th),
-            max_bulges,
-            str(max_edits),
-            str(prune_pam),
-        ],
-        "searchTST (index search)",
-    )
+    argv = [
+        corrected_origin_path + "searchTST",
+        str(dirTSTgenome),
+        str(fileGuide),
+        str(mm),
+        str(bDNA),
+        str(bRNA),
+        str(PAM),
+        str(nameResult),
+        str(r),
+        str(th),
+        max_bulges,
+        str(max_edits),
+        str(prune_pam),
+    ]
+    # the region hooks (docs/INDEX_FORMAT.md section 13), taken from the flags only:
+    # searchTST also reads them from CRISPRITZ_SKIP_BED, CRISPRITZ_KEEP_BED and
+    # CRISPRITZ_LEAF_DUMP, which are not passed on, so a search given none of the flags
+    # is the search without the hooks whatever the environment holds
+    for var in _HOOK_ENV:
+        os.environ.pop(var, None)
+    if hooks:
+        argv += [hooks.get(flag, "") for flag in _HOOK_FLAGS]
+        _run_search_with_hooks(argv, "searchTST (index search)")
+    else:
+        _run_checked(argv, "searchTST (index search)")
     print("Search END")
     print("Search runtime: %s seconds" % (time.time() - start_time))
 
@@ -357,9 +433,19 @@ def searchBruteForce():
             "\n-th < num_thread >: (Optional) Number of threads to use. Default uses all of the available threads (ONE for bulge search)",
             "\n--max-edits <n>: (Optional, indexed search) Cap the TOTAL number of edits (mismatches + DNA bulges + RNA bulges) per off-target. Omitted/negative disables the cap.",
             "\n--prune-pam: (Optional, indexed search) On-the-fly PAM filter. Lets ONE generous-flank PAM-less index (built with an all-N 3' PAM of flank width K, e.g. 8) serve any 3' search PAM of length L <= K (e.g. NGG/NRG/NRR/NGA/NNGRRT): candidates whose concrete flanking PAM does not match the search PAM are skipped before they are emitted, giving the same off-target loci as a dedicated per-PAM index. A shorter 3' PAM is N-padded at its end up to the stored width K. A 5' PAM (e.g. TTTV) needs an index of exactly its width: a shorter 5' PAM is refused, and so is L > K. OFF by default (byte-identical to upstream). See README section 3.3.3.",
+            "\n--skip-bed <bed>: (Optional, indexed search) Skip every site whose core (the search guide and PAM, bulge-free) meets an interval of the BED (contig, 0-based start, end; contigs of the index only): the search returns exactly the lines it returns without the BED whose core meets no interval. Prints SKIPPED LEAVES <n> KEPT LEAVES <n>. See README section 3.3.4 and docs/INDEX_FORMAT.md section 13.",
+            "\n--keep-bed <bed>: (Optional, indexed search) The inverse of --skip-bed: search only the sites whose core meets an interval. Not with --skip-bed.",
+            "\n--leaf-dump <file>: (Optional, with --skip-bed) Write the stored letters of every site the skip drops: contig, window start, the window on the + strand ('-' where no alignment may read), L or R.",
             "\n{-r,-p,-t}: Output type (-r off-targets list only, -p profile only, -t off-targets AND profile)\n",
         )
         sys.exit()
+    if any(flag in sys.argv[1:] for flag in _HOOK_FLAGS):
+        sys.stderr.write(
+            "ERROR: --skip-bed, --keep-bed and --leaf-dump act on an indexed search (give "
+            "-bDNA and/or -bRNA, 0 allowed, and an index directory); this one is a "
+            "brute-force search of a FASTA directory.\n"
+        )
+        sys.exit(1)
 
     genomeDir = os.path.realpath(sys.argv[2]) + "/"
     filePAM = os.path.realpath(sys.argv[3])
@@ -846,8 +932,10 @@ def indexInfo():
             "\nPrints, as JSON, the index format of each .bin of a TST index (1: built by "
             "CRISPRitz <= 2.9.1; 2: built by 2.10.0 or later, see docs/INDEX_FORMAT.md), "
             "for format 2 the parameters it was built with and whether it holds Q, the "
-            "four-allele symbol (four_allele), and, as writes_format, the format this "
-            "CRISPRitz builds. Reads only each file's first bytes, its last bytes and its "
+            "four-allele symbol (four_allele), as contigs the contigs it holds a tree for "
+            "(those a search's --skip-bed or --keep-bed BED may name), and, as "
+            "writes_format, the format this CRISPRitz builds. Reads only each file's first "
+            "bytes, its last bytes and its "
             "size. Exits 1 if the directory holds no .bin, a .bin that searchTST refuses "
             "whatever the search for what those show (its \"error\" entry says why), or .bin "
             "files named for more than one PAM (pams)."
@@ -867,9 +955,13 @@ def indexInfo():
     # than one PAM are not one index: macOS "._" AppleDouble files copied along with
     # an index, named for ".", make searchTST refuse the search
     pams = sorted({n.split("_", 1)[0] for n in files})
+    # the contigs the index holds a tree for, <PAM>_<contig>_<part>.bin, as searchTST
+    # reads them: a region BED (search --skip-bed, --keep-bed) may name only these
+    # (docs/INDEX_FORMAT.md section 13); a contig with no site has no .bin
+    contigs = sorted({n[n.find("_") + 1:n.rfind("_")] for n in files if 0 <= n.find("_") < n.rfind("_")})
     bad = [n for n, i in files.items() if "error" in i]
     print(json.dumps({"index": index_dir, "formats": formats, "pams": pams,
-                      "writes_format": INDEX_FORMAT, "files": files}, indent=1))
+                      "writes_format": INDEX_FORMAT, "contigs": contigs, "files": files}, indent=1))
     why = []
     if not files:
         why.append("no .bin index files in " + index_dir)
@@ -901,6 +993,8 @@ def removeFile(to_remove):
 
 def version():
     print("CRISPRitz v", VERSION)
+    # the search-time region hooks, for a reader that checks for them (CRISPRme)
+    print("search hooks:", " ".join(SEARCH_HOOKS.split(",")))
 
 
 # HELP FUNCTION
