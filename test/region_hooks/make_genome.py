@@ -31,6 +31,10 @@ Writes, under <out_dir>:
                 its PAM, and the distal flank of an 8-wide window; random single bases;
                 three long intervals; chrF whole; nothing on chrE. The fake genomes:
                 their dense windows, whole
+  fake25.sep.bed, fake30.sep.bed
+                the dense windows each with the separator N after it, [start, end + 1),
+                as the haplotype-scan design's INDELS BED: the 21-nt guide's core (27
+                bases) then reaches window 6's interval too (docs/INDEX_FORMAT.md 13.5)
   <g>.windows.tsv  the fake genomes' windows: contig, start, end, left, right, dense
   guides_*.txt  the search guides, one file a search PAM file of the runner
 """
@@ -224,6 +228,7 @@ def main():
             for r in rows:
                 fh.write("%s\t%d\t%d\t%d\t%d\t%d\n" % r)
         write_bed(tag + ".bed", [(c, s, e) for c, s, e, _, _, d in rows if d])
+        write_bed(tag + ".sep.bed", [(c, s, e + (k < len(rows) - 1)) for k, (c, s, e, _, _, d) in enumerate(rows) if d])
 
     def gfile(name, guides, pamlen, side):
         with open(os.path.join(out, name), "w") as fh:

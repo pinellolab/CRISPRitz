@@ -46,7 +46,10 @@ section 11 the tests.
   `ws`, the **window start**, is the + strand coordinate of the window's leftmost
   base (0-based).
 * The **core** of a site is its guide region plus the PAM bases the search
-  constrains. The pad is not part of it.
+  constrains. The pad is not part of it. (That is for `Gs = G`; for any search, section
+  13.1 defines it as the `Gs + L` bases of the site's bulge-free alignment, which hold
+  `Gs - G` pad bases for a longer search guide and leave out `G - Gs` guide-region bases
+  for a shorter one.)
 * The TST stores, per site, a string of `G + mb` characters read from the PAM
   outward (guide first, then pad), and per leaf the `K` flank bases as 4-bit
   nibbles.
@@ -1024,11 +1027,12 @@ arguments it passed before. The flags act on an indexed search (`-bDNA` and/or `
 0 allowed); a brute-force search refuses them.
 
 **The BED**: tab-separated contig, start, end (0-based, the end exclusive); more columns
-are ignored, blank lines and lines starting with `#` skipped, a CR before the newline
+are ignored, empty lines and lines starting with `#` skipped, a CR before the newline
 dropped, overlapping and adjacent intervals merged. The search refuses (exit 1, the line
 and the reason on stderr), before it opens any output, and never reads a BED in part:
 
-* a line with fewer than 3 tab-separated columns (a BED with spaces is one);
+* a line with fewer than 3 tab-separated columns (a BED with spaces is one, and so is a
+  line of spaces only);
 * a start or an end that is not a non-negative integer of at most 18 digits;
 * an end not after its start, or an empty contig;
 * a contig the index holds no tree for: the contigs of its `.bin` files,
@@ -1046,7 +1050,9 @@ The two partition the search without a BED: disjoint, together all of it, and ea
 its order (a tree's lines are written in traversal order, and a skip drops lines without
 moving any, so a single-tree search gives them in the same order, and a multi-tree one
 interleaves its trees in completion order as it does without a BED). The profile outputs
-(`-p`, `-t`) count the lines emitted.
+(`-p`, `-t`) count the rows the search emits, duplicates included (the targets file holds
+each line once), so the pruning (below), which emits fewer duplicates, can change them,
+never the targets.
 
 **How.** As a tree is loaded, every leaf whose core meets an interval (skip; keep: meets
 none) is flagged with the flag a format-1 index-0 artefact carries (section 5), so it is
@@ -1055,7 +1061,12 @@ node (through its lo, hi or eq kid); one lies through its eq kid -- and the trav
 enters no node without the first and no eq branch without the second. The pruning is
 what makes a skip cheap: without it the traversal still walks the dense windows' huge
 subtrees and only drops their leaves at the end (section 13.6). `CRISPRITZ_SKIP_PRUNE=0`
-keeps the flags and drops the pruning, and changes no output.
+keeps the flags and drops the pruning, and changes no byte of the targets file. It can
+change the profile files: a node whose eq branch holds no kept leaf is left without its
+RNA-bulge branch too, which comes back to the node and visits its lo and hi siblings
+again, and only repeats rows each sibling emits through its own RNA bulge; the pruned
+search does not emit those duplicates, which the profiles count (on the test's NGG index
+at 2 mismatches and 2 + 2 bulges, every profile but `profile.xls` differs).
 
 **On stdout**, a search given a skip or a keep BED (an empty one too) prints the first
 line below before it searches and the others when it ends, before its `TOTAL TIME` line:
@@ -1124,41 +1135,68 @@ have neither, and their `crispritz.py search` ignores the three flags.
 * **The fake-indel window's width (CRISPRme's scan of the dense fake-indel windows).** In
   a fake-indel genome every indel allele is a window of LEFT reference bases, the ALT and
   RIGHT reference bases, one `N` between two windows (25/27 up to 2.9.1, 30/30 from
-  2.10.0). A site's guide region lies in one window, and so do all its lines: they
-  consume no pad base past `pad_valid`, which stops at the separator. But on the pad
-  route (`Gs > G`) its core holds `Gs - G` pad bases, and these can run across the
-  separator into the window before (PAM-right) or after (PAM-left) its own: a skip BED of
-  that window then drops every line of the site, though they all lie in the site's own
-  window. So a consumer that scans each dense window on its own misses a line of a window
-  that is not dense if the line covers that window's ALT, which needs `Gs >= G + 2` and
-  `n >= LEFT + 3` (the window before) or `n >= RIGHT + 3` (the window after). Such a scan
-  is therefore exact only while `LEFT >= n - 2` and `RIGHT >= n - 2`, read from each
-  window's own record (the indel log's `CHR` field gives its start and end) or from the
-  width recorded with the INDELS index, never from a constant; where that fails it must
-  refuse, or scan the dense windows with their neighbours. With 2.10.0's 30/30 windows it
-  holds for every `n <= 32` (CRISPRme's longest site is 29: a 21-nt guide and an 8-nt
-  PAM); with 2.9.1's 25/27 it fails from `n = 28` (a 22-nt SaCas9 guide and `NNGRRT` on a
-  20-nt index). The test shows both (section 13.6).
+  2.10.0). A site's guide region lies in one window, and so does every base its lines
+  align to the guide: they consume no pad base past `pad_valid`, which stops at the
+  separator. But its core can meet the interval of a dense window next to its own, and a
+  skip BED of the dense windows then drops every line of the site, though the site is in a
+  window that is not dense: a consumer that scans each dense window on its own misses
+  those lines that cover that window's ALT. Say `c = 1` where the dense window's interval
+  holds the separator between the two windows, and `c = 2` where it does not (the
+  haplotype-scan design's INDELS BED ends each interval on the separator after its window,
+  `[start, end + 1)`: `c = 1` towards the window before a site's, 2 towards the one
+  after). The core gets there in two ways:
+  1. **The pad route** (`Gs > G`): the core holds the `Gs - G` pad bases next to the guide
+     region. A PAM-right site whose guide region starts `a` bases into its window has a
+     core that meets the interval of the window before when `a <= Gs - G - c`, and lines
+     that end where its PAM ends, `a + G + L` bases into the window, so they cover the ALT
+     when `a + G + L > LEFT` (each line with at least `c` RNA bulges more than DNA
+     bulges). So lines can be lost iff `Gs >= G + c` and `n >= LEFT + c + 1`; on a
+     PAM-left site likewise, with the window after and RIGHT.
+  2. **A PAM across the separator**: a genomic `N` matches no PAM letter the search tests,
+     but a PAM-less index searched without `--prune-pam` tests none (section 3.3), so
+     there a line's PAM, and the core with it, can run across the separator into the next
+     window. Such a line holds at most `G + mb + L` bases, and covers its own window's ALT
+     only if it holds more than `RIGHT + c` (a PAM-right line, into the window after) or
+     `LEFT + c` (a PAM-left one, into the window before).
+
+  A scan of the dense windows alone is therefore exact only while `LEFT >= m - c` and
+  `RIGHT >= m - c`, with the `c` of the window before and of the window after, where
+  `m = n = Gs + L` on the pad route and `m = max(Gs, G + mb) + L` on a PAM-less index
+  searched without `--prune-pam`; a search with neither (a search guide no longer than the
+  index's, and a PAM it tests) loses none. Whatever the BED holds of the separators,
+  `LEFT, RIGHT >= m - 1` suffice (an interval that reaches past a separator into the next
+  window is outside this rule). The consumer reads LEFT and RIGHT from each window's own
+  record (the indel log's `CHR` field gives its start and end) or from the width recorded
+  with the INDELS index, never from a constant, and where the rule fails it refuses, or
+  scans the dense windows with their neighbours. 2.10.0's 30/30 windows hold it for every
+  `m <= 31` (`m <= 32` with `c = 2`), so for every search of CRISPRme's PAMs: `n <= 27` (a
+  21-nt guide with `NNGRRT` or `NNNRRT`, a 23-nt one with `TTTV` or `TTTN`), and
+  `m = 23 + mb`, at most 31 up to `-bMax 8`, for its 20-nt `NNN` searched on a PAM-less
+  index without `--prune-pam`. 2.9.1's 25/27 fail from `n = 27` with the design's BED
+  (from `n = 28` with `c = 2` on both sides): CRISPRme's 21-nt SaCas9 guides on the 20-nt
+  K=8 index and its 23-nt Cas12a guides on a 20-nt index (section 5.1) are such searches.
+  The test checks both cases, site by site on the pad route, for the four ways a BED can
+  hold the separators (section 13.6).
 
 ### 13.6 Tests and measurements
 
 1. **`test/run_region_hooks_test.sh`** (`test/region_hooks/`; the CI job `region-hooks`,
-   and `QUICK=1`, one mismatch fewer in its widest searches, in the ASan job): 22 searches
-   with 2,280,442 lines without a BED, 19 on synthetic genomes and 3 on the format-1
+   and `QUICK=1`, one mismatch fewer in its widest searches, in the ASan job): 24 searches
+   with 2,280,504 lines without a BED, 21 on synthetic genomes and 3 on the format-1
    fixtures of section 11 item 2 (built by 2.9.1), each run without a BED, with the skip
    BED and the leaf dump, with the keep BED, and with the skip BED and
    `CRISPRITZ_SKIP_PRUNE=0`. The skip's lines are exactly the lines of the search without
    a BED whose core -- computed from the line by `test/region_hooks/check_hooks.py`, which
    shares no code with the engine -- meets no interval, in their order, and the keep's
-   exactly the others; pruning off changes no byte; `SKIPPED` and `KEPT LEAVES` are each
-   other's mirror and, on a format-2 index, add up to its leaves; the dump holds one line
-   per dropped leaf, the
-   leaf of every dropped line among them, every dumped core meets an interval, and every
-   letter is the FASTA's, or `-` exactly where section 13.3 says (pad bases at `N` runs,
-   at contig ends and at the separators of the fake-indel genomes, the flanks of K=8 and
-   5' K=4 windows that run off a contig). The BEDs put single bases on and beside each
-   planted site's core, so the prototype's leaf rule (section 13.1) disagrees with the core
-   on many lines, and the engine follows the core on all of them:
+   exactly the others; pruning off changes no byte of the targets; `SKIPPED` and
+   `KEPT LEAVES` are each other's mirror and, on a format-2 index, add up to its leaves;
+   the dump holds one line per dropped leaf, the leaf of every dropped line among them,
+   every dumped core meets an interval, and every letter is the FASTA's, or `-` exactly
+   where section 13.3 says (pad bases at `N` runs, at contig ends and at the separators of
+   the fake-indel genomes, the flanks of K=8 and 5' K=4 windows that run off a contig).
+   The BEDs put single bases on and beside each planted site's core, so the prototype's
+   leaf rule (section 13.1) disagrees with the core on many lines, and the engine follows
+   the core on all of them:
 
    | search | lines | the prototype would drop, core outside | would keep, core inside |
    |---|---|---|---|
@@ -1168,22 +1206,46 @@ have neither, and their `crispritz.py search` ignores the three flags.
    | K=8 index, NRG | 16,626 | 5,115 | 0 |
    | K=8 index, 21-nt NNGRRT | 66,422 | 10,495 | 2,827 |
    | TTTV index, 23-nt guides | 17,473 | 0 | 2,033 |
-   | fake-indel genomes, 22- and 23-nt NNGRRT on a 20-nt index | 76 | 0 | 76 |
+   | fake-indel genomes, 22- and 23-nt NNGRRT on a 20-nt index, and 21-nt with the separators in the BED | 138 | 0 | 138 |
 
    On the fake-indel genomes (section 13.5) the dropped lines that lie in a window that is
    not dense and cover its ALT -- the lines a scan of the dense windows alone would miss --
-   are, with 25/27 windows, 24 for the 22-nt guide (n = 28) and 14 for the 23-nt one
-   (n = 29), every line of the site planted for it, and none for a 21-nt guide (n = 27);
-   with 30/30 windows none. Besides: 4 threads give the lines, the dump and the counts of
-   1; 26 refusals (section 13.2), none of them leaving a targets file; an empty BED gives
-   the search without one byte for byte (and the keep, nothing); a BED with comments,
-   blank lines, CRLF, extra columns and unsorted, overlapping intervals gives the clean
-   BED's lines and dump; `crispritz.py` passes none of the three variables on, and
-   `searchTST` reads them as its arguments; `crispritz.py search --skip-bed` stops on a
-   `searchTST` that ignores the arguments; the capability (section 13.4). With
-   `SEARCHTST_REF` set to the `searchTST` of `4579026` (the engine without the hooks), the
-   19 synthetic searches without a BED are byte-identical to its. Passes, plain and under
-   ASan, on amd64 and arm64 (item 3).
+   are, with 25/27 windows and the dense windows' intervals without the separators
+   (`c = 2`), 24 for the 22-nt guide (n = 28) and 14 for the 23-nt one (n = 29), every line
+   of the site planted for it, and none for a 21-nt guide (n = 27); with the separator
+   after each dense window in its interval (`c = 1` towards the window before a site's, the
+   design's BED) the 21-nt guide's 31 lines too; with 30/30 windows none, with either BED
+   (with the separators, the 21-nt guide's 31 lines are dropped, and cover no ALT).
+
+   The rule of section 13.5 itself is checked on five more fake-indel genomes
+   (`test/region_hooks/hr27_bound.py`), each window that is not dense holding one planted
+   site between two dense ones, with the dense windows' intervals in the four forms a BED
+   can take: without the separators, with the one after each, the one before, both. The
+   pad route (case 1), site by site: in 25/27 and in 30/30 windows, PAM-right and PAM-left
+   `NNGRRT` sites whose guide regions start 0 to 5 bases from the window's edge on the
+   side their core reaches across, searched with 21- to 26-nt guides on a 20-nt index
+   (`-bMax 3`; n = 27 to 32; `-mm 1 -bDNA 0 -bRNA 3`): in all 48 skips the sites that lose
+   lines are exactly the rule's, and the sites with lines are those it gives. At 25/27 the
+   PAM-right sites lose lines from n = 27 with the separator after a window in its
+   interval and from n = 28 without, the PAM-left ones from n = 29 with the one before and
+   from n = 30 without; at 30/30 none up to n = 31, and at n = 32 the sites 5 bases in:
+   the PAM-right one with the separator after a window in its interval, the PAM-left one
+   with the one before. A PAM across the separator (case 2): windows of 28, 29 and 30
+   bases, the guide region 0 to 7 bases from the window's edge on its PAM side, a PAM-less
+   K=8 index (`-bMax 3`) searched with 8 N's, no `--prune-pam`, at `-mm 0 -bDNA 3 -bRNA 0`
+   (`G + mb + L = 31`): most lines run across a separator, and in all 12 skips the sides
+   that lose lines are the rule's -- both at 28, at 29 those whose dense neighbour's
+   interval holds the separator, none at 30.
+
+   Besides: 4 threads give the lines, the dump and the counts of 1; 26 refusals (section
+   13.2), none of them leaving a targets file; an empty BED gives the search without one
+   byte for byte (and the keep, nothing); a BED with comments, empty lines, CRLF, extra
+   columns and unsorted, overlapping intervals gives the clean BED's lines and dump;
+   `crispritz.py` passes none of the three variables on, and `searchTST` reads them as its
+   arguments; `crispritz.py search --skip-bed` stops on a `searchTST` that ignores the
+   arguments; the capability (section 13.4). With `SEARCHTST_REF` set to the `searchTST`
+   of `4579026` (the engine without the hooks), the 21 synthetic searches without a BED
+   are byte-identical to its. Passes, plain and under ASan, on amd64 and arm64 (item 3).
 2. **Without a BED, byte for byte the engine without the hooks.** Every `searchTST` call
    that the boundary (full and `QUICK=1`), golden, four-allele, PAM-filter, flank-N,
    format-1, index-format and minimal (NGG; WTN with a DNA bulge) tests make was run
@@ -1200,9 +1262,9 @@ have neither, and their `crispritz.py search` ignores the three flags.
    contig, golden, format 1, index format, boundary and region hooks, and the ASan runs of
    section 11 item 6 plus the region hooks' -- passes on amd64 (ml008, the CRISPRme 2.8.1
    image, g++ 14.2: 35 runs with the identity runs of item 2) and on arm64 (Docker on
-   Apple Silicon, the same image: the same 35 runs). The region-hooks test takes 117 s
-   plain and 372 s under ASan on amd64 (56 s and 685 s on arm64), and 167 s with `QUICK=1`
-   under ASan.
+   Apple Silicon, the same image: the same 35 runs). The region-hooks test takes 118 s
+   plain and 374 s under ASan on amd64 (61 s and 724 s on arm64), and 169 s with
+   `QUICK=1` under ASan.
 4. **Real data: test 5b** (the haplotype-scan design's review finding H-R2-9). chr22's IGL
    locus (21.99-22.96 Mb) and chr14's IGH locus (105.54-106.91 Mb) with HGDP + 1000
    Genomes, the inputs of the design's prototypes (each chromosome masked outside its
@@ -1212,8 +1274,8 @@ have neither, and their `crispritz.py search` ignores the three flags.
    fake-indel windows (IGL 1,421, IGH 3,305). Each search ran without a BED with this
    `searchTST` and with `4579026`'s (byte-identical in every case, up to 204,453,499 lines;
    IGH's INDELS 4+2+1, 225 GB, was not rerun with it), with the skip BED and the dump, with
-   the keep BED, and with the skip BED and pruning off (byte-identical to the pruned skip in
-   every case).
+   the keep BED, and with the skip BED and pruning off (its targets byte-identical to the
+   pruned skip's in every case).
    A streaming check found the skip's lines and the keep's to be exactly the lines without
    a BED whose core meets no interval and those whose core meets one, in their order, and
    the dump complete, every dumped core meeting an interval, and every letter the enriched

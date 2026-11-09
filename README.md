@@ -525,7 +525,7 @@ exactly the lines it returns without the BED whose core meets no interval; with
 `--keep-bed`, exactly the others: the two partition it. The skipped subtrees of the index
 are never entered, so a skip of the variant-dense windows costs a fraction of the search
 it replaces (on chr22's IGL locus with HGDP + 1000 Genomes, one guide at 4 mismatches and
-2+2 bulges on the INDELS index: 3.3 s and 0.06 GB with the BED of its dense windows, 24
+2+2 bulges on the INDELS index: 3.3 s and 0.05 GB with the BED of its dense windows, 24
 minutes and 157 GB without). `--leaf-dump` (with `--skip-bed`) writes one line per skipped
 site: contig, window start, the letters the index stores for its window on the + strand
 (`-` where it stores a placeholder: a bulge-pad base from the first one off the contig or

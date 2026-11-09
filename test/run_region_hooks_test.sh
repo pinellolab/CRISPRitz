@@ -20,6 +20,8 @@
 #   * fake-indel genomes (windows separated by one N, LEFT/RIGHT 25/27 and 30/30) with
 #     their dense windows as the BED: NGG, and NNGRRT with 21-, 22- and 23-nt guides,
 #     where a core reaches across the separator into the window before (section 13.5);
+#     and the 21-nt guide again with the BED whose intervals hold the separator after
+#     each dense window (the haplotype-scan design's form), whose core it then meets;
 #   * indexes built by CRISPRitz 2.9.1 (format 1: test/fixtures/format1), searched by
 #     searchTST with its 13th-15th arguments.
 # For each: the search without a BED (U), with the skip BED and the leaf dump (S), with
@@ -27,9 +29,14 @@
 # U by THE core, in U's order; S0 = S; SKIPPED/KEPT LEAVES add up to the index's leaves;
 # the dump is complete and letter-exact. Where THE core and the prototype's leaf rule
 # disagree (the K=8 index and the pad route), lines of both kinds must occur. With 4
-# threads the skip gives the same lines and the same dump. Then the refusals (a
-# malformed BED, an unknown contig, a skip with a keep BED, a dump without a skip BED,
-# a BED on a brute-force search), an empty BED, a BED with comments and CRLF, the
+# threads the skip gives the same lines and the same dump. Then the rule of section
+# 13.5 for a scan of the dense fake-indel windows alone (test/region_hooks/hr27_bound.py,
+# the dense windows' intervals with and without the separators beside them): on the pad
+# route site by site (PAM-right and PAM-left sites 0-5 bases from the window's edge, 25/27
+# and 30/30 windows, 21- to 26-nt guides), and where a PAM runs across a separator (a
+# PAM-less index searched without --prune-pam; windows of 28, 29 and 30). Then the
+# refusals (a malformed BED, an unknown contig, a skip with a keep BED, a dump without a
+# skip BED, a BED on a brute-force search), an empty BED, a BED with comments and CRLF, the
 # environment variables (crispritz.py does not pass them on), a searchTST without the
 # hooks (crispritz.py stops), and the capability (crispritz.py version, SEARCH_HOOKS).
 #
@@ -96,6 +103,20 @@ printf 'TTTV%s -4\n' "$(n 20)" > "${P}/tttv20.txt"
 printf 'TTTV%s -4\n' "$(n 23)" > "${P}/tttv23.txt"
 printf '%s -4\n'    "$(n 24)" > "${P}/nnnn5.txt"
 
+# cutbed <index-info json> <BED> <out>: the BED cut to the contigs the index holds
+# (index-info's contigs: a contig with no site has no tree, and a BED naming it is
+# refused, below), as a caller does
+cutbed() {
+  "${PYTHON}" - "$1" "$2" "$3" <<'PY'
+import json, sys
+contigs = set(json.load(open(sys.argv[1]))["contigs"])
+with open(sys.argv[2]) as fi, open(sys.argv[3], "w") as fo:
+    for line in fi:
+        if line.startswith("#") or line.split("\t")[0] in contigs:
+            fo.write(line)
+PY
+}
+
 # --- indexes: name genome pam -bMax
 LIB="${WORK}/lib"; mkdir -p "${LIB}"
 declare -A IDX LEAVES
@@ -107,16 +128,7 @@ while read -r name genome ipam mb; do
   ( cd "${WORK}" && "${PYTHON}" "${CZ}" index-info "${IDX[${name}]}" > "${name}.info.json" ) \
     || fail "index-info ${name}"
   LEAVES[${name}]="$("${PYTHON}" -c "import json,sys; print(sum(f['num_leaves'] for f in json.load(open(sys.argv[1]))['files'].values()))" "${WORK}/${name}.info.json")"
-  # the genome's BED cut to the contigs the index holds (index-info's contigs: a contig
-  # with no site has no tree, and a BED naming it is refused, below), as a caller does
-  "${PYTHON}" - "${WORK}/${name}.info.json" "${D}/${genome}.bed" "${WORK}/${name}.bed" <<'PY'
-import json, sys
-contigs = set(json.load(open(sys.argv[1]))["contigs"])
-with open(sys.argv[2]) as fi, open(sys.argv[3], "w") as fo:
-    for line in fi:
-        if line.startswith("#") or line.split("\t")[0] in contigs:
-            fo.write(line)
-PY
+  cutbed "${WORK}/${name}.info.json" "${D}/${genome}.bed" "${WORK}/${name}.bed"  # the genome's BED
   echo "--- index ${name}: ${ipam} -bMax ${mb} on ${genome}, $(ls "${IDX[${name}]}" | wc -l | tr -d ' ') .bin files, ${LEAVES[${name}]} leaves"
 done <<'EOF'
 i3ngg g3 ngg20 2
@@ -149,7 +161,7 @@ while IFS='|' read -r tag idx spam guides prune budget genome bed geo extra; do
   read -r mm bd br <<< "${budget}"; read -r G K mb gs L <<< "${geo}"
   [ -n "${QUICK:-}" ] && [ $((bd + br)) -ge 3 ] && [ "${mm}" -gt 1 ] && mm=$((mm - 1))
   PARAMS[${tag}]="${idx} ${spam} ${guides} ${prune} ${mm} ${bd} ${br}"
-  B="${WORK}/${idx}.bed"
+  B="${WORK}/${tag}.bed"; cutbed "${WORK}/${idx}.info.json" "${D}/${bed}" "${B}"  # the case's BED
   search "${tag}.U" "${idx}" "${spam}" "${guides}" "${prune}" "${mm}" "${bd}" "${br}"
   if [ -n "${SEARCHTST_REF:-}" ]; then  # without a BED: byte for byte the engine without the hooks
     ( cd "${WORK}" && "${SEARCHTST_REF}" "${IDX[${idx}]}/" "${D}/${guides}" "${mm}" "${bd}" "${br}" \
@@ -191,9 +203,11 @@ f25_ngg      | f25ngg | ngg20    | guides_fake_ngg20.txt    | 0 | 3 2 2 | fake25
 f25_grrt21   | f25grrt| nngrrt21 | guides_fake_nngrrt21.txt | 0 | 2 0 3 | fake25 | fake25.bed | 20 6 3 21 6 | --windows DATA/fake25.windows.tsv --hr27 none --min-dropped 0 --min-kept 0
 f25_grrt22   | f25grrt| nngrrt22 | guides_fake_nngrrt22.txt | 0 | 2 0 3 | fake25 | fake25.bed | 20 6 3 22 6 | --windows DATA/fake25.windows.tsv --hr27 any --min-kept 0
 f25_grrt23   | f25grrt| nngrrt23 | guides_fake_nngrrt23.txt | 0 | 2 0 3 | fake25 | fake25.bed | 20 6 3 23 6 | --windows DATA/fake25.windows.tsv --hr27 any --min-kept 0
+f25s_grrt21  | f25grrt| nngrrt21 | guides_fake_nngrrt21.txt | 0 | 2 0 3 | fake25 | fake25.sep.bed | 20 6 3 21 6 | --windows DATA/fake25.windows.tsv --hr27 any --min-kept 0
 f30_ngg      | f30ngg | ngg20    | guides_fake_ngg20.txt    | 0 | 3 2 2 | fake30 | fake30.bed | 20 3 2 20 3 |
 f30_grrt22   | f30grrt| nngrrt22 | guides_fake_nngrrt22.txt | 0 | 2 0 3 | fake30 | fake30.bed | 20 6 3 22 6 | --windows DATA/fake30.windows.tsv --hr27 none --min-dropped 0 --min-kept 0
 f30_grrt23   | f30grrt| nngrrt23 | guides_fake_nngrrt23.txt | 0 | 2 0 3 | fake30 | fake30.bed | 20 6 3 23 6 | --windows DATA/fake30.windows.tsv --hr27 none --min-dropped 0 --min-kept 0
+f30s_grrt21  | f30grrt| nngrrt21 | guides_fake_nngrrt21.txt | 0 | 2 0 3 | fake30 | fake30.sep.bed | 20 6 3 21 6 | --windows DATA/fake30.windows.tsv --hr27 none --min-kept 0
 EOF
 echo "--- ${n_cases} searches: skip + keep = the search without a BED, by THE core; dumps exact (${n_lines} lines)"
 [ -n "${SEARCHTST_REF:-}" ] && echo "--- ${n_ref} searches without a BED byte-identical to SEARCHTST_REF"
@@ -262,6 +276,52 @@ for tag in d3_ngg_b22 k8_ngg f25_ngg; do
 done
 echo "--- 4 threads: the same lines, dump and counts as 1 (3 searches)"
 
+# --- the rule of section 13.5 for a scan of the dense fake-indel windows alone (review
+#     findings H-R2-7, HK-R1-1), site by site: in 25/27 and 30/30 windows, a PAM-right and
+#     a PAM-left NNGRRT site 0 to 5 bases from the window edge its core reaches across
+#     (between two dense windows), searched with 21- to 26-nt guides on a 20-nt index
+#     (n = 27..32, -mm 1, 3 RNA bulges) and skipped with the dense windows in four forms:
+#     without the separators, with the one after each (the haplotype-scan design's INDELS
+#     BED), the one before, both. The sites whose dropped lines lie in their own window and
+#     cover its ALT -- what such a scan misses -- must be the rule's, in all 48 skips. And
+#     where a line's PAM runs across a separator (a PAM-less K=8 index searched with 8 N's
+#     and no --prune-pam, whose flank is not tested; windows of 28, 29 and 30 bases, the
+#     guide region next to the window's edge on its PAM side): the sides that lose lines
+#     must be the rule's, in 12 skips
+"${PYTHON}" "${SCRIPT_DIR}/region_hooks/hr27_bound.py" genome "${D}" > /dev/null
+for gs in 24 25 26; do printf '%sGRRT 6\n' "$(n $((gs + 2)))" > "${P}/nngrrt${gs}.txt"; done
+for g in hr25 hr30; do
+  ( cd "${LIB}" && "${PYTHON}" "${CZ}" index-genome "${g}" "${D}/${g}/" "${P}/nngrrt20.txt" -bMax 3 -th 1 \
+      > "${WORK}/${g}.index.log" 2>&1 ) || fail "index-genome ${g}: $(tail -3 "${WORK}/${g}.index.log")"
+  IH="$(ls -d "${LIB}/genome_library/"*"_3_${g}")"
+  for gs in 21 22 23 24 25 26; do
+    for form in U win trail lead both; do
+      hooks=(); [ "${form}" = U ] || hooks=("${D}/${g}.${form}.bed" "" "")
+      ( cd "${WORK}" && "${ST}" "${IH}/" "${D}/guides_hr${gs}.txt" 1 0 3 "${P}/nngrrt${gs}.txt" "${g}.${gs}.${form}" \
+          r 1 3 -1 0 ${hooks[@]+"${hooks[@]}"} > "${g}.${gs}.${form}.out" 2> "${g}.${gs}.${form}.err" ) \
+        || fail "${g}.${gs}.${form}: searchTST exited non-zero: $(tail -3 "${WORK}/${g}.${gs}.${form}.err")"
+      [ ! -s "${WORK}/${g}.${gs}.${form}.err" ] || fail "${g}.${gs}.${form}: searchTST wrote to stderr"
+    done
+  done
+  "${PYTHON}" "${SCRIPT_DIR}/region_hooks/hr27_bound.py" check "${D}" "${g}" "${WORK}" 20 6 3 3 21 22 23 24 25 26 \
+    || fail "${g}: the sites a scan of the dense windows alone misses are not the rule's (above)"
+done
+for g in st28 st29 st30; do
+  ( cd "${LIB}" && "${PYTHON}" "${CZ}" index-genome "${g}" "${D}/${g}/" "${P}/n8.txt" -bMax 3 -th 1 \
+      > "${WORK}/${g}.index.log" 2>&1 ) || fail "index-genome ${g}: $(tail -3 "${WORK}/${g}.index.log")"
+  IH="$(ls -d "${LIB}/genome_library/"*"_3_${g}")"
+  for form in U win trail lead both; do
+    hooks=(); [ "${form}" = U ] || hooks=("${D}/${g}.${form}.bed" "" "")
+    ( cd "${WORK}" && "${ST}" "${IH}/" "${D}/guides_st.txt" 0 3 0 "${P}/n8.txt" "${g}.${form}" \
+        r 1 3 -1 0 ${hooks[@]+"${hooks[@]}"} > "${g}.${form}.out" 2> "${g}.${form}.err" ) \
+      || fail "${g}.${form}: searchTST exited non-zero: $(tail -3 "${WORK}/${g}.${form}.err")"
+    [ ! -s "${WORK}/${g}.${form}.err" ] || fail "${g}.${form}: searchTST wrote to stderr"
+  done
+  "${PYTHON}" "${SCRIPT_DIR}/region_hooks/hr27_bound.py" check-pam "${D}" "${g}" "${WORK}" 20 8 3 \
+    || fail "${g}: the lines a scan of the dense windows alone misses are not the rule's (above)"
+done
+echo "--- section 13.5's rule for a scan of the dense fake-indel windows alone: what it misses is the rule's, in 60 skips"
+
 # --- the refusals: exit 1, the reason on stderr, no targets file
 I="${IDX[i3ngg]}"
 direct() {  # <out> <skip> <keep> <dump>: searchTST with the hooks as its 13th-15th arguments
@@ -314,7 +374,7 @@ echo "--- refusals: 12 malformed BEDs, a missing one, skip with keep (arguments,
 read -r _ _ _ _ MM BD BR <<< "${PARAMS[d3_ngg_b22]}"
 
 # --- accepted: an empty BED (the search without one, byte for byte, and SKIPPED 0); the
-#     BED with comments, blank lines, CRLF, extra columns, unsorted and overlapping
+#     BED with comments, empty lines, CRLF, extra columns, unsorted and overlapping
 #     intervals (the clean BED's output); the dump and SKIPPED LEAVES of a search with no
 #     dropped leaf
 printf '# nothing\n\n' > "${WORK}/empty.bed"

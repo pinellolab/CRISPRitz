@@ -233,9 +233,10 @@ jobs:
       # --prune-pam, search guides longer and shorter than the index's (the pad route),
       # fake-indel genomes of 25/27 and 30/30 windows. For each search: the skip keeps
       # exactly the lines whose core (read from the line) meets no interval, the keep
-      # exactly the others, in order; pruning off changes nothing; the leaf dump holds
+      # exactly the others, in order; pruning off changes no line; the leaf dump holds
       # every dropped leaf, letter for letter the FASTA's ('-' at a pad base past
-      # pad_valid and a flank base off the contig); the refusals; the capability.
+      # pad_valid and a flank base off the contig); the rule of INDEX_FORMAT 13.5 for a
+      # scan of the dense fake-indel windows alone; the refusals; the capability.
       - name: Run region-hooks test
         run: bash test/run_region_hooks_test.sh
 

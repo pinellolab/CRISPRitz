@@ -238,7 +238,7 @@ static inline bool leafSkipped(const Tleaf &leaf, int thr, int dnaUsed, int rnaU
 // keep keeps exactly those. A dropped leaf is marked LEAF_SKIP | LEAF_REGION when its tree
 // is loaded, so the emit path drops it as it drops a format-1 index-0 artefact; and the
 // traversal enters no subtree that holds no other leaf (two bits a node, computed once the
-// tree is loaded; CRISPRITZ_SKIP_PRUNE=0 turns that off, which changes no output). The leaf
+// tree is loaded; CRISPRITZ_SKIP_PRUNE=0 turns that off: the same targets). The leaf
 // dump (--leaf-dump, the 15th argument or CRISPRITZ_LEAF_DUMP) writes the stored letters of
 // every leaf a skip BED drops. With no BED none of this runs: every check is behind
 // regionActive, and the search is the one without the hooks, byte for byte.
@@ -291,7 +291,7 @@ static string regionHookArg(int argc, char **argv, int pos, const char *env)
 }
 
 // Reads a region BED: tab-separated contig, start, end (0-based, end exclusive), more
-// columns ignored, blank lines and lines starting with '#' skipped, a trailing CR
+// columns ignored, empty lines and lines starting with '#' skipped, a trailing CR
 // dropped. A line that is not that, an end not after its start, or a contig that is
 // not one of the index's (contigs) refuses the whole file: a BED read in part would
 // skip, or keep, part of what it names, silently.
