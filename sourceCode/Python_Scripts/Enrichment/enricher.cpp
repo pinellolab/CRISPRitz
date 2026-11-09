@@ -612,6 +612,23 @@ static void add_to_dict_snps(const std::vector<std::string> &line) {
 }
 
 // ---------------------------------------------------------------------------
+// The fake-indel window (enricher.py's INDEL_LEFT / INDEL_RIGHT): each indel allele's
+// contig is INDEL_LEFT reference bases, then the record's REF (from POS on) with the
+// ALT written in its place, then INDEL_RIGHT reference bases (fewer where the
+// chromosome ends); one N stands between two contigs. A target of L bases (guide +
+// PAM) with b DNA bulges holds a record's change only where L + b <= INDEL_LEFT + 2 and
+// L + b <= INDEL_RIGHT + 1 (INDEL_LEFT + 1 for a record whose REF and ALT differ at
+// their first base), so LEFT = RIGHT = Lmax - 1 + bmax: Lmax = 29 (a 21-nt guide and a
+// PAM of 8 nt, the longest the general K=8 index serves), bmax = 2 (the most DNA bulges
+// CRISPRme's web offers).
+// Up to 2.9.1 the window was 25 / 27 (L + b <= 27). The log's CHR field records each
+// window's real start, from which a reader derives the left flank (POS - 1 - start).
+// ---------------------------------------------------------------------------
+
+static const long INDEL_LEFT = 30;
+static const long INDEL_RIGHT = 30;
+
+// ---------------------------------------------------------------------------
 // indel_to_fasta(line, id_indel, start_fake_pos)
 // returns updated (id_indel, start_fake_pos)
 // ---------------------------------------------------------------------------
@@ -662,17 +679,17 @@ static void indel_to_fasta(const std::vector<std::string> &line, long &id_indel,
     std::vector<std::string> af = splitStr(afValue(line), ',');
 
     long posv = strtol(line[1].c_str(), NULL, 10);
-    long start_position = posv - 26;
-    long end_position = posv + 26 + (long)line[3].size();
+    long start_position = posv - 1 - INDEL_LEFT;
+    long end_position = posv - 1 + (long)line[3].size() + INDEL_RIGHT;
     if (start_position < 0) {
-        // Matches enricher.py: the window is anchored with the REF base at index 25,
-        // which a negative start cannot satisfy. substr() would convert the negative
-        // offset to size_t and throw, where Python silently yields an empty window --
-        // so the two ports only agree if both skip the site.
+        // Matches enricher.py: the window is anchored with the REF base at index
+        // INDEL_LEFT, which a negative start cannot satisfy. substr() would convert the
+        // negative offset to size_t and throw, where Python silently yields an empty
+        // window -- so the two ports only agree if both skip the site.
         // printf, not cerr: a write to stderr is fatal to the CRISPRme stage that
         // calls this. Matches the file's existing <cstdio> idiom.
-        printf("WARNING: skipping indel at %s:%s -- fewer than 26 bases from the chromosome start\n",
-               currentChr.c_str(), line[1].c_str());
+        printf("WARNING: skipping indel at %s:%s -- fewer than %ld bases from the chromosome start\n",
+               currentChr.c_str(), line[1].c_str(), INDEL_LEFT + 1);
         return;
     }
     std::string sub_fasta = genomeStr.substr(start_position, end_position - start_position);
@@ -682,11 +699,12 @@ static void indel_to_fasta(const std::vector<std::string> &line, long &id_indel,
         if (!samps.empty()) {
             std::string indel_info =
                 currentChr + "_" + line[1] + "_" + line[3] + "_" + indels[idx];
-            // allele_fasta = sub_fasta[0:25] + re.sub(ref, indel, sub_fasta[25:], 1, IGNORECASE)
+            // allele_fasta = sub_fasta[0:INDEL_LEFT]
+            //               + re.sub(ref, indel, sub_fasta[INDEL_LEFT:], 1, IGNORECASE)
             // Derived from the REFERENCE window each time -- see enricher.py for why
             // assigning back into sub_fasta compounds alleles at a multiallelic site.
-            std::string head = sub_fasta.substr(0, 25);
-            std::string tail = sub_fasta.substr(25);
+            std::string head = sub_fasta.substr(0, INDEL_LEFT);
+            std::string tail = sub_fasta.substr(INDEL_LEFT);
             std::string allele_fasta = head + reSubFirstCI(line[3], indels[idx], tail);
 
             list_fasta_indels.push_back(allele_fasta + "\n" + "N\n");

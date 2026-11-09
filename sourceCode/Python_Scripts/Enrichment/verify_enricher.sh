@@ -35,7 +35,10 @@
 # N, as does a byte that is no base or IUPAC code: the enriched genome holds an N
 # exactly where the reference does -- the N-count invariant), the dict at cases 24
 # and 31-33 (merged carriers, AF by key, the records at a reference N, X or '-', a
-# record listing three SNP ALTs) and the indel log's AF at case 31.
+# record listing three SNP ALTs), the indel log's AF at case 31, and every fake-indel
+# window against the reference: 30 bases on each side of the record (25 before and 27
+# after up to 2.9.1), its log row's CHR field, FAKEPOS and refseq, and the skips at the
+# chromosome's start.
 # A reference holding 'Q' must be refused by both ports alike.
 #
 # Prints "BYTE-IDENTICAL: PASS" only if every check passes.
@@ -195,9 +198,10 @@ lines.append(row(p, "rs801", b(p), b(p)+"CC",
                  "AC=1;AF=0.1", ["0|0","0|1","0|0","0|0","0|0"]))
 
 # ---- cases 9-16: SNP + indel COMBINATIONS ------------------------------------
-# The enricher cuts each indel's contig from the PLAIN reference: a 25 bp left
-# flank, REF->ALT at offset 25, a 27 bp right flank, i.e. the 1-based window
-# [POS-25, POS+26+len(REF)]. A SNP in that window goes into the enriched genome
+# The enricher cuts each indel's contig from the PLAIN reference: a 30-base left
+# flank, REF->ALT at offset 30, a 30-base right flank, i.e. the 1-based window
+# [POS-30, POS+29+len(REF)] (25 / 27 bases up to 2.9.1, [POS-25, POS+26+len(REF)]).
+# A SNP in that window goes into the enriched genome
 # and the dict but never into the contig (CRISPRme overlays it later, in
 # overlay_indel_snps.py, and judges cis/trans from the genotypes), so here the
 # two ports must agree on all of: where the SNP lands, what the contig holds, and
@@ -209,17 +213,17 @@ lines.append(row(p, "rs801", b(p), b(p)+"CC",
 #    outside each edge; around an insertion (450) and a 4-bp deletion (550).
 p=450
 lines.append(row(p, "rs900", b(p), b(p)+"AG", "AC=4;AF=0.4", ["1|0","0|1","1|1","0|0","0|0"]))
-for s, gts in ((424, ["1|0","0|0","0|0","0|1","0|0"]), (425, ["1|0","1|0","0|0","0|0","0|0"]),
+for s, gts in ((419, ["1|0","0|0","0|0","0|1","0|0"]), (420, ["1|0","1|0","0|0","0|0","0|0"]),
                (440, ["1|0","1|0","0|0","0|1","0|0"]), (451, ["0|1","0|1","1|0","0|0","0|0"]),
-               (465, ["1|0","0|0","0|1","1|1","0|0"]), (477, ["1|0","1|0","0|0","0|0","0|0"]),
-               (478, ["1|0","0|0","0|0","0|0","1|0"])):
+               (465, ["1|0","0|0","0|1","1|1","0|0"]), (480, ["1|0","1|0","0|0","0|0","0|0"]),
+               (481, ["1|0","0|0","0|0","0|0","1|0"])):
     lines.append(row(s, "rsW%d" % s, b(s), other(s), "AC=1;AF=0.1", gts))
 p=550
 lines.append(row(p, "rs901", ref[p-1:p+3], b(p), "AC=2;AF=0.2", ["1|0","0|1","0|0","0|0","0|0"]))
-for s, gts in ((524, ["1|0","0|0","0|0","0|1","0|0"]), (525, ["1|0","1|0","0|0","0|0","0|0"]),
+for s, gts in ((519, ["1|0","0|0","0|0","0|1","0|0"]), (520, ["1|0","1|0","0|0","0|0","0|0"]),
                (540, ["1|0","1|0","0|0","0|1","0|0"]), (554, ["1|0","0|1","0|0","0|0","0|0"]),
-               (570, ["0|1","1|0","0|0","1|1","0|0"]), (580, ["1|0","0|0","0|0","0|0","0|0"]),
-               (581, ["1|0","0|0","0|0","0|0","0|1"])):
+               (570, ["0|1","1|0","0|0","1|1","0|0"]), (583, ["1|0","0|0","0|0","0|0","0|0"]),
+               (584, ["1|0","0|0","0|0","0|0","0|1"])):
     lines.append(row(s, "rsW%d" % s, b(s), other(s), "AC=1;AF=0.1", gts))
 
 # 10) A DELETION SPANNING SNP positions: a 6-bp deletion at 650 with SNPs at its
@@ -309,10 +313,10 @@ lines.append(row(p, "rs1307", b(p), other(p)+","+b(p)+"TT", "AC=1,4;AF=0.1,0.4",
 p=1460
 lines.append(row(p, "rs1500", other(p,0), other(p,1), "AC=1;AF=0.1", ["0|1","1|0","0|0","0|0","0|0"]))
 p=1500
-wrong=[x for x in "ACGT" if x != b(p) and x in ref[p:p+27]][0]
+wrong=[x for x in "ACGT" if x != b(p) and x in ref[p:p+30]][0]
 lines.append(row(p, "rs1501", wrong, wrong+"TT", "AC=1;AF=0.1", ["1|0","0|0","0|0","0|0","0|0"]))
 p=1540
-win=ref[p-26:p+29]
+win=ref[p-31:p+32]
 bad=next(x+y+z for x in "ACGT" for y in "ACGT" for z in "ACGT" if x+y+z not in win)
 lines.append(row(p, "rs1502", bad, bad[0], "AC=1;AF=0.1", ["0|1","0|0","0|0","0|0","0|0"]))
 p=1580
@@ -547,9 +551,9 @@ lines.append(row(p, "rs1974", b(p), ",".join(other(p,j) for j in range(3)), "AC=
                  ["0|1","0|2","3|0","0|0","0|0"]))
 
 # 14) THE CHROMOSOME EDGES (records listed last; the enricher does not need
-#     sorted input): an insertion at POS 1 and a 2-bp deletion at POS 25 have
-#     POS-26 < 0, so BOTH ports must skip them with the same stdout warning; an
-#     insertion at POS 26 (window start exactly 0) with SNPs at 26 and at 1; at
+#     sorted input): an insertion at POS 1 and a 2-bp deletion at POS 30 have
+#     POS-31 < 0, so BOTH ports must skip them with the same stdout warning; an
+#     insertion at POS 31 (window start exactly 0) with SNPs at 31 and at 1; at
 #     the END, a deletion whose REF runs past the last base (cannot match), a
 #     deletion of the last two bases, and a SNP + an insertion on the last base
 #     (windows truncated by the chromosome end). 28) A second SNP record at POS 1
@@ -557,9 +561,9 @@ lines.append(row(p, "rs1974", b(p), ",".join(other(p,j) for j in range(3)), "AC=
 L=len(ref)
 lines.append(row(1, "rs1400", b(1), other(1), "AC=1;AF=0.1", ["0|1","0|0","0|0","0|0","0|0"]))
 lines.append(row(1, "rs1401", b(1), b(1)+"A", "AC=2;AF=0.2", ["1|0","0|1","0|0","0|0","0|0"]))
-lines.append(row(25, "rs1402", ref[24:26], b(25), "AC=1;AF=0.1", ["1|0","0|0","0|0","0|0","0|0"]))
-lines.append(row(26, "rs1403", b(26), b(26)+"CC", "AC=2;AF=0.2", ["0|1","1|0","0|0","0|0","0|0"]))
-lines.append(row(26, "rs1404", b(26), other(26), "AC=2;AF=0.2", ["1|0","0|0","0|1","0|0","0|0"]))
+lines.append(row(30, "rs1402", ref[29:31], b(30), "AC=1;AF=0.1", ["1|0","0|0","0|0","0|0","0|0"]))
+lines.append(row(31, "rs1403", b(31), b(31)+"CC", "AC=2;AF=0.2", ["0|1","1|0","0|0","0|0","0|0"]))
+lines.append(row(31, "rs1404", b(31), other(31), "AC=2;AF=0.2", ["1|0","0|0","0|1","0|0","0|0"]))
 lines.append(row(L-2, "rs1405", ref[L-3:L]+"AA", b(L-2), "AC=1;AF=0.1", ["0|0","0|0","0|0","1|0","0|0"]))
 lines.append(row(L-1, "rs1406", ref[L-2:L], b(L-1), "AC=1;AF=0.1", ["0|0","0|0","0|0","0|0","1|0"]))
 lines.append(row(L, "rs1407", b(L), other(L), "AC=1;AF=0.1", ["0|0","0|0","1|0","0|0","0|0"]))
@@ -650,9 +654,9 @@ fi
 # agreement is not correctness: the outputs against what they must be
 # ---------------------------------------------------------------------------
 echo "Checking outputs against an independent reconstruction:"
-if python3 - "$CHR_FA" "$VCF_PLAIN" "$PYDIR" "$CPPDIR" "$ENRICHED" "$JSON" "$LOG" <<'PY'
+if python3 - "$CHR_FA" "$VCF_PLAIN" "$PYDIR" "$CPPDIR" "$ENRICHED" "$JSON" "$LOG" "$FAKE" <<'PY'
 import json, sys
-fa, vcf, pydir, cppdir, enriched, jsn, log = sys.argv[1:]
+fa, vcf, pydir, cppdir, enriched, jsn, log, fake = sys.argv[1:]
 ref = "".join(open(fa).read().splitlines()[1:]).upper()
 BIT = {"A": 1, "C": 2, "G": 4, "T": 8}
 CODE = {3: "M", 5: "R", 9: "W", 6: "S", 10: "Y", 12: "K", 14: "B", 13: "D", 11: "H", 7: "V", 15: "Q"}
@@ -736,6 +740,49 @@ rows = [x.split("\t") for x in open("%s/%s" % (pydir, log)).read().splitlines()[
 af = [x[3] for x in rows if x[4].startswith("chrTest_2340_")]
 bad += af != ["0.05"]
 print("  %s  : indel log AF at 2340 by key (%s)" % ("OK  " if af == ["0.05"] else "DIFF", af))
+# the fake-indel windows: 30 reference bases on each side (25 before and 27 after up to
+# 2.9.1). Each log row's CHR field holds its window's real start and end, 0-based
+# (POS - 31 and POS - 1 + len(REF) + 30, the end not clipped), its FAKEPOS its contig on
+# the fake chromosome, one N after each contig: the reference over the window (cut at the
+# chromosome's end) with the first match of REF from POS on, in any case, replaced by the
+# ALT; its refseq the reference from the window's start, as long as the contig. An indel
+# whose window would start before base 0 is in no row (case 14: POS 1 and 30).
+LEFT = RIGHT = 30
+for port, d in (("enricher.py", pydir), ("enricher.cpp", cppdir)):
+    with open("%s/%s" % (d, fake)) as fh:
+        head, body = fh.readline(), fh.read()
+    flat = body.replace("\n", "")
+    prows = [x.split("\t") for x in open("%s/%s" % (d, log)).read().splitlines()[1:]]
+    wrong, nxt, contigs = [], 0, []
+    for x in prows:
+        pos, r_, a_ = x[4].rsplit("_", 3)[1:]
+        pos = int(pos)
+        start, stop = (int(v) for v in x[0].rsplit("_", 1)[0].rsplit("_", 1)[1].split("-"))
+        tail = ref[pos - 1:pos - 1 + len(r_) + RIGHT]
+        k = tail.upper().find(r_.upper())
+        if k >= 0:
+            tail = tail[:k] + a_ + tail[k + len(r_):]
+        contig = ref[max(pos - 1 - LEFT, 0):pos - 1] + tail
+        f0, f1 = (int(v) for v in x[5].split(","))
+        if not (pos - 1 - LEFT >= 0 and start == pos - 1 - LEFT
+                and stop == pos - 1 + len(r_) + RIGHT and f0 == nxt
+                and flat[f0:f1] == contig and flat[f1:f1 + 1] == "N"
+                and x[6] == ref[start:start + len(contig)]):
+            wrong.append(x[4])
+        contigs.append(contig)
+        nxt = f1 + 1
+    whole = head == ">fakechrTest\n" and body == "".join(c + "\nN\n" for c in contigs)
+    ok = not wrong and whole and len(prows) >= 30
+    bad += not ok
+    print("  %s  : %s fake-indel windows of 30 bases on each side (%d log rows%s)"
+          % ("OK  " if ok else "DIFF", port, len(prows), "" if ok else
+             ": wrong at %s%s" % (wrong[:5], "" if whole else "; the FASTA is not its contigs")))
+skips = [l for l in open("%s/run.log" % pydir).read().splitlines() if "skipping indel" in l]
+want = ["WARNING: skipping indel at chrTest:%d -- fewer than 31 bases from the chromosome start"
+        % p for p in (1, 30)]
+bad += sorted(skips) != sorted(want)
+print("  %s  : the indels at POS 1 and 30 skipped with a warning (%s)"
+      % ("OK  " if sorted(skips) == sorted(want) else "DIFF", skips))
 sys.exit(1 if bad else 0)
 PY
 then :; else FAIL=1; fi

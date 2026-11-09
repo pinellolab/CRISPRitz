@@ -19,7 +19,9 @@ tests pin the merged behaviour on small synthetic inputs, with exact expected ou
   * non-PASS records, '*', haploid / unphased / missing genotypes, non-adjacent
     records, an indel at the same position, a reference N, IUPAC base or byte that is
     neither (kept, as an N), a reference that already holds Q (refused);
-  * the indel log and fake-indel contigs do not move;
+  * the indel log and fake-indel contigs do not move; each contig is 30 reference bases,
+    the REF with the ALT in its place, and 30 reference bases (the log's CHR field and
+    FAKEPOS say where);
   * a position with one record behaves exactly as before.
 
 Each test runs the real program as a subprocess: `enricher.py` under this interpreter
@@ -35,6 +37,7 @@ import itertools
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -524,7 +527,7 @@ class EnricherMultiallelicTests(object):
         fake-indel contig are those of the indel alone (cut from the reference)."""
         p = 260
         a1, a2, a3 = others(p)
-        q = 270  # inside the 25/27-bp window of the indel at p
+        q = 270  # inside the window of the indel at p (30 bases on each side)
         b1, b2 = others(q)[:2]
         indel = [rec(p, "ins", ref1(p), ref1(p) + "GA", "AC=1;AF=0.3", ["1|0", "0|1", "0|0", "0|0"]),
                  rec(p, "del", REF[p - 1:p + 2], ref1(p), "AC=1;AF=0.2", ["0|0", "0|0", "1|0", "0|0"])]
@@ -544,6 +547,57 @@ class EnricherMultiallelicTests(object):
         self.assertEqual(mixed.base(q), code_of({ref1(q), b1, b2}))
         self.assertEqual([e.split(";")[2] for e in mixed.entries(p)], ["s1", "s2", "s3"])
         self.assertEqual([e.split(";")[2] for e in mixed.entries(q)], ["w1", "w2"])
+
+    def test_indel_window_is_30_bases_on_each_side(self):
+        """Each indel allele's contig is 30 reference bases, the REF (from POS on) with the
+        ALT in its place, then 30 reference bases (fewer where the chromosome ends), one N
+        between contigs: the INDEL_LEFT and INDEL_RIGHT crispritz.py states. The log's CHR
+        field gives the window's real start and end (POS - 31 and POS - 1 + len(REF) + 30,
+        0-based, the end unclipped), its FAKEPOS the contig on the fake chromosome, and
+        refseq the reference from the window's start, as long as the contig. An indel whose
+        window would start before the chromosome is skipped with a warning on stdout (POS
+        30), while one at POS 31 starts at base 0. Up to 2.9.1 the window was 25 bases
+        before the REF and 27 after it, and crispritz.py stated none."""
+        with open(os.path.join(REPO, "crispritz.py")) as f:
+            stated = dict(re.findall(r"^(INDEL_LEFT|INDEL_RIGHT) = (\d+)$", f.read(), re.M))
+        self.assertEqual(stated, {"INDEL_LEFT": "30", "INDEL_RIGHT": "30"})
+        end = len(REF)
+        g = ["0|1", "0|0", "0|0", "0|0"]
+        mnv_alt = others(220)[0] + others(221)[0]
+        recs = [  # (POS, REF, ALT) as each record lists them
+            (30, ref1(30), ref1(30) + "T"),             # skipped: its window starts at -1
+            (31, ref1(31), ref1(31) + "GG"),            # its window starts at base 0
+            (100, ref1(100), ref1(100) + "GA"),         # an insertion
+            (160, REF[159:162], ref1(160)),             # a 3-base deletion
+            (220, REF[219:221], mnv_alt),               # an MNV: REF and ALT differ at once
+            (end - 10, REF[end - 11:end - 8], ref1(end - 10)),  # 8 bases left after its REF
+        ]
+        r = self.run_enricher([rec(p, "i%d" % p, ref, alt, "AC=1;AF=0.1", g)
+                               for p, ref, alt in recs])
+        self.assertIn("WARNING: skipping indel at %s:30 -- fewer than 31 bases from the "
+                      "chromosome start" % CHROM, r.stdout)
+        log = r.raw("SNPs_genome/log%s.txt" % CHROM).decode().splitlines()
+        self.assertEqual(log[0], "CHR\tSAMPLES\trsID\tAF\tindel\tFAKEPOS\trefseq")
+        rows = [x.split("\t") for x in log[1:]]
+        flat, want_rows = "", []
+        for k, (p, ref, alt) in enumerate(recs[1:]):
+            start = p - 1 - 30
+            contig = REF[start:p - 1] + alt + REF[p - 1 + len(ref):p - 1 + len(ref) + 30]
+            want_rows.append([
+                "%s_%d-%d_%d" % (CHROM, start, p - 1 + len(ref) + 30, k + 1), "S1", "i%d" % p,
+                "0.1", "%s_%d_%s_%s" % (CHROM, p, ref, alt),
+                "%d,%d" % (len(flat), len(flat) + len(contig)), REF[start:start + len(contig)]])
+            flat += contig + "N"
+        self.assertEqual(rows, want_rows)
+        # the left flank, read back from the log as a reader derives it: POS - 1 - start
+        self.assertEqual({int(x[4].split("_")[1]) - 1 - int(x[0].rsplit("_", 1)[0].rsplit("_", 1)[1]
+                                                            .split("-")[0]) for x in rows}, {30})
+        fake = r.raw("fake_variants.vcf_%s/fake%s.fa" % (CHROM, CHROM)).decode()
+        self.assertEqual(fake, ">fake%s\n" % CHROM
+                         + "".join(c + "\nN\n" for c in flat.split("N")[:-1]))
+        # the right flank of the last contig is cut by the chromosome's end: 8 bases
+        last = flat.split("N")[-2]
+        self.assertEqual(len(last), 30 + 1 + 8)
 
     # ---- a position with one record behaves as before ----------------------------
 

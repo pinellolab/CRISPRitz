@@ -475,6 +475,21 @@ def dictSave():
         json.dump(chr_dict_snps, f) 
 
 
+# The fake-indel window (enricher.cpp's INDEL_LEFT / INDEL_RIGHT): each indel allele's
+# contig is INDEL_LEFT reference bases, then the record's REF (from POS on) with the ALT
+# written in its place, then INDEL_RIGHT reference bases (fewer where the chromosome
+# ends); one N stands between two contigs. A target of L bases (guide + PAM) with b DNA
+# bulges holds a record's change only where L + b <= INDEL_LEFT + 2 and
+# L + b <= INDEL_RIGHT + 1 (INDEL_LEFT + 1 for a record whose REF and ALT differ at their
+# first base), so LEFT = RIGHT = Lmax - 1 + bmax: Lmax = 29 (a 21-nt guide and a PAM of 8
+# nt, the longest the general K=8 index serves), bmax = 2 (the most DNA bulges CRISPRme's
+# web offers). Up to 2.9.1 the
+# window was 25 / 27 (L + b <= 27). The log's CHR field records each window's real start,
+# from which a reader derives the left flank (POS - 1 - start).
+INDEL_LEFT = 30
+INDEL_RIGHT = 30
+
+
 def indel_to_fasta(line, id_indel, start_fake_pos):
     if (len(line[3]) > 1 or len(line[4]) > 1) and '<' not in line[3]:
         #print(''.join(line[3:5]))
@@ -506,15 +521,16 @@ def indel_to_fasta(line, id_indel, start_fake_pos):
                 rsID = line[2].split(',')
                 af = _af_value(line).split(',')
 
-                start_position = int(line[1])-26
-                end_position = int(line[1])+26+len(line[3])
+                start_position = int(line[1]) - 1 - INDEL_LEFT
+                end_position = int(line[1]) - 1 + len(line[3]) + INDEL_RIGHT
                 if start_position < 0:
-                    # The window is anchored so the REF base lands at index 25, which a
-                    # negative start cannot satisfy: Python would slice from the far end
-                    # of the chromosome and hand back an EMPTY window, so the contig and
-                    # the coordinates logged for it would disagree. (enricher.cpp throws
-                    # instead, so the two ports only agree if both skip.)
-                    print(f"WARNING: skipping indel at {currentChr}:{line[1]} -- fewer than 26 bases from the chromosome start")
+                    # The window is anchored so the REF base lands at index INDEL_LEFT,
+                    # which a negative start cannot satisfy: Python would slice from the
+                    # far end of the chromosome and hand back an EMPTY window, so the
+                    # contig and the coordinates logged for it would disagree.
+                    # (enricher.cpp throws instead, so the two ports only agree if both
+                    # skip.)
+                    print(f"WARNING: skipping indel at {currentChr}:{line[1]} -- fewer than {INDEL_LEFT + 1} bases from the chromosome start")
                     return id_indel, start_fake_pos
                 sub_fasta = genomeStr[start_position:end_position]
                 for idx, indel in enumerate(indels):
@@ -533,7 +549,7 @@ def indel_to_fasta(line, id_indel, start_fake_pos):
                         # gnomAD-converter --multiallelic) does not. Dropping the `break`
                         # in the carrier scan made it worse, by letting more alleles reach
                         # this gate.
-                        allele_fasta = sub_fasta[0:25] + re.sub(line[3], indel, sub_fasta[25:], 1, flags=re.IGNORECASE)
+                        allele_fasta = sub_fasta[0:INDEL_LEFT] + re.sub(line[3], indel, sub_fasta[INDEL_LEFT:], 1, flags=re.IGNORECASE)
 
                         #fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
                         list_fasta_indels.append(allele_fasta+'\n'+"N\n")

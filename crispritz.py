@@ -25,6 +25,14 @@ VERSION = "2.10.0"
 # .bin to read (docs/INDEX_FORMAT.md section 8). Read it from this file as CRISPRme
 # reads VERSION. CRISPRitz 2.9.1 and earlier have none and write format 1.
 INDEX_FORMAT = 2
+# The fake-indel window add-variants writes: INDEL_LEFT reference bases before each indel
+# record's REF and INDEL_RIGHT after it, one N between two windows (both enricher ports
+# define the same: test/test_enricher_multiallelic.py checks they write it). A window's own
+# width is read from its indel log row (left = POS - 1 - start); this is for an enrichment
+# not made yet (docs/INDEX_FORMAT.md section 8). Read them from this file as CRISPRme reads
+# VERSION. CRISPRitz 2.9.1 and earlier have none and write 25 and 27.
+INDEL_LEFT = 30
+INDEL_RIGHT = 30
 
 
 def _run_checked(argv, what):
