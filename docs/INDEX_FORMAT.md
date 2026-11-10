@@ -734,8 +734,11 @@ of `a5379e0`:
    * take a window's left flank from its log row, `POS - 1 - start`, wherever it maps a
      fake-indel coordinate to the reference (a SNP overlay, an indel row's place, its REF
      text), never as a constant: a reader that took 2.10.0's 30 bases for 2.9.1's 25 would
-     place every flank base, SNP code and row of a window five bases off, and a published
-     index of either release must stay readable;
+     map a window's bases from its 26th through the ALT's last to the wrong reference
+     position or to none (the bases before and after them map alike under either width), so
+     the SNP codes it overlays on and around the REF and ALT, and the alleles and carriers of
+     the rows that read them, would be wrong; and a published index of either release must
+     stay readable;
    * record the window of the fake-indel genome an `_INDELS` index is built from with the
      index, and refuse a search of it beside an indel log of another width (the two come
      from two enrichments); an index of format 1 was built by 2.9.1 or earlier, whose
