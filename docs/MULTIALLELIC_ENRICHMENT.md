@@ -53,7 +53,8 @@ byte (verified, section 5).
 ### 2.1 The enriched genome
 
 The code at a position is the IUPAC letter of **{reference base} ∪ {its SNP ALTs}**, its SNP
-ALTs being every ALT that is one upper-case base, A, C, G or T, of the position's records
+ALTs being every ALT that is one base, A, C, G or T (in either case: REF and ALT are read in
+upper case, below), of the position's records
 whose REF is one base and whose FILTER is `PASS` or `.`, whatever the order and adjacency of
 those records — the code the same site gets when written as one record listing every ALT. A
 record adds its SNP ALTs to what earlier records coded; it no longer starts from the
@@ -61,7 +62,7 @@ reference base. Two exceptions are new in 2.10.0: a set of all four bases is wri
 not its IUPAC letter `N` (section 2.2), and a reference `N`, like any reference byte that is
 no base or IUPAC code, stays as it is whatever the records at it list (section 2.8; 2.9.1
 wrote over it the code of a record listing two or more SNP ALTs, `N` for all four). The rest
-of the rule is that of 2.9.1: an ALT that is not A/C/G/T (`*`, `N`, a lowercase base) adds
+of the rule is that of 2.9.1: an ALT that is not A/C/G/T (`*`, `N`) adds
 nothing, a reference IUPAC base adds nothing of its own (the code there is that of the ALTs
 alone, `Q` if they cover all four bases), and a set of one base leaves the FASTA letter in
 place.
@@ -70,8 +71,23 @@ Both ports read the reference FASTA upper-cased and write the enriched chromosom
 case, as 2.9.1 did: a soft-masked (lower-case) reference base is that base, and the
 reference base, the FASTA letter and a byte that stays as it is, here and below, are the
 upper-cased ones (`verify_enricher.sh`'s chromosome is mixed case; its reconstruction
-upper-cases the FASTA). `add-variants` copies a chromosome without a VCF as it is. The VCF
-is not upper-cased: a lower-case ALT is not a SNP ALT.
+upper-cases the FASTA). `add-variants` copies a chromosome without a VCF as it is.
+
+The VCF's REF and ALTs are read in upper case too, since 2.10.0, as VCF 4.x reads their
+bases whatever their case: each port upper-cases a record's REF and every ALT as it reads
+the line, before anything uses them (`enricher.py` `_upper_allele`, `enricher.cpp`
+`upperAllele`: ASCII `a`-`z` only; an ALT holding `<`, a symbolic allele, as written; `*` and
+`.` hold no letter). So a SNP ALT written in lower case is coded, a record that differs from
+another only by case is the same allele (section 2.3: one entry, as two records written
+alike), and the fake-indel window, its log row and every dictionary entry name the record
+in upper case (section 2.4). The REF is still found in the window case-insensitively, as
+before. rsID, AF and genotypes are read as they were, and a VCF without a lower-case allele
+gives the same outputs as before, byte for byte (section 2.9). Up to 2.9.1, and in 2.10.0
+up to `26ffe46`, the alleles were read as written: a lower-case SNP ALT was no A, C, G or T,
+so the genome kept the reference base there and no search read the allele while the
+dictionary listed its carriers (CRISPRme's synthetic world WLOW: a carrier's perfect target,
+never reported), `C>G` and `c>g` were two alleles (two entries, the second not coded), and
+an indel's window held its ALT, and its log row the record, in the VCF's case.
 
 The running union is kept in a byte per position beside the genome (`snp_mask` /
 `snpMask`), because a letter in the genome cannot tell a code the enricher wrote from an
@@ -154,7 +170,8 @@ written ALT by ALT, so that a `1|2` carrier of `C>A,T` reads `1|0` under A and `
 T, where 2.9.1 wrote the raw `1|2` under both), its rsID (`;` normalised to `,`) and its own
 AF.
 Entries are in file order. A second record of an allele already listed (the same `REF>ALT`
-twice: 362 genome-wide in the published panels, 351 pure duplicates) **merges into that
+twice, in either case since 2.10.0, section 2.1: 362 genome-wide in the published panels, 351
+pure duplicates) **merges into that
 allele's entry**, in place: the entry lists the carriers of both records; a sample listed by
 both, phased alike (as many alleles, every separator `|`), carries the ALT on every slot
 where either record puts it (`0|1` and `1|0` give `1|1`), and otherwise, as unphased slots
@@ -212,7 +229,8 @@ an indel does not reach a contig, its log row or its FAKEPOS (unit test
 `test_indel_outputs_unmoved_by_split_snps`; `verify_enricher.sh` cases 19, 21, 28;
 byte-identical on chr22 of all three panels, section 4, between 2.9.1 and the branch, whose
 windows are 2.9.1's). 2.10.0 widens the window, which changes both: each contig is 30
-reference bases, the REF with the ALT in its place, and 30 reference bases (25 and 27 up to
+reference bases, the REF with the ALT (in upper case, section 2.1) in its place, and 30
+reference bases (25 and 27 up to
 2.9.1; CHANGELOG, Changed), so a target of guide, PAM and DNA bulges up to 31 bases holds
 its record's change (27 up to 2.9.1, 26 at an MNV). Measured through `add-variants` on hg38
 chr22 against the 881f761 build (2.10.0 at 2.9.1's window): on HGDP + 1000 Genomes the same
@@ -280,6 +298,9 @@ log. Such an input is still not enriched by 2.10.0 as by 2.9.1 wherever
 * a record lists several ALTs and one of its entries a carrier holding an allele number
   above 1: that entry's genotypes are in split form, where 2.9.1 wrote the raw numbers (2.3);
 * a SNP lies outside the chromosome: an error (2.7), as is a reference holding `Q` (2.2);
+* a record writes its REF or an ALT in lower case: read in upper case (2.1, 2.9), where 2.9.1
+  left a lower-case SNP ALT uncoded and named the record as written in the dictionary, the
+  fake-indel window and the indel log;
 
 and every indel's log row and contig change with the wider window (2.4).
 
@@ -335,6 +356,59 @@ dictionary lists the records at it (unit test `test_reference_N_and_reference_iu
 `verify_enricher.sh` case 33). Merged split records were coded over it up to `2d1f57b` (an
 `X` with ALTs C and G became `S`), and up to 2.9.1 a record listing two or more SNP ALTs was
 (`N` for all four).
+
+### 2.9 REF and ALT in lower case
+
+Section 2.1 gives the rule: since 2.10.0 the enricher reads a record's REF and every ALT in
+upper case, as VCF 4.x reads them. Lower case enters a panel through normalisation:
+`bcftools norm -f` writes the case of the reference it reads into the bases it adds to an
+indel it left-aligns, so against the soft-masked hg38 an indel realigned into a repeat gets
+lower-case REF and ALT bases. HF's raw HPRC vcfwave VCFs hold none (0 of their 42,056,098
+records), but normalised as
+CRISPRme's HPRC panel is built (`bcftools norm -m -any -f`, then `+fill-tags`) they hold
+108,178 records in lower or mixed case over the 24 chromosomes, 1,546 of them on chr22, every
+one an indel or MNV of FILTER `PASS` or `.` (realignment moves no SNV); the mega's merged
+VCFs hold 2, on chr21: 41,806,097 and 44,410,608, deletions whose REF of 275 and 288 bases
+is in mixed case and whose ALT is `c` (274 and 287 bases deleted; AF_max 0.0126 and 0.0039),
+and none on chr14, chr22 or chrY; HGDP + 1000 Genomes holds none (0 of its 144.9 M records;
+measured again on chr22: 0 of 1,998,332).
+
+Measured with 2.10.0 against `26ffe46` (2.10.0 before this change) through `crisprme.py
+build-index-only` of CRISPRme `6bff65b`, the same thread count (16), in the CRISPRme 2.8.1
+SIF on ml007 (amd64), every file of the two builds compared byte for byte (a `.gz` by its
+content; the files under `Genomes/`, `Dictionaries/` and `genome_library/`: the enriched
+genome, the dictionary, the indel log, the fake-indel genome, every `.bin`, CRISPRme's
+stores):
+
+| input | records in lower case | the two builds |
+|---|---|---|
+| HGDP + 1000 Genomes chr22, `hgdp1kgp.chr22.norm.vcf.gz` (NRG, Tier-1 install) | 0 | 23 files byte-identical |
+| HPRC chr22, HF's raw `ALL.chr22.HPRC.vcfwave.vcf.gz` (NRG, Tier-1 install) | 0 | 28 files byte-identical |
+| mega chr22 (`mega_rebuild.sh` steps 1-3: NRR, 2 + 2 bulges) | 0 | 21 files byte-identical |
+| HPRC chr22 normalised as CRISPRme builds it (NRG, Tier-1 install) | 1,546 | 26 of 28 files byte-identical: the enriched genome, the dictionary, every `.bin` of the variant and `_INDELS` indexes, CRISPRme's stores; the indel log differs at exactly the 1,546 rows that name a record in lower case, in their `indel` field alone, upper-cased (`chr22_10515076_aaGG_a` → `chr22_10515076_AAGG_A`), and the fake-indel genome at exactly its 1,818 lower-case bases, upper-cased |
+| mega chr21 (as mega chr22) | 2 | 19 of 21 byte-identical: the log's 2 rows and the fake-indel genome's 2 lower-case bases, upper-cased |
+
+So on these panels the change is one of text: the `_INDELS` index of each is byte-identical,
+as `buildTST` reads the fake-indel FASTA upper-cased (`26ffe46`'s windows held the ALT in the
+VCF's case, which the index read as its upper case). A guide whose target crosses a
+deletion's junction finds it either way: on the
+mega chr21, `GATGGTGGTGGTGATGGTGG` (PAM `TGG`, minus strand) lies with 0 mismatches across
+the junction of 41,806,097 in its window, `CAACCAAGACAGTGCGGTCA` (PAM `AAA`) across that of
+44,410,608, through both engines' `crispritz.py search` of the `_INDELS` index (both
+deletions lie in tandem repeats, so each 20-mer has perfect sites on the reference too: 30
+and 5). What changes is what a reader of the log takes: the row now names the deletion as
+VCF 4.x reads it, `chr21_41806097_CACCACCATCACC…ACT_C`, where `26ffe46` wrote
+`chr21_41806097_caccaccaTCACC…ACT_c`. CRISPRme 6bff65b already names an indel record in upper
+case: a per-sample search of a guide across the junction of one of HPRC chr22's (11,969,408,
+`aC>a`; `GAAAAAAAAATCCTCCTTTT`, 2 mismatches) gives the same rows and integrated results, byte
+for byte, on the two builds, the row naming it `chr22_11969408_AC_A` in both. A SNV in lower
+case changes the code too: none of
+these panels holds one, but CRISPRme's synthetic world WLOW (`C>g` beside a deletion) shows
+it, through `crisprme.py` 6bff65b: with `26ffe46` the enriched genome kept `C` at the SNV,
+the dictionary named it `C,g`, and two carriers' perfect target (the SNV and the deletion on
+one haplotype) was never reported; with 2.10.0 the genome codes `S`, the dictionary names it
+`C,G`, and both carriers are listed on that target, as an independent VCF 4.x haplotype
+oracle requires (section 6.7 says what CRISPRme's own VCF readers must change).
 
 ## 3. Cost
 
@@ -432,7 +506,7 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
 
 ## 5. Tests
 
-* `test/test_enricher_multiallelic.py` — 27 unit tests, each run against **both** ports (54
+* `test/test_enricher_multiallelic.py` — 32 unit tests, each run against **both** ports (64
   in all), with exact expected outputs: two and three ALTs in every order, split == joined,
   four bases coded `Q` (every order, whatever the AF fields, a record listing three ALTs, an
   ALT on two records), a reference holding `Q` or `q` refused, reference `N` and IUPAC bases
@@ -449,28 +523,42 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
   ALTs in split form, beside a split record and with phased, unphased and haploid calls;
   and the dictionary the documents describe (the worked example of section 2.3, run whole,
   and each "a `1|2` carrier of `C>A,T` reads `1|0` under A and `0|1` under T" of the README,
-  this document and the CHANGELOG, each of which must give one). Of the 24 tests the branch
+  this document and the CHANGELOG, each of which must give one); REF and ALTs in lower or
+  mixed case (section 2.9: a lower-case SNP ALT coded, in both modes, and four of them `Q`;
+  a lower-case REF; deletions, insertions and an MNV in lower or mixed case, their windows
+  and log rows in upper case; a record listing several ALTs, one in lower case; `C>G`, `c>g`
+  and `C>g` merged as three records written alike, and two indel records differing by case
+  windowed as two written alike; a VCF of 18 records, SNPs, `*`, `N`, `.`, symbolic ALTs, a
+  four-base site, a reference `N`, a non-PASS record, indels and MNVs, its REF and ALTs in a
+  seeded random mix of cases, whose every output is that of the VCF in upper case). The 5
+  case tests (10 runs) fail against `26ffe46`'s ports and the 27 others pass. Of the 24 tests the branch
   had, 26 of the 48 runs failed against its last commit (`f266eac`, the four-base rule) and
   44 against 2.9.1 (the 4 that pass, mode `no` == mode `yes` and a position with one record,
   pin what does not change); the split-form test and the three whose expectations it moved
   to split form fail against c18c575's ports (8 of the 52); the documents' test (2 of the 54
   runs) fails against c18c575's ports too, and against the documents of 1a9812d, which gave
   no example in the README or section 2.3.
-* `verify_enricher.sh` — grows from 17 to 33 cases (cases 18-30: split sites in every
+* `verify_enricher.sh` — grows from 17 to 34 cases (cases 18-30: split sites in every
   order, the same sites as one record, four bases, non-adjacent records, genotype shapes,
   SNP + indel at one position and in an indel's window, a split record beside a multi-ALT
   record, a non-PASS record, the same allele twice, AF spellings, `AF_<x>` fields, a
   reference IUPAC base and `N`, `*`, the chromosome edges, two and three ALTs on one
   haplotype slot; 31-33: AF read by its key, the same allele on two records merged, ALTs on
-  a reference `N`, `X` or `-`); both ports byte-identical, with the file set and the run
+  a reference `N`, `X` or `-`; 34: REF and ALTs in lower or mixed case, section 2.9); both
+  ports byte-identical, with the file set and the run
   log, and checked against what they must be: the enriched genome against an independent
-  reconstruction from the FASTA and the VCF (with the N-count invariant), the dictionary at
-  cases 24 and 31-33 (merged carriers, AF by key, the records at a reference `N`, `X` or
-  `-`, a record listing three SNP ALTs; every entry of a record listing several ALTs in
-  split form), the indel log's AF at case 31, every fake-indel
+  reconstruction from the FASTA and the VCF, its ALTs read in either case (with the N-count
+  invariant), the dictionary at cases 24 and 31-34 (merged carriers, AF by key, the records
+  at a reference `N`, `X` or `-`, a record listing three SNP ALTs, records in lower case;
+  every entry of a record listing several ALTs in split form) and no entry naming a REF or
+  ALT in lower case, the indel log's AF at case 31 and its rows against the VCF's carried
+  indel and MNV alleles in upper case, every fake-indel
   window against the reference (30 bases on each side of its record, its log row's `CHR`
-  field, `FAKEPOS` and `refseq`, the skips at the chromosome's start; cases 9 and 14 at the
-  window's edges), and a reference holding `q` refused by both ports with one message. Earlier, on the branch, also checked
+  field, `FAKEPOS` and `refseq`, no base in lower case, the skips at the chromosome's
+  start; cases 9 and 14 at the window's edges), and a reference holding `q` refused by both
+  ports with one message. With `26ffe46`'s ports it fails (both ports byte-identical, but the
+  reconstruction at the six lower-case SNP positions, the dictionary at case 34, the
+  dictionary's case, the log rows and the windows). Earlier, on the branch, also checked
   against an independent oracle (91 coded positions, 81 dictionary keys, 0 mismatches) and
   an independent carrier check at the 62 positions whose SNP records each list one ALT, none
   repeated (each entry lists exactly its record's carriers, genotypes verbatim; 0
@@ -743,6 +831,65 @@ should compare positions. Expect more variant rows and more carriers at the affe
 positions; the changelog and `METHODS.md` must say that earlier releases reported only the
 last ALT of a split site, and what `Q` is (a target may show it in its DNA column).
 
+### 6.7 REF and ALT in lower case
+
+The enricher reads REF and ALT in upper case (section 2.1), so the enriched genome, the
+dictionary, the indel log and the fake-indel genome are all VCF 4.x's. CRISPRme's readers of
+those outputs need no change to read them (the dictionary and the log hold no lower-case
+allele any more). Those that read the **VCF itself** were written to the 2.9.1 rule ("a
+lower-case SNP ALT is no allele") or compare its alleles case by case with the engine's, and
+must read REF and every ALT in upper case too (an ALT holding `<` as written), as
+`check_indel_rows.Vcf._parse` already does. At CRISPRme `6bff65b`:
+
+* `PostProcess/build_mega_registry.py:180` (`iter_records`) yields REF and ALTs as written,
+  so `snp_alleles` (line 135, `CODED_BASES` line 123) drops a lower-case SNP ALT the genome
+  now codes, and `read_as_enricher`'s key (line 228) keeps `C>G` and `c>g` apart: upper-case
+  them there (docstrings and comments at 16-21, 30-32, 120-122, 130-133, 241-245, and the
+  manifest's `VCF_RECORDS_READ`, 282-285, say "upper-case A, C, G or T").
+* `PostProcess/prepare_mega_build_vcf.py:168, 170, 174` (`collapse`) keys `(REF, ALT)` as
+  written, so two records of one allele that differ by case both stay in the build input
+  and the enricher writes two log rows of one allele: key them upper-cased.
+* `PostProcess/verify_mega_chrom.py:154` (`read_source`) reads REF and ALTs as written:
+  its SNP alleles (line 165) miss a lower-case ALT the genome codes, and its indel keys
+  (157, 175) no longer match the log's, which it keys as written at line 240. Measured: the
+  whole recipe (`mega_rebuild.sh`) on the mega chr21 passes with `26ffe46` and fails with
+  this engine ("indel log alleles ...: 2 more, 2 missing"), its two deletions named in upper
+  case by the log and in mixed case by the VCF. Upper-case at 154 (and the docstring, line 9).
+* `scripts/check_indel_rows.py` refuses a run whose VCF holds an SNV ALT in lower case
+  (`Window.lower_snv`, 1323-1326 and 1357-1364; `run_unit` 6831-6832 and 6841-6842;
+  `refused` 6858-6865; `main` 7447, 7453, 7471, 7481, 7491 and the message 7508-7518): with
+  this engine such an allele is coded, and `_parse` already reads it upper-cased
+  (1031-1036), so it can be modeled as any SNV; drop the refusal for a run of this engine
+  (docstrings 31-39, 1015-1021 and `var_text` 2093-2099: a 2.10.0 row now names an SNV
+  record in upper case too).
+* `PostProcess/validate_inputs.py` warns (full scan) that "CRISPRitz codes no lower-case
+  ALT" (1576-1578, 1640-1645, 1868-1880) and keys an SNV's ALT as written in its survey of
+  repeated REF>ALTs (1626-1634, the message at 1850-1857): drop the warning and key it
+  upper-cased.
+* `PostProcess/site_alleles.py:216` (`read_records`) and `PostProcess/indel_snp_cis.py:1303`
+  (`parse_dict_value`) read a dictionary ALT as written (docstrings 209-214 and
+  1286-1294), `PostProcess/tier0_compile.py:203` (`parse_entry`) both REF and ALT, and
+  `analisi_indels_NNN.py:933`, `new_simple_analysis.py:1254` keep a Tier-1 ALT only if it is
+  `in "ACGT"`: with this engine's dictionaries they meet only upper case, so these are
+  consistency changes (upper-case at the read), not fixes.
+
+Already case-blind: `build_mega_indel_af.py` (147-157, 216, 219), `build_indel_genotypes`'s
+`store_key` (279-287), `indel_snp_cis.record_name` (325-340, whose docstring says the log
+keeps the VCF's text: no longer), `haplotype_prioritizer.py:465-480`, the Tier-0 and Tier-1
+filters (`tier0_compile.py:359`, `tier1_genotypes.py:247`). CRISPRme's tests that pin the
+2.9.1 rule flip with it: `test_build_mega_registry.py` (`test_build_and_read_back`, lines
+82-91 and 115; `test_alts_the_enricher_does_not_code`, 204), `test_site_alleles.py:383`,
+`test_indel_overlaid_rows.py:1012`, `test_check_indel_rows.py:6304`,
+`test_validate_inputs.py:1436`; and its documents say it: `METHODS.md` 228-241, 2564-2569 and
+2684-2687, `docs/INPUT_FORMATS.md` 345-351, `test/benchmark/README.md` 195-198, the
+CHANGELOG's entries of 2.10.0 on it. Through CRISPRme `6bff65b` with this engine, the
+synthetic worlds WLOW, WLOWALT (tier and classic installs) and WLOWR give the rows an
+independent VCF 4.x haplotype oracle requires (with `26ffe46`: WLOW misses two carriers'
+perfect target, WLOWALT one), as their rows come from the engine's dictionary and
+fake-indel genome; the checker refuses WLOW (the SNV ALT in lower case) and WLOWALT (it
+cannot tell how the run coded a site written as `C>G` and `C>g`, as for any one allele on two
+records).
+
 ### 6.6 Tests CRISPRme should add
 
 * A Tier-0/Tier-1 compile of a merged value (two ALTs, carriers on opposite slots): per-ALT
@@ -870,8 +1017,11 @@ column identical and each AF its record's (0 mismatches against the VCF), and 47
 chrY dictionary's 109,033 values change in their AF alone. None of the 23 HGDP + 1000
 Genomes VCFs has such a record, and mega's VCF lists no `AF` key (chr22: only `AF_<panel>`
 and `AF_max`), so their logs keep their AF; on chr22 the logs of all three panels were
-byte-identical to 2.9.1's at its window. Rebuild the logs with the rest rather than carry
-the published ones over. A classic (non-dict-less) publish's
+byte-identical to 2.9.1's at its window. With REF and ALT read in upper case (section 2.9),
+HPRC's logs change besides at the rows of its 108,178 records written in lower case (1,546
+on chr22), and the mega's chr21 log at its 2, each with the fake-indel genome's bases of
+those ALTs (their `_INDELS` indexes do not change by it). Rebuild the logs with the rest
+rather than carry the published ones over. A classic (non-dict-less) publish's
 `Dictionaries/dictionaries_<vcf>/` changes and must be rebuilt with the rest.
 
 Then: `docs/INDEX_PROVENANCE.md` and `docs/PRECOMPUTED_INDEXES.md` record the rebuild and the

@@ -222,9 +222,9 @@ Multi-allelic sites: a site may be one VCF record listing several ALTs or one re
 (as `bcftools norm -m -any` writes it). Since 2.10.0, either way, the code of a position is
 the IUPAC letter of its reference base (the reference is read upper-cased, as before, so a
 soft-masked base is a base, and a chromosome with a VCF is written in upper case) and of
-every ALT that is one upper-case base (`A`, `C`, `G` or `T`) of its records whose FILTER is
-`PASS` or `.` and whose REF is one base, in any record order, and its SNP dictionary entry
-lists every ALT of one character of those records (a `*`, an `N` or a lower-case base too,
+every ALT that is one base (`A`, `C`, `G` or `T`, in either case: see below) of its records
+whose FILTER is `PASS` or `.` and whose REF is one base, in any record order, and its SNP
+dictionary entry lists every ALT of one character of those records (a `*` or an `N` too,
 which add nothing to the code); up to 2.9.1 a split site kept only its last record's ALT. A
 reference IUPAC code adds no base of its own, and a single base leaves the reference letter
 in place; a reference `N` stays `N`, whatever the VCF lists there, as does a byte that is no
@@ -244,6 +244,18 @@ its raw `1|2` stood under both. One allele on two records is one entry with the 
 both. Split records phased one by one can put two ALTs of a position on one haplotype slot
 (`0|1` under each), and whatever builds haplotypes from the dictionary has to resolve that.
 Details: [`docs/MULTIALLELIC_ENRICHMENT.md`](docs/MULTIALLELIC_ENRICHMENT.md).
+
+REF and ALT in lower case: VCF 4.x reads their bases whatever their case, and since 2.10.0
+so does `add-variants`, which reads a record's REF and every ALT in upper case (a symbolic
+ALT, `<...>`, as written; `*` and `.` hold no letter). So a SNP ALT written in lower case
+(`C>g`) is coded, a record that differs from another only by case is the same allele (one
+dictionary entry with the carriers of both, as for two records written alike), and an
+indel's fake-indel window, its indel log row and every dictionary entry name the record in
+upper case; rsID, AF and genotypes are read as before. Up to 2.9.1 the alleles were read as
+written: a lower-case SNP ALT was not coded while the dictionary listed its carriers, and a
+window held its ALT, and a log row its REF and ALT, in the VCF's case. Lower case comes in
+through normalisation: `bcftools norm -f` writes a soft-masked reference's lower case into
+the indels it left-aligns (1,546 chr22 records of HPRC normalised as CRISPRme builds it).
 
 
 **<a name="Index-Genome">3.2</a> CRISPRitz Index-Genome Tool**  

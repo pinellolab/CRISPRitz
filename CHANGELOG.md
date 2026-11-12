@@ -102,14 +102,15 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
 - `test/test_enricher_multiallelic.py`: 24 unit tests run against both ports (48), with
   exact expected outputs (every ALT, `Q`, the N-count invariant, merged carriers, each
   record's AF, a reference holding `Q` or `q`); 44 of them fail on 2.9.1. In CI with
-  `verify_enricher.sh`, which grows from 17 to 33 cases (split multi-allelic sites in every
+  `verify_enricher.sh`, which grows from 17 to 34 cases (split multi-allelic sites in every
   order, genotype shapes, SNP + indel at one position, four bases, two ALTs on one haplotype
-  slot, AF by key, one allele on two records, ALTs on a reference `N`, `X` or `-`) and now
-  also checks the outputs against what they must be: the enriched genome against an
-  independent reconstruction (with the N-count invariant), the dict where one allele's
-  records merge, AFs are read by key, records sit at a reference `N`, `X` or `-` and a
-  record lists three SNP ALTs (cases 24 and 31-33), the indel log's AF read by key (case
-  31), and a reference holding `q` refused.
+  slot, AF by key, one allele on two records, ALTs on a reference `N`, `X` or `-`, REF and
+  ALTs in lower or mixed case) and now also checks the outputs against what they must be:
+  the enriched genome against an independent reconstruction (with the N-count invariant),
+  the dict where one allele's records merge, AFs are read by key, records sit at a reference
+  `N`, `X` or `-`, a record lists three SNP ALTs or records are in lower case (cases 24 and
+  31-34), the indel log's AF read by key (case 31) and its rows against the VCF's indel
+  alleles in upper case, and a reference holding `q` refused.
 - `docs/MULTIALLELIC_ENRICHMENT.md`: the behaviour, its measurement, what CRISPRme must change
   to use it, the owner's decisions, and the published indexes and stores to rebuild.
 - **Region hooks for CRISPRme's haplotype scan: `crispritz.py search --skip-bed <bed>`,
@@ -382,6 +383,36 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
   had no `AF`) got no AF, in the dict and the indel log: the retired 1000G2021_HGDP index (a
   merged VCF) lost the AF of 224,981 of 232,384 chr22 indels, and HPRC chrY 91,950 of its
   102,665 indel AFs. Each record's AF is now found by its key (exactly `AF`), in both ports.
+- **`add-variants` read a record's REF and ALTs in the VCF's case**, where VCF 4.x reads their
+  bases whatever their case. A SNP ALT written in lower case (`C>g`) was no A, C, G or T to the
+  enricher, so the enriched genome kept the reference base there and no search read the
+  allele, while the dictionary listed it and its carriers (CRISPRme's synthetic world WLOW:
+  two carriers' perfect target never reported); a record that differed from another only by
+  case (`C>G` and `c>g`) was another allele, two dictionary entries where one `REF>ALT` on two
+  records is one (owner decision B2); and an indel or MNV in lower or mixed case got its
+  fake-indel window with the ALT as written and its log row named it so (the `_INDELS` index
+  was the same: `buildTST` reads a FASTA upper-cased). Both ports now upper-case REF and every
+  ALT as they read a record (ASCII `a`-`z`; an ALT holding `<`, a symbolic allele, as written;
+  `*` and `.` hold no letter): such a SNP ALT is coded, such records merge as two records
+  written alike do, and the window, the log row and the dictionary entry are those of the
+  record written in upper case. rsID, AF and genotypes are read as before, and a VCF without a
+  lower-case allele gives the same outputs, byte for byte. Lower case comes in through
+  normalisation (`bcftools norm -f` writes a soft-masked reference's case into the indels it
+  left-aligns): HPRC normalised as CRISPRme builds it holds 108,178 such records over its 24
+  chromosomes (1,546 on chr22), every one an indel or MNV, where HF's raw vcfwave VCFs hold
+  none; the mega's merged VCFs hold 2, on chr21 (deletions whose REF of 275 and 288 bases is
+  in mixed case and whose ALT is `c`, at 41,806,097 and 44,410,608); HGDP + 1000 Genomes
+  none. Measured through
+  `crisprme.py build-index-only` of CRISPRme `6bff65b` (16 threads) against `26ffe46`: HGDP +
+  1000 Genomes chr22, HF's raw HPRC chr22 and the mega chr22 byte-identical, every file
+  (enriched genome, dictionary, indel log, fake-indel genome, every `.bin`); HPRC chr22 as
+  CRISPRme normalises it and the mega chr21 differ only where the VCF writes lower case: the
+  log's `indel` field at the 1,546 (2) rows naming such a record and the fake-indel genome's
+  1,818 (2) lower-case bases, upper-cased, every `.bin` byte-identical
+  (docs/MULTIALLELIC_ENRICHMENT.md section 2.9). CRISPRme readers that read the VCF itself
+  must read it in upper case too (section 6.7: CRISPRme 6bff65b's mega recipe fails its
+  check on chr21 with this engine until they do). Tests: five unit tests, run against both
+  ports, and `verify_enricher.sh` case 34; each fails on `26ffe46`.
 - **`searchBruteForce` reported a window with an `N` in its guide region when the mismatch
   budget exceeded 100**: an `N` counted as 101 mismatches. Such a window is now dropped
   whatever the budget, as an index never holds one.
