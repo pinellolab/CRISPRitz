@@ -37,13 +37,13 @@ whose SNP ALTs, with its reference base when that is A, C, G or T, cover all fou
 written `Q`, a fifth symbol the search engine reads as any base (section 2.2; the IUPAC
 letter `N` would be read as a gap), and a reference `N`, like any reference byte that is no
 base or IUPAC code, stays as it is (section 2.8). The dictionary lists every ALT of one
-character, each with its own record's genotypes as they were phased (an allele on two
-records with the carriers of both, section 2.3). On HGDP + 1000 Genomes that includes 672
-chr22 sample-positions with two ALTs on one haplotype slot, which CRISPRme's per-sample
-analysis turns into a CONFIRMED haplotype holding both (measured through the CLI on the
-enrichment of `feat/multiallelic-enrich`, whose dictionary 2.10.0 writes byte for byte,
-indexed by CRISPRitz 2.9.1, as no CRISPRme release reads a 2.10.0 index yet): CRISPRme must
-handle them before it uses a 2.10.0 index (section 6.3).
+character, each with its own record's genotypes as they were phased, in split form (`1` the
+entry's ALT; an allele on two records with the carriers of both, section 2.3). On HGDP +
+1000 Genomes that includes 672 chr22 sample-positions with two ALTs on one haplotype slot,
+which CRISPRme's per-sample analysis turns into a CONFIRMED haplotype holding both
+(measured through the CLI on the enrichment of `feat/multiallelic-enrich`, whose dictionary
+2.10.0 writes byte for byte, indexed by CRISPRitz 2.9.1, as no CRISPRme release reads a
+2.10.0 index yet): CRISPRme must handle them before it uses a 2.10.0 index (section 6.3).
 
 ## 2. What the enricher does now
 
@@ -146,12 +146,13 @@ The value of `"<chr>,<pos>"` lists **every ALT** of one character of the records
 reads at the position (REF of one base, FILTER `PASS` or `.`): one entry per ALT joined by
 `$`, the form a record listing several ALTs has always produced, so every reader of
 multi-ALT values reads it unchanged. Each entry is `<sample:GT,...>;<REF>,<ALT>;<rsID>;<AF>`
-built from **its own record**, exactly as 2.9.1 built a lone record's value: its carriers
-(sorted), their genotypes in split form (`1` that entry's ALT, which is `tier0_registry`'s
-default `alt_index`, every other called allele `0`, a missing one and the separators as they
-were: a split record's verbatim, and a record listing several ALTs written ALT by ALT, so
-that its `1|2` carrier reads `1|0` under its first ALT and `0|1` under its second), its
-rsID (`;` normalised to `,`) and its own AF.
+built from **its own record**, as 2.9.1 built a lone record's value but for the allele
+numbers: its carriers (sorted), their genotypes in split form (`1` that entry's ALT, which
+is `tier0_registry`'s default `alt_index`, every other called allele `0`, a missing one and
+the separators as they were: a split record's verbatim, and a record listing several ALTs
+written ALT by ALT, so that a `1|2` carrier of `C>A,T` reads `1|0` under A and `0|1` under
+T, where 2.9.1 wrote the raw `1|2` under both), its rsID (`;` normalised to `,`) and its own
+AF.
 Entries are in file order. A second record of an allele already listed (the same `REF>ALT`
 twice: 362 genome-wide in the published panels, 351 pure duplicates) **merges into that
 allele's entry**, in place: the entry lists the carriers of both records; a sample listed by
@@ -166,15 +167,38 @@ there), so they never mix two records' allele numbering. Up to the branch the la
 entry replaced the earlier one and its carriers were lost (owner decision B2: merge; section
 7). CRISPRme's Tier-1 compiler refuses a repeated `(pos, alt)`
 (`tier1_genotypes.py:283-287`), so the dictionary never holds one. Keys and key order are
-unchanged. A key holding one record is byte-identical to 2.9.1, but for its AF (section
-2.5).
+unchanged. A key holding one record of one ALT is byte-identical to 2.9.1, but for its AF
+(section 2.5); so is a key holding one record of several ALTs, unless an entry lists a
+carrier holding an allele number above 1, which the split form rewrites (7,088 of the
+529,585 keys of the raw HPRC vcfwave chr22 VCF's dictionary, section 2.6).
 
-The genotypes are copied verbatim, phase included, so split records that were phased
-independently come through as they were phased, even where that puts two ALTs of one
-position on one haplotype slot (`0|1` under G and `0|1` under T): 672 sample-positions on
-chr22 of HGDP + 1000 Genomes (section 4). The enricher neither resolves nor drops such a
-conflict (unit test `test_dict_passes_conflicting_phase_through`, `verify_enricher.sh` case
-30); whatever builds haplotypes from the dictionary has to. For CRISPRme see section 6.3.
+An example, as both ports write it (`test/test_enricher_multiallelic.py` runs it through
+each): a record of three ALTs and a record of one,
+
+```text
+#CHROM POS ID REF ALT   QUAL FILTER INFO           FORMAT S1  S2  S3
+chr22  100 m  C   T,G,A .    PASS   AF=0.1,0.2,0.3 GT     2|3 0|1 1/2
+chr22  200 b  G   A     .    PASS   AF=0.4         GT     0|1 1|1 0|0
+```
+
+give, in `my_dict_chr22.json`,
+
+```text
+"chr22,100": "S2:0|1,S3:1/0;C,T;m;0.1$S1:1|0,S3:0/1;C,G;m;0.2$S1:0|1;C,A;m;0.3"
+"chr22,200": "S1:0|1,S2:1|1;G,A;b;0.4"
+```
+
+where 2.9.1 wrote the same `chr22,200` and, at `chr22,100`, the raw numbers: `S2:0|1,S3:1/2`
+under T, `S1:2|3,S3:1/2` under G and `S1:2|3` under A.
+
+The genotypes keep their phase (a split record's are copied verbatim, and a record listing
+several ALTs has only its allele numbers rewritten, slot by slot), so split records that
+were phased independently come through as they were phased, even where that puts two ALTs
+of one position on one haplotype slot (`0|1` under G and `0|1` under T): 672
+sample-positions on chr22 of HGDP + 1000 Genomes (section 4). The enricher neither resolves
+nor drops such a conflict (unit test `test_dict_passes_conflicting_phase_through`,
+`verify_enricher.sh` case 30); whatever builds haplotypes from the dictionary has to. For
+CRISPRme see section 6.3.
 Merging the carriers of an allele on two records can make such conflicts too (on HPRC
 chr22, 37 sample-positions at 38,152,965; section 7, decision 2): CRISPRme must resolve them
 by the same rule as the others (owner decision B4, section 7: two ALTs on one haplotype
@@ -240,11 +264,11 @@ So filter **after** splitting, as the published panels are built.
 
 ### 2.6 Inputs with one SNP record per position
 
-What sections 2.1 and 2.3 change needs two SNP records at a position, so it changes nothing
-where no position holds more than one: on the 17-case `verify_enricher.sh` fixture of 2.9.1
-with its two split sites reduced to one record each, both ports of 2.9.1 and of the branch
-gave identical md5 for all four outputs and the run log. Such an input is still not enriched
-by 2.10.0 as by 2.9.1 wherever
+What section 2.1 changes, and the merge of section 2.3, need two SNP records at a position,
+so they change nothing where no position holds more than one: on the 17-case
+`verify_enricher.sh` fixture of 2.9.1 with its two split sites reduced to one record each,
+both ports of 2.9.1 and of the branch gave identical md5 for all four outputs and the run
+log. Such an input is still not enriched by 2.10.0 as by 2.9.1 wherever
 
 * a record lists three SNP ALTs over an A, C, G or T base, or four over a reference IUPAC
   code: `Q`, where 2.9.1 wrote `N` (2.2);
@@ -253,21 +277,35 @@ by 2.10.0 as by 2.9.1 wherever
   four) over it (2.8);
 * a record lists `AF` at another place in its INFO than the file's first record: it gets
   its AF, in the dictionary and the indel log (2.5);
-* a SNP lies outside the chromosome: an error (2.7), as is a reference holding `Q` (2.2).
+* a record lists several ALTs and one of its entries a carrier holding an allele number
+  above 1: that entry's genotypes are in split form, where 2.9.1 wrote the raw numbers (2.3);
+* a SNP lies outside the chromosome: an error (2.7), as is a reference holding `Q` (2.2);
+
+and every indel's log row and contig change with the wider window (2.4).
 
 Measured with 2.10.0 against 2.9.1 (the CRISPRme 2.8.1 SIF's) on ml008, before the window of
-section 2.4 was widened (which changes every indel log row and contig, whatever the input).
-On the reduced fixture both ports of each give the same dictionary, indel log, fake-indel
-genome and run log, and genomes that differ at one base, 1,618, where case 17 lists `N>A,C`
-at a reference `N` (`M` in 2.9.1, `N` now). Through `add-variants` (compiled ports) on hg38
-chr22 with the raw HPRC vcfwave VCF (`ALL.chr22.HPRC.vcfwave.vcf.gz` of `vcfs/hg38_HPRC/`,
-623,085 records, which keep a site's ALTs on one record: 529,585 positions with a SNP
-record, none with two; no record listing two or three ALTs at a reference `N`; `AF` at the
-same place in every record's INFO), the dictionary, indel log and fake-indel FASTA are
-byte-identical, and the genome differs at 61 bases, those of the 61 records listing three
-SNP ALTs: `N` in 2.9.1 (11,658,752 `N` against the reference's 11,658,691), `Q` now. So an
-enrichment of a VCF that keeps a site's ALTs on one record changes too wherever one of the
-above occurs, as on the raw HPRC vcfwave VCFs: rebuild it.
+section 2.4 was widened and before the split form of section 2.3: on the reduced fixture
+both ports of each gave the same dictionary, indel log, fake-indel genome and run log, and
+genomes that differ at one base, 1,618, where case 17 lists `N>A,C` at a reference `N` (`M`
+in 2.9.1, `N` now); through `add-variants` (compiled ports) on hg38 chr22 with the raw HPRC
+vcfwave VCF (`ALL.chr22.HPRC.vcfwave.vcf.gz` of `vcfs/hg38_HPRC/`, 623,085 records, which
+keep a site's ALTs on one record: 529,585 positions with a SNP record, none with two; no
+record listing two or three ALTs at a reference `N`; `AF` at the same place in every
+record's INFO), the dictionary, indel log and fake-indel FASTA were byte-identical, and the
+genome differed at 61 bases, those of the 61 records listing three SNP ALTs: `N` in 2.9.1
+(11,658,752 `N` against the reference's 11,658,691), `Q` in 2.10.0. Measured again with the
+window and the split form, through `crispritz.py add-variants` on ml007 against 2.9.1 and
+against c18c575 (2.10.0 before the split form): the genome differs from 2.9.1's at those 61
+bases alone; the dictionary at 7,088 of its 529,585 keys, those of the 8,616 holding a
+record of several ALTs where an entry lists a carrier holding an allele number above 1,
+each as the split form gives it (a dictionary built from the VCF alone in each form equals
+2.9.1's and 2.10.0's, key for key), the other 522,497 byte-identical (c18c575 writes 2.9.1's
+dictionary, byte for byte); the indel log and fake-indel FASTA by the window alone (the
+same 202,404 rows in the same order with the same carriers, rsID and AF, each `CHR` field's
+start 5 less and end 3 more, each contig 2.9.1's with the 5 reference bases before it and
+the 3 after it, `refseq` and `FAKEPOS` to match: 0 exceptions), and they are c18c575's byte
+for byte. So an enrichment of a VCF that keeps a site's ALTs on one record changes too
+wherever one of the above occurs, as on the raw HPRC vcfwave VCFs: rebuild it.
 
 ### 2.7 A SNP outside the chromosome
 
@@ -394,7 +432,7 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
 
 ## 5. Tests
 
-* `test/test_enricher_multiallelic.py` — 26 unit tests, each run against **both** ports (52
+* `test/test_enricher_multiallelic.py` — 27 unit tests, each run against **both** ports (54
   in all), with exact expected outputs: two and three ALTs in every order, split == joined,
   four bases coded `Q` (every order, whatever the AF fields, a record listing three ALTs, an
   ALT on two records), a reference holding `Q` or `q` refused, reference `N` and IUPAC bases
@@ -407,13 +445,17 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
   several (merged carriers), each record's AF by its key, a split record beside a multi-ALT
   record, `*`, non-adjacent records, the indel outputs, a position with one record, and a
   SNP outside the chromosome; the fake-indel window of 30 / 30 (both ports' windows and
-  `crispritz.py`'s `INDEL_LEFT` / `INDEL_RIGHT`); and the entries of a record listing several
-  ALTs in split form, beside a split record and with phased, unphased and haploid calls.
-  Of the 24 tests the branch had, 26 of the 48 runs failed against its last commit
-  (`f266eac`, the four-base rule) and 44 against 2.9.1 (the 4 that pass, mode `no` == mode
-  `yes` and a position with one record, pin what does not change); the split-form test and
-  the three whose expectations it moved to split form fail against c18c575's ports (8 of
-  the 52).
+  `crispritz.py`'s `INDEL_LEFT` / `INDEL_RIGHT`); the entries of a record listing several
+  ALTs in split form, beside a split record and with phased, unphased and haploid calls;
+  and the dictionary the documents describe (the worked example of section 2.3, run whole,
+  and each "a `1|2` carrier of `C>A,T` reads `1|0` under A and `0|1` under T" of the README,
+  this document and the CHANGELOG, each of which must give one). Of the 24 tests the branch
+  had, 26 of the 48 runs failed against its last commit (`f266eac`, the four-base rule) and
+  44 against 2.9.1 (the 4 that pass, mode `no` == mode `yes` and a position with one record,
+  pin what does not change); the split-form test and the three whose expectations it moved
+  to split form fail against c18c575's ports (8 of the 52); the documents' test (2 of the 54
+  runs) fails against c18c575's ports too, and against the documents of 1a9812d, which gave
+  no example in the README or section 2.3.
 * `verify_enricher.sh` — grows from 17 to 33 cases (cases 18-30: split sites in every
   order, the same sites as one record, four bases, non-adjacent records, genotype shapes,
   SNP + indel at one position and in an indel's window, a split record beside a multi-ALT
@@ -775,11 +817,13 @@ Taken for CRISPRitz 2.10.0 and CRISPRme 2.10.0 (CRISPRme plan, section 3, B1-B4)
 Every variant index built from a panel VCF holding more than one SNP record at a position,
 or a record that section 2.6 lists (three SNP ALTs over an A, C, G or T base or four over a
 reference IUPAC code; two or three at a reference `N` or two or more at another byte that is
-no base or IUPAC code; `AF` at another place in its INFO than in the first record; a SNP
-outside the chromosome), and everything derived from its enrichment. Reference-only indexes
-(`NRG_3_hg38`, `NRR_3_hg38`, `NGG_3_hg38`, `NNN_3_hg38`, `NNNNNNNN_3_hg38`) are not affected
-by the enricher, but are rebuilt too, in index format 2 (docs/INDEX_FORMAT.md; owner
-decision C1: one format on the Hub, and the sites at contig ends and N runs format 2 adds).
+no base or IUPAC code; `AF` at another place in its INFO than in the first record; several
+ALTs and an entry listing a carrier of an allele number above 1, which changes only the
+dictionary and what is compiled from it; a SNP outside the chromosome), and everything
+derived from its enrichment. Reference-only indexes (`NRG_3_hg38`, `NRR_3_hg38`,
+`NGG_3_hg38`, `NNN_3_hg38`, `NNNNNNNN_3_hg38`) are not affected by the enricher, but are
+rebuilt too, in index format 2 (docs/INDEX_FORMAT.md; owner decision C1: one format on the
+Hub, and the sites at contig ends and N runs format 2 adds).
 
 Panels, each measured on its published chr22 source VCF (`vcfs/<panel>/` of
 `lucapinello/crisprme-data`): **HGDP + 1000 Genomes** (`hg38_HGDP1kGP`) — 43,389 positions

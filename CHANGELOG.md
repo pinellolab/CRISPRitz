@@ -20,9 +20,10 @@ exact version. Releasing therefore also drives a downstream repin in CRISPRme
 Not yet tagged: the date is set when it is. Released together with rebuilt indexes and the
 CRISPRme release that pins it (CRISPRme 2.10.0): the IDX-13, IDX-4 and IDX-15 fixes below
 change what an index holds, and every allele of a split multi-allelic site, the
-four-allele symbol `Q`, the merged carriers and the wider fake-indel window change what an
-enrichment holds, so they take effect only on genomes enriched and indexes built by this
-version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
+four-allele symbol `Q`, the merged carriers, the split form of a record listing several
+ALTs and the wider fake-indel window change what an enrichment holds, so they take effect
+only on genomes enriched and indexes built by this version (the brute-force scan gains
+IDX-15 at once, and IDX-14 applies to existing indexes).
 
 ### Added
 - **`Q`, the four-allele symbol.** A position whose SNP ALTs, with its reference base when
@@ -271,7 +272,12 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   CRISPRme 2.10.0's `build-index-only` (NRG, 1 + 1, `--samplesID`, 16 threads on both sides)
   with this CRISPRitz and with c18c575, HGDP + 1000 Genomes (24 files) and HPRC (29) are
   byte-identical, the enriched and fake-indel genomes, the dict, the indel log, CRISPRme's
-  stores and every index `.bin` among them. Through CRISPRme's real CLI on the review's
+  stores and every index `.bin` among them. A record listing several ALTs changes only where
+  an entry lists a carrier holding an allele number above 1: on hg38 chr22 with the raw HPRC
+  vcfwave VCF, which keeps a site's ALTs on one record (623,085 records), `add-variants`
+  writes 2.9.1's dict (c18c575 writes it too) but at 7,088 of its 529,585 keys, every one
+  such a key (of the 8,616 holding a record of several ALTs), and c18c575's enriched genome,
+  indel log and fake-indel FASTA byte for byte. Through CRISPRme's real CLI on the review's
   synthetic worlds (per sample, 4 + 1 + 1), an independent haplotype oracle finds every
   carrier's target, phase and variants right where records list several ALTs (two such
   records at one position, worlds WMM and WMM2; beside a split record, worlds X and Y),
@@ -279,20 +285,23 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   haplotypes do not hold, and WMM2 lost a CFD-1.0 target that 2.8.1 reported; the other 20
   world runs (18 without such a record, and two whose record's genotypes tell its numbers
   either way) give c18c575's rows byte for byte. Both ports; `test/test_enricher_multiallelic.py`
-  and `verify_enricher.sh` (both fail on c18c575's ports).
+  and `verify_enricher.sh` (both fail on c18c575's ports); the unit tests also run through
+  both ports the split form's examples the README and `docs/MULTIALLELIC_ENRICHMENT.md` §2.3
+  give.
 - **The dict now shows the phase of split records as it was phased, conflicts included.**
-  Each entry keeps its own record's genotypes verbatim (a merged one, above, the union of
-  its records'), and records phased one by one can put two ALTs of a position on one
-  haplotype slot: 672 sample-positions at 584 positions on HGDP + 1000 Genomes chr22 (e.g.
-  10,661,629 NA18869: `0|1` under G and `0|1` under T). On HPRC chr22 the records' own phase
-  puts none there, and the merged carriers of one allele's two records (above) put 37, all
-  at 38,152,965. Up to 2.9.1 the dict held one record's ALTs per position, so no reader met
-  one. CRISPRme's per-sample analysis builds a CONFIRMED haplotype holding both ALTs from
-  it, measured through `complete-search --per-sample` of CRISPRme `a5379e0` on the
-  multi-allelic branch's enrichment of chr22:1-10,700,000, indexed by CRISPRitz 2.9.1 in
-  format 1, as no CRISPRme release reads a 2.10.0 index yet; 2.10.0 enriches those inputs
-  into the same dict and the same bases but one, a `Q` 13 kb from the measured site.
-  CRISPRme must handle these before it uses a 2.10.0 index
+  Each entry keeps its own record's genotypes as they were phased (verbatim for a split
+  record, in split form for a record listing several ALTs, and for a merged entry the union
+  of its records', both above), and records phased one by one can put two ALTs of a
+  position on one haplotype slot: 672 sample-positions at 584 positions on HGDP + 1000
+  Genomes chr22 (e.g. 10,661,629 NA18869: `0|1` under G and `0|1` under T). On HPRC chr22
+  the records' own phase puts none there, and the merged carriers of one allele's two
+  records (above) put 37, all at 38,152,965. Up to 2.9.1 the dict held one record's ALTs per
+  position, so no reader met one. CRISPRme's per-sample analysis builds a CONFIRMED
+  haplotype holding both ALTs from it, measured through `complete-search --per-sample` of
+  CRISPRme `a5379e0` on the multi-allelic branch's enrichment of chr22:1-10,700,000,
+  indexed by CRISPRitz 2.9.1 in format 1, as no CRISPRme release reads a 2.10.0 index yet;
+  2.10.0 enriches those inputs into the same dict and the same bases but one, a `Q` 13 kb
+  from the measured site. CRISPRme must handle these before it uses a 2.10.0 index
   (`docs/MULTIALLELIC_ENRICHMENT.md` §6.3).
 
 ### Fixed
@@ -351,11 +360,15 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   three SNP ALTs over an A, C, G or T base, or four over a reference IUPAC code, is now `Q`,
   one listing two or three SNP ALTs at a reference `N` (or two or more at another byte that
   is no base or IUPAC code) leaves it, one listing `AF` at another place in its INFO than
-  the file's first record gets its AF, a SNP outside the chromosome is an error, and a
-  reference holding `Q` is refused. So an enrichment of a VCF that keeps a site's ALTs on
-  one record can change too: on chr22 with the raw HPRC vcfwave VCF (no position with two
-  SNP records), the genome differs at 61 bases, each `N` → `Q`, and the dict, indel log and
-  fake-indel FASTA are byte-identical.
+  the file's first record gets its AF, one listing several ALTs writes its entries in split
+  form (see Changed), a SNP outside the chromosome is an error, and a reference holding `Q`
+  is refused; and the wider fake-indel window (see Changed) moves every indel's log row and
+  contig. So an enrichment of a VCF that keeps a site's ALTs on one record can change too:
+  on chr22 with the raw HPRC vcfwave VCF (no position with two SNP records), against 2.9.1,
+  the genome differs at 61 bases, each `N` → `Q`, the dict at 7,088 of its 529,585 keys
+  (the split form), and the indel log and fake-indel FASTA by the window alone (202,404
+  rows, 0 exceptions); before the split form and the window, the dict, indel log and
+  fake-indel FASTA were byte-identical.
 - **A record listing three SNP ALTs over an A, C, G or T base, or four over a reference
   IUPAC code, wrote `N`**, which `index-genome` and `search` read as an assembly gap: every
   target through the position, the reference one included, left the index (shown through

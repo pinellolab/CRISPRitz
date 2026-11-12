@@ -23,7 +23,9 @@ tests pin the merged behaviour on small synthetic inputs, with exact expected ou
   * the indel log and fake-indel contigs do not move; each contig is 30 reference bases,
     the REF with the ALT in its place, and 30 reference bases (the log's CHR field and
     FAKEPOS say where);
-  * a position with one record of one ALT behaves exactly as before.
+  * a position with one record of one ALT behaves exactly as before;
+  * the dictionary examples README.md, docs/MULTIALLELIC_ENRICHMENT.md and CHANGELOG.md
+    give are what the port writes.
 
 Each test runs the real program as a subprocess: `enricher.py` under this interpreter
 (needs pandas; ENRICHER_PY overrides the path) and the compiled `enricher`
@@ -89,6 +91,45 @@ def rec(pos, rsid, ref, alt, info, gts, filt="PASS", fmt="GT"):
     return "\t".join([CHROM, str(pos), rsid, ref, alt, ".", filt, info, fmt] + list(gts))
 
 
+def vcf_header(samples=SAMPLES):
+    return [
+        "##fileformat=VCFv4.2",
+        '##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count">',
+        '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">',
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">',
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" + "\t".join(samples),
+    ]
+
+
+# The documents whose dictionary examples test_the_documented_dictionary_examples runs.
+DOC_FILES = ("README.md", os.path.join("docs", "MULTIALLELIC_ENRICHMENT.md"), "CHANGELOG.md")
+_DOC_GT = r"[0-9.]+(?:[|/][0-9.]+)*"
+# "a `1|2` carrier of `C>A,T` reads `1|0` under A and `0|1` under T"
+_DOC_SENTENCE = re.compile(r"a `(%s)` carrier of `([ACGT])>([ACGT](?:,[ACGT])+)` reads `(%s)` "
+                           r"under ([ACGT]) and `(%s)` under ([ACGT])\b" % (_DOC_GT, _DOC_GT, _DOC_GT))
+
+
+def doc_sentence_examples(text):
+    """Every 'a `<GT>` carrier of `<REF>><ALT>,<ALT>...` reads `<GT>` under <ALT> and `<GT>`
+    under <ALT>' of a Markdown text (its line breaks read as spaces), as tuples (GT, REF,
+    ALTs, GT under the first ALT named, that ALT, GT under the second, that ALT)."""
+    return _DOC_SENTENCE.findall(" ".join(text.split()))
+
+
+def doc_worked_example(text):
+    """The worked example of docs/MULTIALLELIC_ENRICHMENT.md section 2.3: the fenced block
+    that starts with a VCF header line (#CHROM ...; fields split on blanks), and the fenced
+    block after it, which lists the "<chr>,<pos>": "<value>" pairs those records give in
+    my_dict. Returns (rows of fields, header first; {key: value}), or None."""
+    blocks = re.findall(r"^```[a-z]*\n(.*?)^```", text, flags=re.S | re.M)
+    for i, block in enumerate(blocks[:-1]):
+        if block.startswith("#CHROM"):
+            rows = [line.split() for line in block.strip().splitlines()]
+            pairs = json.loads("{" + ",".join(blocks[i + 1].strip().splitlines()) + "}")
+            return rows, pairs
+    return None
+
+
 def _build_cpp(workdir):
     cxx = os.environ.get("CXX") or shutil.which("c++") or shutil.which("g++")
     if not cxx:
@@ -114,13 +155,7 @@ class Run(object):
             f.write(">" + CHROM + "\n")
             for i in range(0, len(fasta), 60):
                 f.write(fasta[i:i + 60] + "\n")
-        lines = header or [
-            "##fileformat=VCFv4.2",
-            '##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count">',
-            '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">',
-            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">',
-            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" + "\t".join(SAMPLES),
-        ]
+        lines = header or vcf_header()
         plain = os.path.join(self.dir, "variants.vcf")
         with open(plain, "w") as f:
             f.write("\n".join(lines + list(records)) + "\n")
@@ -626,6 +661,62 @@ class EnricherMultiallelicTests(object):
         # the right flank of the last contig is cut by the chromosome's end: 8 bases
         last = flat.split("N")[-2]
         self.assertEqual(len(last), 30 + 1 + 8)
+
+    # ---- the dictionary the documents describe -----------------------------------
+
+    def test_the_documented_dictionary_examples(self):
+        """What the documents say the dictionary holds is what this port writes: the worked
+        example of docs/MULTIALLELIC_ENRICHMENT.md section 2.3 (VCF records and the my_dict
+        values they give, compared whole), and each "a `<GT>` carrier of `<REF>><ALTs>`
+        reads `<GT>` under <ALT> and `<GT>` under <ALT>" of README.md, that document and
+        CHANGELOG.md, each of which must give one. Up to 1a9812d the README said every
+        entry kept its record's genotypes verbatim and section 2.3 that a key holding one
+        record was byte-identical to 2.9.1, both false for a record listing several ALTs
+        since the split form, and neither gave an example a test could run."""
+        problems = []
+        runs = {}
+        for name in DOC_FILES:
+            with open(os.path.join(REPO, name)) as f:
+                text = f.read()
+            examples = doc_sentence_examples(text)
+            if not examples:
+                problems.append("%s gives no \"a `<GT>` carrier of `<REF>><ALTs>` reads `<GT>` "
+                                "under <ALT> and `<GT>` under <ALT>\"" % name)
+            for gt, ref, alts, g1, a1, g2, a2 in examples:
+                key = (gt, ref, alts)
+                if key not in runs:
+                    p = 120
+                    r = self.run_enricher(
+                        [rec(p, "ex", ref, alts, "AF=" + ",".join(["0.1"] * len(alts.split(","))),
+                             [gt, "0|0", "0|0", "0|0"])],
+                        fasta=REF[:p - 1] + ref + REF[p:])
+                    runs[key] = {}
+                    for e in r.entries(p):  # "<sample:GT,...>;<REF>,<ALT>;<rsID>;<AF>"
+                        carriers, ref_alt = e.split(";")[:2]
+                        runs[key][ref_alt] = dict(c.rsplit(":", 1) for c in carriers.split(",") if c)
+                for want, alt in ((g1, a1), (g2, a2)):
+                    got = runs[key].get(ref + "," + alt, {}).get("S1")
+                    if got != want:
+                        problems.append("%s: a `%s` carrier of `%s>%s` reads %r under %s, not `%s`"
+                                        % (name, gt, ref, alts, got, alt, want))
+            if name.endswith("MULTIALLELIC_ENRICHMENT.md"):
+                worked = doc_worked_example(text)
+                if worked is None:
+                    problems.append("%s gives no worked example (a fenced VCF block, then the "
+                                    "my_dict values it gives)" % name)
+                    continue
+                rows, want = worked
+                fasta = list(REF)
+                records = []
+                for fields in rows[1:]:
+                    fasta[int(fields[1]) - 1] = fields[3]
+                    records.append("\t".join([CHROM] + fields[1:]))
+                r = self.run_enricher(records, fasta="".join(fasta), header=vcf_header(rows[0][9:]))
+                got = dict((rows[1][0] + k[len(CHROM):], v) for k, v in r.dict.items())
+                if got != want:
+                    problems.append("%s: the worked example gives %s, not %s"
+                                    % (name, json.dumps(got, sort_keys=True), json.dumps(want, sort_keys=True)))
+        self.assertFalse(problems, "\n" + "\n".join(problems))
 
     # ---- a position with one record behaves as before ----------------------------
 

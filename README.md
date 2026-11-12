@@ -236,10 +236,14 @@ holding `Q` is flagged in its header, so that no engine that cannot read it sear
 reference FASTA must not hold `Q`, in either case, and `add-variants` refuses one). Apply an
 allele-frequency filter after splitting, so it acts per ALT. Each record's `INFO/AF` is read
 by its key (up to 2.9.1 its place came from the file's first record). Each dictionary entry
-keeps its own record's genotypes verbatim, but one allele on two records is one entry with
-the carriers of both: split records phased one by one can put two ALTs of a position on one
-haplotype slot (`0|1` under each), and whatever builds haplotypes from the dictionary has to
-resolve that. Details: [`docs/MULTIALLELIC_ENRICHMENT.md`](docs/MULTIALLELIC_ENRICHMENT.md).
+lists its own record's carriers, their genotypes in split form: `1` is the entry's ALT and
+`0` the reference or another ALT, a missing allele and the separators as they were. So a
+split record's genotypes are kept verbatim, and a record listing several ALTs is written ALT
+by ALT: a `1|2` carrier of `C>A,T` reads `1|0` under A and `0|1` under T, where up to 2.9.1
+its raw `1|2` stood under both. One allele on two records is one entry with the carriers of
+both. Split records phased one by one can put two ALTs of a position on one haplotype slot
+(`0|1` under each), and whatever builds haplotypes from the dictionary has to resolve that.
+Details: [`docs/MULTIALLELIC_ENRICHMENT.md`](docs/MULTIALLELIC_ENRICHMENT.md).
 
 
 **<a name="Index-Genome">3.2</a> CRISPRitz Index-Genome Tool**  
