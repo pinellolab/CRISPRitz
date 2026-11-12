@@ -400,19 +400,24 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
   normalisation (`bcftools norm -f` writes a soft-masked reference's case into the indels it
   left-aligns): HPRC normalised as CRISPRme builds it holds 108,178 such records over its 24
   chromosomes (1,546 on chr22), every one an indel or MNV, where HF's raw vcfwave VCFs hold
-  none; the mega's merged VCFs hold 2, on chr21 (deletions whose REF of 275 and 288 bases is
-  in mixed case and whose ALT is `c`, at 41,806,097 and 44,410,608); HGDP + 1000 Genomes
-  none. Measured through
+  none; the mega's merged VCFs hold 13, on chr3, chr4, chr5, chr10, chr12, chr18 and chr21
+  (deletions of 238 to 317 bases whose REF is in mixed case and whose ALT is one lower-case
+  base, none an SNV; docs/MULTIALLELIC_ENRICHMENT.md section 2.9 lists them); HGDP + 1000
+  Genomes none. Measured through
   `crisprme.py build-index-only` of CRISPRme `6bff65b` (16 threads) against `26ffe46`: HGDP +
   1000 Genomes chr22, HF's raw HPRC chr22 and the mega chr22 byte-identical, every file
   (enriched genome, dictionary, indel log, fake-indel genome, every `.bin`); HPRC chr22 as
   CRISPRme normalises it and the mega chr21 differ only where the VCF writes lower case: the
   log's `indel` field at the 1,546 (2) rows naming such a record and the fake-indel genome's
-  1,818 (2) lower-case bases, upper-cased, every `.bin` byte-identical
+  1,818 (2) lower-case bases, upper-cased, every `.bin` byte-identical, as does the mega's
+  whole recipe on each of its seven chromosomes, at its 13 rows and 13 bases
   (docs/MULTIALLELIC_ENRICHMENT.md section 2.9). CRISPRme readers that read the VCF itself
-  must read it in upper case too (section 6.7: CRISPRme 6bff65b's mega recipe fails its
-  check on chr21 with this engine until they do). Tests: five unit tests, run against both
-  ports, and `verify_enricher.sh` case 34; each fails on `26ffe46`.
+  must read it in upper case too, while those that read the dictionary stay as they are
+  (section 6.7): with this engine CRISPRme 6bff65b's mega recipe fails its check on each of
+  chr3, chr4, chr5, chr10, chr12, chr18 and chr21 (measured on all seven) until three of its
+  VCF readers do.
+  Tests: five unit tests, run against both ports, and `verify_enricher.sh` case 34; each
+  fails on `26ffe46`.
 - **`searchBruteForce` reported a window with an `N` in its guide region when the mismatch
   budget exceeded 100**: an `N` counted as 101 mismatches. Such a window is now dropped
   whatever the budget, as an index never holds one.
