@@ -190,6 +190,18 @@ def _af_rank(af):
     return float(af) if _AF_NUMBER.match(af) else 0.0
 
 
+# ASCII a-z to A-Z and nothing else, byte for byte what enricher.cpp's upperAllele does
+# (str.upper() would also change a non-ASCII letter).
+_ASCII_UPPER = str.maketrans('abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+
+
+def _upper_allele(allele):
+    """A REF or ALT with its bases in upper case: VCF 4.x reads the bases of REF and ALT
+    whatever their case. A symbolic allele (<DEL>, <INS:ME>: it holds '<') stays as it is;
+    '*' and '.' hold no letter."""
+    return allele if '<' in allele else allele.translate(_ASCII_UPPER)
+
+
 def SNPsProcess(line):
     global four_base_count
     if len(line[3]) > 1: #se len ref > 1 significa che non è snp
@@ -213,12 +225,13 @@ def SNPsProcess(line):
         # which buildTST and searchBruteForce read as N, and stays as it is. The dict
         # still lists the record.
         return
-    # The reference base and every single-character ALT, as A/C/G/T bits. A member
-    # that is not A/C/G/T -- the '*' of a spanning deletion, an 'N', a lowercase
-    # base, an IUPAC reference base -- adds nothing, so the real SNP alleles beside
-    # it are still coded. Building the code from the whole set instead left the base
-    # unchanged whenever such a member was present, dropping a real SNP at every
-    # multiallelic '*' site. This is enricher.cpp's rule (baseBit/iupacFromMask).
+    # The reference base and every single-character ALT, as A/C/G/T bits (an ALT written
+    # in lower case was upper-cased when the line was read). A member that is not
+    # A/C/G/T -- the '*' of a spanning deletion, an 'N', an IUPAC reference base -- adds
+    # nothing, so the real SNP alleles beside it are still coded. Building the code from
+    # the whole set instead left the base unchanged whenever such a member was present,
+    # dropping a real SNP at every multiallelic '*' site. This is enricher.cpp's rule
+    # (baseBit/iupacFromMask).
     #
     # The set starts from what earlier records coded HERE, not from the reference base
     # alone. A normalised VCF (`bcftools norm -m -any`, how every CRISPRme panel is
@@ -616,6 +629,16 @@ for line in inAltFile:
     # multi-value convention) once, so all rsID uses below stay a single field.
     if len(line) > 2:
         line[2] = line[2].replace(";", ",")
+    # REF and every ALT in upper case, before anything reads them (VCF 4.x: their bases are
+    # case-insensitive). Up to 2.9.1 the alleles were read as written: a lower-case SNP ALT
+    # (C>g) was no A, C, G or T to SNPsProcess, so it was not coded while the dict listed
+    # it, a record that differed from another only by case (C>G and c>g) was another allele
+    # in the dict, and an indel's window and log row held the VCF's case. Now each is the
+    # record written in upper case, whose REF the window finds in the upper-cased genome as
+    # before (re.IGNORECASE).
+    if len(line) > 4:
+        line[3] = _upper_allele(line[3])
+        line[4] = ','.join(_upper_allele(a) for a in line[4].split(','))
     if line[6] not in ('PASS', '.'):  # '.' = no filter applied (e.g. HPRC vcfwave VCFs)
         continue
     if sys.argv[4] == 'yes': #if true do all the creation, if false do only genome enrichment with SNPs

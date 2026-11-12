@@ -68,6 +68,17 @@ static std::set<int> gtAltAlleles(const std::string &gt) {
     return out;
 }
 
+// A REF or ALT with its bases in upper case -- enricher.py's _upper_allele: VCF 4.x reads
+// the bases of REF and ALT whatever their case. A symbolic allele (<DEL>, <INS:ME>: it holds
+// '<') stays as it is; '*' and '.' hold no letter. ASCII a-z only, as enricher.py.
+static std::string upperAllele(const std::string &a) {
+    if (a.find('<') != std::string::npos) return a;
+    std::string out = a;
+    for (size_t i = 0; i < out.size(); ++i)
+        if (out[i] >= 'a' && out[i] <= 'z') out[i] = (char)(out[i] - 'a' + 'A');
+    return out;
+}
+
 // Python str.strip(): removes leading/trailing ASCII whitespace.
 static std::string pyStrip(const std::string &s) {
     size_t b = 0, e = s.size();
@@ -925,6 +936,16 @@ int main(int argc, char **argv) {
         // crash. Normalize the ID field's ';' to ',' so rsID stays one field.
         if (line.size() > 2)
             std::replace(line[2].begin(), line[2].end(), ';', ',');
+        // REF and every ALT in upper case, before anything reads them (VCF 4.x: their bases
+        // are case-insensitive): a lower-case SNP ALT is coded, a record differing from
+        // another only by case is the same allele, and an indel's window and log row are in
+        // upper case. Up to 2.9.1 the alleles were read as written. See enricher.py.
+        if (line.size() > 4) {
+            line[3] = upperAllele(line[3]);
+            std::vector<std::string> alts = splitStr(line[4], ',');
+            for (size_t k = 0; k < alts.size(); ++k) alts[k] = upperAllele(alts[k]);
+            line[4] = joinStr(alts, ',');
+        }
         if (line[6] != "PASS" && line[6] != ".") continue;  // '.' = no filter applied (e.g. HPRC vcfwave VCFs)
         if (doYes) {
             add_to_dict_snps(line);
