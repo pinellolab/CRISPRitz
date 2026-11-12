@@ -571,10 +571,13 @@ static void add_to_dict_snps(const std::vector<std::string> &line) {
                 std::string gt = splitStr(sample, ':')[0];
                 std::set<int> alleles = gtAltAlleles(gt);
                 // No break: a sample carrying two different ALTs (e.g. "2|1")
-                // belongs to BOTH of them.
+                // belongs to BOTH of them. Each entry holds its carriers' genotypes in
+                // split form (gtForAllele: 1 the entry's own ALT), as a split record's
+                // entry and a merged entry do -- enricher.py's add_to_dict_snps.
                 for (size_t idx = 0; idx < values_for_allele_info.size(); ++idx) {
                     if (alleles.count(values_for_allele_info[idx])) {
-                        dols[snps[idx]].push_back(VCFheader[p] + ":" + gt);
+                        dols[snps[idx]].push_back(VCFheader[p] + ":" +
+                                                  gtForAllele(gt, values_for_allele_info[idx]));
                     }
                 }
             }
@@ -605,7 +608,8 @@ static void add_to_dict_snps(const std::vector<std::string> &line) {
                 }
                 final_entry.push_back(entry);
             }
-            dictPut(chr_pos_string, final_entry, values_for_allele_info);
+            // every entry in split form: its ALT is allele 1 for dictPut's merge
+            dictPut(chr_pos_string, final_entry, std::vector<int>(final_entry.size(), 1));
         }
     }
     // len(line[3])>1 : stores nothing

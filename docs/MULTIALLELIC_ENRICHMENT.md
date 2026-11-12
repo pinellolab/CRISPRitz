@@ -147,8 +147,11 @@ reads at the position (REF of one base, FILTER `PASS` or `.`): one entry per ALT
 `$`, the form a record listing several ALTs has always produced, so every reader of
 multi-ALT values reads it unchanged. Each entry is `<sample:GT,...>;<REF>,<ALT>;<rsID>;<AF>`
 built from **its own record**, exactly as 2.9.1 built a lone record's value: its carriers
-(sorted), their genotypes verbatim (for a split record `1` is that entry's ALT, which is
-`tier0_registry`'s default `alt_index`), its rsID (`;` normalised to `,`) and its own AF.
+(sorted), their genotypes in split form (`1` that entry's ALT, which is `tier0_registry`'s
+default `alt_index`, every other called allele `0`, a missing one and the separators as they
+were: a split record's verbatim, and a record listing several ALTs written ALT by ALT, so
+that its `1|2` carrier reads `1|0` under its first ALT and `0|1` under its second), its
+rsID (`;` normalised to `,`) and its own AF.
 Entries are in file order. A second record of an allele already listed (the same `REF>ALT`
 twice: 362 genome-wide in the published panels, 351 pure duplicates) **merges into that
 allele's entry**, in place: the entry lists the carriers of both records; a sample listed by
@@ -476,9 +479,10 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
   right for split-record entries. Verified by compiling a merged value with CRISPRme's own
   compilers: two registry records at the position, AC/AN per ALT exact, Tier-1 carriers per
   ALT with their genotypes. **Rebuild** them from the new dictionaries.
-* Pre-existing, unrelated to split records: an entry from a record listing several ALTs
-  keeps that record's genotypes (`1|2`), which `alt_index="1"` counts as 0 copies of the
-  second ALT. Not reachable on a published panel; worth a test if such VCFs are accepted.
+* An entry from a record listing several ALTs is written in split form (2.10.0; up to the
+  integration it kept that record's raw genotypes, `1|2`, which `alt_index="1"` counted as 0
+  copies of the second ALT, and which CRISPRme's readers had to tie to an allele number from
+  the position's other entries).
 * The mega registry is compiled from INFO/AF straight from the VCF
   (`compile_registry_from_info_af`), so it already lists every ALT — 20,517 chr22 positions
   with two or more SNP ALTs in the published `registry_hg38_mega` — while the mega enriched
@@ -736,12 +740,12 @@ Taken for CRISPRitz 2.10.0 and CRISPRme 2.10.0 (CRISPRme plan, section 3, B1-B4)
    all at 38,152,965, 8 of them with more ALT copies than slots — e.g. HG02071, `1|1` under
    the first A record, `0|0` under the second, `1|1` under C, whom the later entry left a
    carrier of C only. Such conflicts follow decision 4.
-3. **Records listing several ALTs are left to CRISPRme** (B3): their entries keep their
-   multi-index genotypes (`1|2`), which the registry's `alt_index="1"` and the legacy
-   haplotype test mishandle (6.2, 6.3); every CRISPRme reader is to learn to handle them
-   (store the ALT index per allele) rather than CRISPRitz normalising them, so its output
-   for such inputs stays stable. Only an entry merged from two records (decision 2) is in
-   split form.
+3. **Records listing several ALTs** (B3, revisited): their entries were to keep their
+   multi-index genotypes (`1|2`), every CRISPRme reader learning to tie each to its ALT's
+   index. A reader cannot, where the dictionary also lists a split record of the position:
+   its entry's `1` numbers its own record, and CRISPRme 2.10.0 then reads such an ALT without
+   phase. Each ALT's entry is now written in split form, as a merged entry (decision 2)
+   already was, so every entry's `1` is its own ALT.
 4. **Two ALTs on one haplotype slot are PUTATIVE** (B4), to be resolved in CRISPRme (6.3; no
    CRISPRme release does so yet), which has the window and every ALT's carriers in hand: the
    enricher passes them through verbatim (independently phased split records: 672

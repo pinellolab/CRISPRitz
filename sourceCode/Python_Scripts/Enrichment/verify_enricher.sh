@@ -524,7 +524,8 @@ lines.append(row(2345, "rs1953", b(2345), other(2345), "AF_max=0.2;AC=1", G1))
 
 # 32) THE SAME REF>ALT ON TWO SPLIT RECORDS with carriers on both, one of them on the
 #     same slot and one on the other (2360), and on a record listing several ALTs then
-#     a split record (2365): one entry each, genotypes in split form (1 = that ALT).
+#     a split record (2365): one entry each, genotypes in split form (1 = that ALT), a
+#     record listing several ALTs' every entry too (2365, 2380, 1616, 2425).
 p=2360
 lines.append(row(p, "rs1960", b(p), other(p,0), "AC=2;AF=0.1", ["0|1","0|0","0|1","0|0","0|0"]))
 lines.append(row(p, "rs1961", b(p), other(p,1), "AC=1;AF=0.2", ["0|0","1|0","0|0","0|0","0|0"]))
@@ -710,10 +711,10 @@ expect = {
     1612: ("listed at a reference N",
            ["S1:0|1;N,A;rs1970;0.1", "S1:0|1;N,C;rs1971;0.1", "S1:0|1;N,G;rs1972;0.1"]),
     1616: ("listed at a reference N",
-           ["S1:0|1;N,A;rs1973;0.1", "S2:2|3;N,C;rs1973;0.1", "S2:2|3;N,G;rs1973;0.1",
-            "S3:0|4;N,T;rs1973;0.1"]),
+           ["S1:0|1;N,A;rs1973;0.1", "S2:1|0;N,C;rs1973;0.1", "S2:0|1;N,G;rs1973;0.1",
+            "S3:0|1;N,T;rs1973;0.1"]),
     2420: ("listed at a reference X", ["S1:0|1;A,C;rs1975;0.1", "S2:1|0;A,G;rs1976;0.2"]),
-    2425: ("listed at a reference '-'", ["S1:0|1;A,C;rs1977;0.1", "S2:2|0;A,T;rs1977;0.2"]),
+    2425: ("listed at a reference '-'", ["S1:0|1;A,C;rs1977;0.1", "S2:1|0;A,T;rs1977;0.2"]),
     2130: ("carriers merged",
            ["S1:0|1,S3:1|0;%s,%s;rs1892;0.3" % (r(2130), other(2130, 0)),
             "S2:0|1;%s,%s;rs1891;0.2" % (r(2130), other(2130, 1))]),
@@ -724,12 +725,12 @@ expect = {
            ["S1:1|1,S3:0|1,S4:1|1;%s,%s;rs1962;0.4" % (r(2360), other(2360, 0)),
             "S2:1|0;%s,%s;rs1961;0.2" % (r(2360), other(2360, 1))]),
     2365: ("carriers merged",
-           ["S1:1|2;%s,%s;rs1963;0.1" % (r(2365), other(2365, 0)),
+           ["S1:1|0;%s,%s;rs1963;0.1" % (r(2365), other(2365, 0)),
             "S1:0|1,S2:0|1,S3:1|0;%s,%s;rs1963;0.2" % (r(2365), other(2365, 1))]),
     2380: ("a record listing three SNP ALTs",
            ["S1:0|1;%s,%s;rs1974;0.1" % (r(2380), other(2380, 0)),
-            "S2:0|2;%s,%s;rs1974;0.2" % (r(2380), other(2380, 1)),
-            "S3:3|0;%s,%s;rs1974;0.3" % (r(2380), other(2380, 2))]),
+            "S2:0|1;%s,%s;rs1974;0.2" % (r(2380), other(2380, 1)),
+            "S3:1|0;%s,%s;rs1974;0.3" % (r(2380), other(2380, 2))]),
 }
 for p, (what, e) in sorted(expect.items()):
     ok = entries(p) == e

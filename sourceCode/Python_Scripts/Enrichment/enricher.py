@@ -379,13 +379,14 @@ def _merge_entries(old, k_old, new, k_new):
 
 def _dict_put(key, entries, alleles):
     """Store one record's per-ALT entries under "chr,pos", MERGED with what earlier
-    records stored there; alleles[i] is the allele index of entries[i]'s ALT in its
-    record (1 on a split record).
+    records stored there; alleles[i] is the allele index of entries[i]'s ALT the
+    entry's genotypes use (1: add_to_dict_snps writes every entry in split form).
 
     A position's value is its ALTs' entries joined by '$', the form a record listing
     several ALTs has always produced, so every reader of multi-ALT values reads it. Each
-    entry keeps its own record's carriers, genotypes, rsID and AF: the genotypes of a
-    split record use 1 for its ALT, as tier0_registry's default alt_index expects.
+    entry keeps its own record's carriers, genotypes, rsID and AF: its genotypes use 1
+    for its ALT (a record listing several ALTs' too, written in split form), as
+    tier0_registry's default alt_index expects.
     Assigning instead let a later record at the position overwrite the earlier ones, so
     a split multi-allelic site kept only its last ALT. An allele already listed here
     (the same REF>ALT on two records) gets the carriers of both (_merge_entries); any
@@ -447,11 +448,19 @@ def add_to_dict_snps(line):
             dict_of_lists_samples[snp] = []
         if len(snps) > 0:		
             for pos, sample in enumerate(line[9:]):
-                alleles = _gt_alt_alleles(sample.split(':')[0])
-                # no break: a sample carrying two different ALTs belongs to BOTH
+                gt = sample.split(':')[0]
+                alleles = _gt_alt_alleles(gt)
+                # no break: a sample carrying two different ALTs belongs to BOTH. Each entry
+                # holds its carriers' genotypes in split form (_gt_for_allele: 1 is the
+                # entry's own ALT, 0 the reference or another ALT), as a split record's
+                # entry and a merged entry do: a 1|2 carrier of C>A,T reads 1|0 under A
+                # and 0|1 under T. Kept raw (1|2 under both), a reader had to guess each
+                # entry's allele number from the position's other entries, which a split
+                # record's entry beside the line numbers otherwise (C>G 1|0 beside C>A,CT
+                # 1|2 read A as allele 2, the insertion's slot).
                 for idx, value in enumerate(values_for_allele_info):
                     if value in alleles:
-                        dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 9]+':'+sample.split(':')[0]) #add to correct entry of dict the sample with such snp
+                        dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 9]+':'+_gt_for_allele(gt, value)) #add to correct entry of dict the sample with such snp
                     
             chr_pos_string = currentChr + ',' + line[1]
             rsID = line[2].split(',')
@@ -467,7 +476,8 @@ def add_to_dict_snps(line):
                     final_entry.append(','.join(sorted(dict_of_lists_samples[snp])) + ';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af_val)
                 else:
                     final_entry.append(';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af_val)
-            _dict_put(chr_pos_string, final_entry, values_for_allele_info)
+            # every entry in split form: its ALT is allele 1 for _dict_put's merge
+            _dict_put(chr_pos_string, final_entry, [1] * len(final_entry))
 
 def dictSave():
     #os.chdir("./SNPs_genome/")

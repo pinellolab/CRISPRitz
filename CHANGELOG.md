@@ -185,6 +185,18 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   enriches, in both enricher ports, and in one it copies), with
   `ERROR: <chr> holds 'Q' at <pos>: ...` and exit status 1: the search would read it as a
   four-allele position.
+- **A record listing several ALTs writes each ALT's dict entry in split form** (`1` its own
+  ALT, `0` the reference or another ALT; a missing allele and the separators as they were):
+  a `1|2` carrier of `C>A,T` reads `1|0` under A and `0|1` under T, where its raw `1|2` stood
+  under both. Every entry of a position now numbers its own ALT `1`, as a split record's and a
+  merged one's already did, so a reader no longer guesses an entry's allele number from the
+  position's other entries: beside a split record of the position (`C>G`, `1|0`) CRISPRme's
+  readers tied A of `C>A,CT` to allele `2` and read a `1|2` carrier's A on the insertion's
+  slot, losing its target of A (the CRISPRme review's world X; CRISPRme 2.10.0 reads such a
+  position without phase), and a carrier of two ALTs of one record with no other carrier to
+  tell their numbers is no longer read without phase. (This revisits owner decision B3,
+  which left such records' genotypes raw for CRISPRme to read.) A position whose records
+  each list one ALT is byte-identical. Both ports; `test/test_enricher_multiallelic.py`.
 - **The dict now shows the phase of split records as it was phased, conflicts included.**
   Each entry keeps its own record's genotypes verbatim (a merged one, above, the union of
   its records'), and records phased one by one can put two ALTs of a position on one

@@ -14,7 +14,8 @@ tests pin the merged behaviour on small synthetic inputs, with exact expected ou
     reference N stays N: the enriched genome holds exactly the reference's N;
   * the dict lists every ALT, each entry with its own record's carriers, genotypes,
     rsID and AF, joined by '$' like a multi-ALT record's value; the same REF>ALT on two
-    records is one entry with the carriers of both;
+    records is one entry with the carriers of both; every entry's genotypes are in split
+    form (1 its own ALT), a record listing several ALTs' too;
   * each record's AF is read by its key, whatever the INFO field's order;
   * non-PASS records, '*', haploid / unphased / missing genotypes, non-adjacent
     records, an indel at the same position, a reference N, IUPAC base or byte that is
@@ -22,7 +23,7 @@ tests pin the merged behaviour on small synthetic inputs, with exact expected ou
   * the indel log and fake-indel contigs do not move; each contig is 30 reference bases,
     the REF with the ALT in its place, and 30 reference bases (the log's CHR field and
     FAKEPOS say where);
-  * a position with one record behaves exactly as before.
+  * a position with one record of one ALT behaves exactly as before.
 
 Each test runs the real program as a subprocess: `enricher.py` under this interpreter
 (needs pandas; ENRICHER_PY overrides the path) and the compiled `enricher`
@@ -452,9 +453,10 @@ class EnricherMultiallelicTests(object):
 
     def test_same_alt_on_a_record_listing_several(self):
         """The same ALT on a split record and as the second ALT of a record listing
-        several: the merged entry's genotypes are in split form (1 = that ALT, 0 = the
-        reference or another ALT), so a 1|2 carrier of the joined record reads 0|1 there,
-        while the joined record's other ALT keeps its genotypes verbatim."""
+        several: every entry's genotypes are in split form (1 = that ALT, 0 = the
+        reference or another ALT), the merged one's and the joined record's other ALT's
+        too, so a 1|2 carrier of the joined record reads 0|1 under its second ALT and 1|0
+        under its first."""
         p = 185
         a1, a2 = others(p)[:2]
         recs = [rec(p, "s1", ref1(p), a2, "AC=1;AF=0.1", ["0|1", "0|0", "0|0", "0|0"]),
@@ -462,12 +464,37 @@ class EnricherMultiallelicTests(object):
         r = self.run_enricher(recs)
         self.assertEqual(r.entries(p), [
             "S1:0|1,S2:1|0;%s,%s;j1;0.3" % (ref1(p), a2),
-            "S1:1|2,S3:0|1;%s,%s;j1;0.2" % (ref1(p), a1)])
+            "S1:1|0,S3:0|1;%s,%s;j1;0.2" % (ref1(p), a1)])
         # the other way round: the joined record first, then the split record
         r = self.run_enricher(recs[::-1])
         self.assertEqual(r.entries(p), [
-            "S1:1|2,S3:0|1;%s,%s;j1;0.2" % (ref1(p), a1),
+            "S1:1|0,S3:0|1;%s,%s;j1;0.2" % (ref1(p), a1),
             "S1:0|1,S2:1|0;%s,%s;j1;0.3" % (ref1(p), a2)])
+
+    def test_a_record_listing_several_beside_a_split_record_numbers_its_own_alts(self):
+        """C>G (a split record, S1 1|0) and then C>A,CT (S2 1|2: A on the first slot, the
+        insertion on the second): A's entry holds S2's genotype in split form, 1|0, so
+        its slot is told whatever else the position lists. Kept raw (1|2), CRISPRme's
+        readers tied A to allele 2 against the split record's 1 and read A on the
+        insertion's slot (the CRISPRme review's world X, site C); an unphased 1/2 stays
+        unphased (0/1 under its second ALT), a haploid 2 is 1 under that ALT."""
+        p = 187
+        a1, a2 = others(p)[:2]
+        recs = [rec(p, "s1", ref1(p), a2, "AC=1;AF=0.1", ["1|0", "0|0", "0|0", "0|0"]),
+                rec(p, "j1", ref1(p), a1 + "," + ref1(p) + "T", "AC=1,1;AF=0.2,0.3",
+                    ["0|0", "1|2", "2/1", "0|0"])]
+        r = self.run_enricher(recs)
+        self.assertEqual(r.entries(p), [
+            "S1:1|0;%s,%s;s1;0.1" % (ref1(p), a2),
+            "S2:1|0,S3:0/1;%s,%s;j1;0.2" % (ref1(p), a1)])
+        q = 189
+        b1, b2, b3 = others(q)
+        recs = [rec(q, "m", ref1(q), b1 + "," + b2 + "," + b3, "AC=1,1,1;AF=0.1,0.2,0.3",
+                    ["1|2", "3|1", "2", "0|3"])]
+        self.assertEqual(self.run_enricher(recs).entries(q), [
+            "S1:1|0,S2:0|1;%s,%s;m;0.1" % (ref1(q), b1),
+            "S1:0|1,S3:1;%s,%s;m;0.2" % (ref1(q), b2),
+            "S2:1|0,S4:0|1;%s,%s;m;0.3" % (ref1(q), b3)])
 
     def test_af_read_per_record_by_key(self):
         """Each record's INFO/AF, wherever the field stands in its INFO: up to 2.9.1 the AF
@@ -494,8 +521,9 @@ class EnricherMultiallelicTests(object):
         recs = [rec(p, "j1", ref1(p), a1 + "," + a2, "AC=1,1;AF=0.1,0.2", ["0|1", "2|0", "0|0", "0|0"]),
                 rec(p, "s1", ref1(p), a3, "AC=1;AF=0.05", ["0|0", "0|0", "1|0", "0|0"])]
         r = self.run_enricher(recs)
+        # S2's 2|0 in split form under the joined record's second ALT (2.9.1: raw 2|0)
         self.assertEqual(r.entries(p), ["S1:0|1;%s,%s;j1;0.1" % (ref1(p), a1),
-                                        "S2:2|0;%s,%s;j1;0.2" % (ref1(p), a2),
+                                        "S2:1|0;%s,%s;j1;0.2" % (ref1(p), a2),
                                         "S3:1|0;%s,%s;s1;0.05" % (ref1(p), a3)])
         self.assertEqual(r.base(p), "Q")
 
@@ -614,7 +642,9 @@ class EnricherMultiallelicTests(object):
         self.assertEqual(r.base(s), ref1(s))
         self.assertEqual(r.dict, {
             CHROM + ",%d" % p: "S1:0|1,S2:1|1;%s,%s;b;0.1" % (ref1(p), a),
-            CHROM + ",%d" % q: "S1:1|2;%s,%s;m;0.1$S1:1|2,S2:0|2;%s,%s;m;0.2"
+            # a record listing several ALTs: each entry's genotypes in split form (2.9.1
+            # wrote the raw S1:1|2 under both)
+            CHROM + ",%d" % q: "S1:1|0;%s,%s;m;0.1$S1:0|1,S2:0|1;%s,%s;m;0.2"
                                % (ref1(q), b1, ref1(q), b2),
         })
         self.assertNotIn("NOTE:", r.stdout)
