@@ -111,6 +111,71 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   31), and a reference holding `q` refused.
 - `docs/MULTIALLELIC_ENRICHMENT.md`: the behaviour, its measurement, what CRISPRme must change
   to use it, the owner's decisions, and the published indexes and stores to rebuild.
+- **Region hooks for CRISPRme's haplotype scan: `crispritz.py search --skip-bed <bed>`,
+  `--keep-bed <bed>` and `--leaf-dump <file>`** (docs/INDEX_FORMAT.md section 13; `searchTST`
+  takes them as its 13th-15th arguments or as `CRISPRITZ_SKIP_BED`, `CRISPRITZ_KEEP_BED`,
+  `CRISPRITZ_LEAF_DUMP`). With a skip BED (contig, start, end) an indexed search skips every
+  site whose core -- its search PAM and the search-guide bases next to it, `Gs + L` bases --
+  meets an interval: it returns exactly the lines it returns without the BED whose core meets
+  none, read from the line as `[Position + d - r, + n)` (a PAM-right line) or
+  `[Position, + n)` (PAM-left), and with the BED as a keep BED exactly the others, so the two
+  partition it, each in its order. The core is the search's, not the stored window's: on the
+  K=8 index searched for NGG under `--prune-pam` it leaves out the 5 distal flank bases, and
+  for a guide longer than the index's it takes the pad bases the longer guide reads (the
+  prototype's window rule lost lines there, and wrote others twice). The dropped leaves are
+  flagged as their tree is loaded and the search enters no subtree without another leaf, so
+  skipping the dense windows costs a fraction of the search: on chr22's IGL locus with HGDP +
+  1000 Genomes, one guide at 4 mismatches and 2+2 bulges, the INDELS index's search,
+  204,453,499 lines in 1,440 s and 157 GB without the BED of its dense windows, gives with it
+  the 728 lines outside them in 3.3 s and 0.05 GB, and the variant index's, 33,858,344 lines
+  in 241 s and 26.6 GB, gives 2,110 in 16.7 s and 0.17 GB. `--leaf-dump` writes, for every
+  leaf a skip drops, the letters the index stores for its window on the + strand (`-` where it
+  stores a placeholder: a bulge-pad base past `pad_valid`, a flank base off the contig), which
+  a reader needs to rewrite a line of a skipped site from an index downloaded without its
+  genomes: on IGL they equal the enriched and fake-indel FASTAs at every letter. Every search
+  given a BED prints `SKIPPED LEAVES <n> KEPT LEAVES <n>` (and `LEAF DUMP <n>`), and
+  `crispritz.py search` stops when its `searchTST` prints none (one without the hooks, which
+  ignores the arguments); `crispritz.py version` lists
+  `search hooks: skip-bed keep-bed leaf-dump`, `crispritz.py` states `SEARCH_HOOKS`, and
+  `index-info` lists the index's `contigs`, the only ones a BED may name. A malformed BED, a
+  contig the index has no tree for, a skip BED with a keep BED, a dump without a skip BED, or
+  one of the flags on a brute-force search is refused before the search; `crispritz.py` passes
+  the three variables to no search. With no BED the search is byte-identical to the one
+  before: every `searchTST` call of the boundary, golden, four-allele, PAM-filter, flank-N,
+  format-1, index-format and minimal tests, run beside `4579026`'s and compared byte for byte
+  (373 calls and 21,739,834 target lines on amd64, 143 and 14,525,735 under ASan, the same on
+  arm64), and every IGL and IGH search without a BED of docs/INDEX_FORMAT.md section 13.6.
+  CRISPRme 2.10.1 uses the hooks (CRISPRme 2.10.0 does not); section 13.5 says what such a
+  reader must hold to, among it the fake-indel window's width a scan of the dense fake-indel
+  windows needs. With a search guide longer than the index's, `LEFT, RIGHT >= Gs + L - 1`,
+  or `- 2` towards a dense window whose interval leaves out the separator `N` between the
+  two (on a PAM-less index searched without `--prune-pam`, whose PAM can run across the
+  separator, `max(Gs, G + mb) + L` in place of `Gs + L`): 2.10.0's 30/30 windows hold it up
+  to 31 bases, for every site CRISPRme searches; 2.9.1's 25/27 fail from 27 bases, a 21-nt
+  SaCas9 or a 23-nt Cas12a guide on a 20-nt index, where the dense windows' intervals hold
+  the separator after them, as the haplotype-scan design writes them (from 28 where they
+  leave the separators out).
+- `test/run_region_hooks_test.sh` (`test/region_hooks/`): synthetic genomes whose BED puts a
+  base on, and just beside, each planted site's core (its pad, its guide region's and PAM's
+  edges, the distal flank of an 8-wide window) -- dedicated 3' and 5' indexes at 0 and 2+2
+  bulges, PAM-less K=8 and 5' K=4 indexes under `--prune-pam`, guides longer (21-, 23-nt) and
+  shorter (19-nt) than the index's, fake-indel genomes of 25/27 and 30/30 windows, their dense
+  windows' intervals with and without the separator after them -- and the format-1 fixtures
+  built by 2.9.1: 24 searches, 2,280,504 lines, the skip, the keep and the skip without pruning
+  checked against the search without a BED line by line, by the core computed from each line
+  (`test/region_hooks/check_hooks.py`), among them the lines on which the prototype's window
+  rule and the core disagree (149,662 it would drop on the K=8 index, 4,267 it would keep on
+  the 21-nt route); the leaf dump letter by letter against the FASTA, and complete; 4 threads
+  as 1; the rule of docs/INDEX_FORMAT.md section 13.5 for a scan of the dense fake-indel
+  windows alone (`test/region_hooks/hr27_bound.py`), on planted fake-indel genomes with the
+  dense windows' intervals in four forms (the separators out, the one after each, the one
+  before, both): site by site on the pad route (25/27 and 30/30 windows, 21- to 26-nt guides on
+  a 20-nt index, 48 skips), and where a PAM runs across a separator (a PAM-less K=8 index
+  searched without `--prune-pam`, windows of 28 to 30, 12 skips); 26 refusals; an empty BED,
+  and one with comments, CRLF, extra columns and overlaps; the environment; a `searchTST`
+  without the hooks (`crispritz.py` stops); the capability. With `SEARCHTST_REF` every search
+  without a BED is compared byte for byte with another engine's; `QUICK=1` (CI's ASan job)
+  searches one mismatch fewer.
 
 ### Changed
 - **New indexes are format 2, which CRISPRitz 2.9.1 and earlier cannot search** (2.9.1

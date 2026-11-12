@@ -514,6 +514,42 @@ bytes. Extrapolated to a full hg38 reference index (~6.2 × 10⁹ leaves): ≈13
 the same +2 bytes/leaf, so the percentage is unchanged. **A generous K = 8 flank is a
 ~10% size premium that eliminates the need to store one index per PAM — not an explosion.**
 
+**<a name="Search_regions">3.3.4</a> Skipping or keeping regions: `--skip-bed`, `--keep-bed`, `--leaf-dump` (2.10.0).**  
+An indexed search (with `-bDNA`/`-bRNA`, 0 allowed) can be given a BED of intervals
+(tab-separated contig, 0-based start, end; contigs of the index only, which
+`crispritz.py index-info` lists as `contigs`):
+
+```bash
+# every site whose core meets an interval is skipped; the rest is searched as usual
+crispritz.py search genome_library/NGG_2_hg38_ref/ pamNGG.txt guides.txt out_skip \
+    -index -mm 4 -bDNA 1 -bRNA 1 -th 4 -r --skip-bed dense.bed --leaf-dump out_skip.dump.tsv
+# the inverse: only the sites whose core meets an interval are searched
+crispritz.py search genome_library/NGG_2_hg38_ref/ pamNGG.txt guides.txt out_keep \
+    -index -mm 4 -bDNA 1 -bRNA 1 -th 4 -r --keep-bed dense.bed
+```
+
+A site's **core** is its bulge-free alignment's search PAM and the search-guide bases next
+to it (`Gs + L` bases: on the K=8 index searched for NGG, 23, without the 5 distal flank
+bases; for a 21-nt guide on a 20-nt index, 24, with the pad base next to the guide). Read
+from an output line, it is `[Position + d - r, + n)` for a PAM-right line (a 3′ PAM on
+`+`, a 5′ PAM on `-`) and `[Position, + n)` for a PAM-left one, `d` and `r` the gaps in
+its crRNA and DNA, `n` the crRNA's length less `d`. With `--skip-bed` the search returns
+exactly the lines it returns without the BED whose core meets no interval; with
+`--keep-bed`, exactly the others: the two partition it. The skipped subtrees of the index
+are never entered, so a skip of the variant-dense windows costs a fraction of the search
+it replaces (on chr22's IGL locus with HGDP + 1000 Genomes, one guide at 4 mismatches and
+2+2 bulges on the INDELS index: 3.3 s and 0.05 GB with the BED of its dense windows, 24
+minutes and 157 GB without). `--leaf-dump` (with `--skip-bed`) writes one line per skipped
+site: contig, window start, the letters the index stores for its window on the + strand
+(`-` where it stores a placeholder: a bulge-pad base from the first one off the contig or
+on an `N` on, a flank base off the contig) and `L` or `R`, the window's side. A search
+given a BED prints `SKIPPED LEAVES <n> KEPT LEAVES <n>`, `crispritz.py version` lists
+`search hooks: skip-bed keep-bed leaf-dump`, and a malformed BED, a contig the index has
+no tree for, a skip with a keep BED, or a dump without a skip BED is refused before the
+search starts. Without these flags the search is unchanged, byte for byte. CRISPRme's
+haplotype scan of dense regions uses them; the specification and its measurements are in
+[docs/INDEX_FORMAT.md](docs/INDEX_FORMAT.md) section 13.
+
 
 **<a name="Annotation">3.4</a> CRISPRitz Annotation Tool:**  
 This tool is created to perform genomic annotation on results obtained during the search phase.  

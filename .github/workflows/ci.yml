@@ -216,6 +216,30 @@ jobs:
       - name: Run boundary test (full matrix)
         run: bash test/run_boundary_test.sh
 
+  region-hooks:
+    name: region hooks (search --skip-bed / --keep-bed / --leaf-dump) == THE core, line by line
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+
+      # Synthetic genomes with a BED base on, and just beside, each planted site's core
+      # (its pad, the edges of its guide region and PAM, the distal flank of an 8-wide
+      # window); dedicated 3' and 5' indexes, PAM-less K=8 and 5' K=4 indexes under
+      # --prune-pam, search guides longer and shorter than the index's (the pad route),
+      # fake-indel genomes of 25/27 and 30/30 windows. For each search: the skip keeps
+      # exactly the lines whose core (read from the line) meets no interval, the keep
+      # exactly the others, in order; pruning off changes no line; the leaf dump holds
+      # every dropped leaf, letter for letter the FASTA's ('-' at a pad base past
+      # pad_valid and a flank base off the contig); the rule of INDEX_FORMAT 13.5 for a
+      # scan of the dense fake-indel windows alone; the refusals; the capability.
+      - name: Run region-hooks test
+        run: bash test/run_region_hooks_test.sh
+
   asan:
     name: AddressSanitizer (#105 regression guard, WTN + DNA bulge)
     runs-on: ubuntu-latest
@@ -247,13 +271,16 @@ jobs:
       # searchBruteForce) instrumented, over index format 2's boundary sites (pad
       # and flank off the contig, signed window starts), the format-1 reader, the
       # damaged files of the index-format test and the four-allele symbol Q (its
-      # slot-dependent tree nibbles; the enricher instrumented too).
-      - name: Run ASan boundary, format-1, index-format and four-allele tests
+      # slot-dependent tree nibbles; the enricher instrumented too), and the region
+      # hooks (the leaf marking, the subtree pruning, the leaf dump; QUICK=1: one
+      # mismatch fewer in its widest searches).
+      - name: Run ASan boundary, format-1, index-format, four-allele and region-hooks tests
         run: |
           QUICK=1 bash test/run_boundary_test.sh
           bash test/run_format1_test.sh
           bash test/run_index_format_test.sh
           bash test/run_four_allele_test.sh
+          QUICK=1 bash test/run_region_hooks_test.sh
         env:
           OMP_NUM_THREADS: "1"
           CXXFLAGS: "-fsanitize=address -g -O1"
