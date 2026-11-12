@@ -2185,6 +2185,18 @@ int main(int argc, char **argv)
 						 << (pam_at_start ? "5'" : "3'") << " end (the sign of the PAM file's length)." << endl;
 					return 1;
 				}
+				// The index holds each site's bases for at most its max_bulges bulges of
+				// either kind (crispritz.py search lowers -bDNA and -bRNA to it). Up to
+				// 2.10.0 a direct call asking for more crashed (a segfault, once the targets
+				// file was open) or read past the bases a site holds.
+				if (bulDNA > h.mb || bulRNA > h.mb)
+				{
+					cerr << "ERROR: '" << path << "' was built with max_bulges " << h.mb << " and holds no "
+						 << "alignment with more bulges of either kind, but the search asks for " << bulDNA
+						 << " DNA and " << bulRNA << " RNA bulges (search with at most " << h.mb
+						 << ", or build the index with -bMax " << max(bulDNA, bulRNA) << ")." << endl;
+					return 1;
+				}
 				if (h.mb != max_bulges && !mbNoted)
 				{
 					// stdout, not stderr: CRISPRme treats any stderr output as a failure
@@ -2220,6 +2232,19 @@ int main(int argc, char **argv)
 		if (nQuad)
 			cout << " (" << nQuad << " holding Q, the four-allele symbol)";
 		cout << endl;
+	}
+
+	// max_bulges (the 10th argument) sizes the search's per-bulge tables, and a format-1
+	// index is read with it: a search may ask for at most that many bulges of either kind
+	// (crispritz.py search passes the index's and lowers -bDNA and -bRNA to it). Up to
+	// 2.10.0 a direct call asking for more crashed once the targets file was open.
+	if (bulDNA > max_bulges || bulRNA > max_bulges)
+	{
+		cerr << "ERROR: the search asks for " << bulDNA << " DNA and " << bulRNA << " RNA bulges, more than "
+			 << "its max_bulges argument " << max_bulges << " (the 10th), which sizes the search and with which a "
+			 << "format-1 index is read; give at least " << max(bulDNA, bulRNA) << ", and no more than the "
+			 << "index was built with." << endl;
+		return 1;
 	}
 
 	// Region hooks: read the BED against the index's contigs (those its .bin files are

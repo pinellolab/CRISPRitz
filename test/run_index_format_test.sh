@@ -13,9 +13,11 @@
 #                   decodes coordinates with its own, with a note on stdout (stderr is
 #                   fatal to CRISPRme).
 #   4. REFUSALS   : a cut-short file, a PAM side other than the index's, an unknown future
-#                   format version, a header guide length other than the body's, and
-#                   -bMax above 31 at build time each fail with an error naming the
-#                   reason, not a crash or a silent wrong result.
+#                   format version, a header guide length other than the body's,
+#                   -bMax above 31 at build time, and a search called directly with more
+#                   bulges than the index's max_bulges (its header) or the max_bulges
+#                   argument (a segfault up to c18c575) each fail with an error naming
+#                   the reason, not a crash or a silent wrong result.
 #   5. GUIDE LENGTH : a search guide longer or shorter than the index's is searched, with
 #                   a note on stdout naming both lengths (docs/INDEX_FORMAT.md 5.1); the
 #                   boundary suite checks its rows.
@@ -128,6 +130,28 @@ search glen "${FIX}/pam_NGG.txt" 2 s_glen; refused "header guide length 21, body
 mkdir -p b32 && set +e && ( cd b32 && "${BT}" "${FIX}/genome/f1.fa" "${FIX}/pam_NGG.txt" 1 32 > /dev/null 2> ../b32.err ); RC=$?; set -e
 refused "buildTST -bMax 32" "max bulges must be 0 to 31" b32.err
 [ -z "$(ls b32)" ] || fail "buildTST -bMax 32 wrote files"
+# More bulges than the index or the max_bulges argument allows, called directly
+# (crispritz.py search lowers -bDNA and -bRNA to the index's max_bulges): 2.10.0 up to
+# c18c575 crashed with a segfault once the targets file was open (a, c, d), or read past
+# the bases a site holds and exited 0 (b). Each is now one line on stderr naming the
+# bulges asked for and the max_bulges they exceed, exit 1, and no output file.
+bulges() {  # <label> <index dir> <bDNA> <bRNA> <max_bulges argument> <out> <stderr fragment>
+  set +e
+  "${ST}" "$2/" "${FIX}/guide3.txt" 2 "$3" "$4" "${FIX}/pam_NGG.txt" "$6" r 1 "$5" > "$6.log" 2> "$6.err"
+  RC=$?
+  set -e
+  refused "$1" "$7" "$6.err"
+  [ "$(wc -l < "$6.err" | tr -d ' ')" = 1 ] || fail "$1: stderr is not one line: $(cat "$6.err")"
+  [ -z "$(ls "$6".* 2> /dev/null | grep -v -e "\.log$" -e "\.err$")" ] || fail "$1: wrote $(ls "$6".*)"
+}
+bulges "0+3 bulges on a -bMax 2 index, max_bulges 2" v2 0 3 2 s_b03 \
+  "was built with max_bulges 2 and holds no alignment with more bulges of either kind, but the search asks for 0 DNA and 3 RNA bulges"
+bulges "3+0 bulges on a -bMax 2 index, max_bulges 3" v2 3 0 3 s_b30 \
+  "was built with max_bulges 2 and holds no alignment with more bulges of either kind, but the search asks for 3 DNA and 0 RNA bulges"
+bulges "2+0 bulges on a -bMax 2 index, max_bulges 1" v2 2 0 1 s_b20 \
+  "the search asks for 2 DNA and 0 RNA bulges, more than its max_bulges argument 1 (the 10th)"
+bulges "0+3 bulges on a 2.9.1 -bMax 2 index, max_bulges 2" "${FIX}/idx_NGG_2" 0 3 2 s_b03f1 \
+  "the search asks for 0 DNA and 3 RNA bulges, more than its max_bulges argument 2 (the 10th)"
 
 echo "########## 5. GUIDE LENGTH other than the index's ##########"
 for g in 21 19; do
