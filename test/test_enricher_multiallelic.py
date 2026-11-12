@@ -24,6 +24,10 @@ tests pin the merged behaviour on small synthetic inputs, with exact expected ou
     the REF with the ALT in its place, and 30 reference bases (the log's CHR field and
     FAKEPOS say where);
   * a position with one record of one ALT behaves exactly as before;
+  * REF and ALTs in lower or mixed case are read upper-cased, as VCF 4.x reads them (a
+    symbolic ALT as written): a lower-case SNP ALT is coded, a record differing from
+    another only by case is one allele with it, an indel's window and log row are in
+    upper case, and every output is that of the VCF written in upper case;
   * the dictionary examples README.md, docs/MULTIALLELIC_ENRICHMENT.md and CHANGELOG.md
     give are what the port writes.
 
@@ -99,6 +103,20 @@ def vcf_header(samples=SAMPLES):
         '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">',
         "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" + "\t".join(samples),
     ]
+
+
+def recased(line, case):
+    """VCF data line ``line`` with its REF and every ALT passed through ``case`` (a
+    str -> str function), a symbolic ALT (holding '<') as written."""
+    f = line.split("\t")
+    f[3] = case(f[3])
+    f[4] = ",".join(a if "<" in a else case(a) for a in f[4].split(","))
+    return "\t".join(f)
+
+
+def alternate(s):
+    """s with every other letter in lower case, from the first: 'ACGT' -> 'aCgT'."""
+    return "".join(c.lower() if i % 2 == 0 else c for i, c in enumerate(s))
 
 
 # The documents whose dictionary examples test_the_documented_dictionary_examples runs.
@@ -207,6 +225,20 @@ class EnricherMultiallelicTests(object):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(r.stderr, "", "a run must write nothing to stderr")
         return r
+
+    # the four outputs of a run in mode yes (mode no writes the enriched genome alone)
+    OUTPUTS = ("SNPs_genome/res_enriched/%s.enriched.fa" % CHROM,
+               "SNPs_genome/my_dict_%s.json" % CHROM,
+               "SNPs_genome/log%s.txt" % CHROM,
+               "fake_variants.vcf_%s/fake%s.fa" % (CHROM, CHROM))
+
+    def assert_same_outputs(self, got, want, what):
+        """Every output ``want`` wrote, byte for byte in ``got``, and stdout but its
+        DONE line (which holds the run's seconds)."""
+        for rel in self.OUTPUTS[:1 if want.mode == "no" else 4]:
+            self.assertEqual(got.raw(rel), want.raw(rel), "%s: %s" % (what, rel))
+        done = re.compile(r"^DONE IN .*$", re.M)
+        self.assertEqual(done.sub("", got.stdout), done.sub("", want.stdout), what)
 
     # ---- the enriched genome -------------------------------------------------
 
@@ -661,6 +693,150 @@ class EnricherMultiallelicTests(object):
         # the right flank of the last contig is cut by the chromosome's end: 8 bases
         last = flat.split("N")[-2]
         self.assertEqual(len(last), 30 + 1 + 8)
+
+    # ---- REF and ALT in lower or mixed case ----------------------------------------
+    # VCF 4.x reads the bases of REF and ALT whatever their case, and so does the enricher
+    # since 2.10.0: it upper-cases REF and every ALT as it reads a record (a symbolic ALT,
+    # which holds '<', as written; '*' and '.' hold no letter). Up to 2.9.1 a lower-case
+    # SNP ALT was not coded, a record differing from another only by case was another
+    # allele, and an indel's window and log row held the VCF's case.
+
+    def test_an_snv_alt_in_lower_case_is_coded(self):
+        """A SNP ALT in lower case (C>g) is coded as its upper case, in both modes, and
+        its dict entry names the record in upper case, as one whose REF is in lower case
+        (c>G); three ALTs in lower case over an A, C, G or T base are Q. Up to 2.9.1 the
+        genome kept the reference base where the ALT was in lower case, so the search
+        never read the allele, while the dict listed its carriers (CRISPRme's world WLOW:
+        a perfect target on a carrier's haplotype, never found)."""
+        p, q, s = 40, 45, 55
+        a, b = others(p)[0], others(q)[1]
+        recs = [rec(p, "l1", ref1(p), a.lower(), "AC=3;AF=0.375", ["0|1", "1|1", "0|0", "0|0"]),
+                rec(q, "l2", ref1(q).lower(), b, "AC=1;AF=0.125", ["0|0", "1|0", "0|0", "0|0"])]
+        recs += [rec(s, "l3" + x, ref1(s).lower(), x.lower(), "AC=1;AF=0.1",
+                     ["0|1", "0|0", "0|0", "0|0"]) for x in others(s)]
+        r = self.run_enricher(recs)
+        self.assertEqual(r.base(p), code_of({ref1(p), a}))
+        self.assertEqual(r.base(q), code_of({ref1(q), b}))
+        self.assertEqual(r.base(s), "Q")
+        self.assertEqual(r.entries(p), ["S1:0|1,S2:1|1;%s,%s;l1;0.375" % (ref1(p), a)])
+        self.assertEqual(r.entries(q), ["S2:1|0;%s,%s;l2;0.125" % (ref1(q), b)])
+        self.assertEqual([e.split(";")[1] for e in r.entries(s)],
+                         ["%s,%s" % (ref1(s), x) for x in others(s)])
+        self.assertEqual(r.stdout.count("NOTE: 1 position(s) of %s are coded Q" % CHROM), 1)
+        self.assertEqual(self.run_enricher(recs, mode="no").genome, r.genome)
+        self.assert_same_outputs(r, self.run_enricher([recased(x, str.upper) for x in recs]),
+                                 "the records in upper case")
+
+    def test_indels_in_lower_or_mixed_case(self):
+        """An indel or MNV whose REF or ALT is in lower or mixed case (bcftools norm -f
+        writes the case of a soft-masked reference into an indel it realigns) is the
+        record in upper case: its window holds the ALT upper-cased, its log row names it
+        so, and the log and the fake-indel FASTA are byte for byte those of the records in
+        upper case. Up to 2.9.1 the window held the ALT as written (buildTST reads a
+        FASTA upper-cased, so its index was the same) and the log the VCF's text."""
+        g = ["0|1", "1|0", "0|0", "0|0"]
+        mnv = others(250)[0] + others(251)[0]
+        recs = [  # (POS, REF, ALT) as the records write them
+            (100, alternate(REF[99:103]), REF[99].lower()),        # a deletion, mixed REF
+            (150, ref1(150).lower(), (ref1(150) + "ACG").lower()),  # an insertion in lower case
+            (200, ref1(200), ref1(200) + "gTa"),                    # an insertion, mixed ALT
+            (250, REF[249:251].lower(), alternate(mnv)),            # an MNV
+            (300, REF[299:310].lower(), REF[299].lower()),          # a deletion of 10 bases
+        ]
+        lines = [rec(p, "i%d" % p, ref, alt, "AC=2;AF=0.2", g) for p, ref, alt in recs]
+        r = self.run_enricher(lines)
+        log = r.raw("SNPs_genome/log%s.txt" % CHROM).decode().splitlines()
+        self.assertEqual([x.split("\t")[4] for x in log[1:]],
+                         ["%s_%d_%s_%s" % (CHROM, p, ref.upper(), alt.upper()) for p, ref, alt in recs])
+        fake = r.raw("fake_variants.vcf_%s/fake%s.fa" % (CHROM, CHROM)).decode()
+        self.assertEqual(fake, ">fake%s\n" % CHROM + "".join(
+            REF[p - 31:p - 1] + alt.upper() + REF[p - 1 + len(ref):p - 1 + len(ref) + 30] + "\nN\n"
+            for p, ref, alt in recs))
+        self.assert_same_outputs(r, self.run_enricher([recased(x, str.upper) for x in lines]),
+                                 "the records in upper case")
+
+    def test_lower_case_in_a_record_listing_several_alts(self):
+        """c>a,G,ctt: each ALT is read in upper case, so A and G are coded, both dict
+        entries name the record in upper case (genotypes in split form), and the
+        insertion's window and log row hold CTT. Up to 2.9.1 the lower-case a was not
+        coded and the entries kept the VCF's case."""
+        p = 190
+        a1, a2 = others(p)[:2]
+        line = rec(p, "j", ref1(p).lower(), ",".join([a1.lower(), a2, (ref1(p) + "TT").lower()]),
+                   "AC=1,2,1;AF=0.1,0.2,0.3", ["1|2", "0|3", "2|0", "0|0"])
+        r = self.run_enricher([line])
+        self.assertEqual(r.base(p), code_of({ref1(p), a1, a2}))
+        self.assertEqual(r.entries(p), ["S1:1|0;%s,%s;j;0.1" % (ref1(p), a1),
+                                        "S1:0|1,S3:1|0;%s,%s;j;0.2" % (ref1(p), a2)])
+        log = r.raw("SNPs_genome/log%s.txt" % CHROM).decode().splitlines()
+        self.assertEqual([x.split("\t")[1:5] for x in log[1:]],
+                         [["S2", "j", "0.3", "%s_%d_%s_%sTT" % (CHROM, p, ref1(p), ref1(p))]])
+        self.assert_same_outputs(r, self.run_enricher([recased(line, str.upper)]),
+                                 "the record in upper case")
+
+    def test_a_record_differing_only_by_case_is_the_same_allele(self):
+        """The same REF>ALT on two records is one allele (CRISPRme decision B2), whatever
+        their case: C>G, c>g and C>g at one position are one dict entry with the carriers
+        of all three, genotypes merged and the rsID and AF of the most frequent, exactly
+        as three records written alike; two indel records differing by case get a window
+        and a log row each, in upper case, exactly as two written alike. Up to 2.9.1 each
+        spelling was an allele of its own (an entry each, the lower-case ALTs not coded)."""
+        p, q = 180, 260
+        a = others(p)[0]
+        lines = [rec(p, "d1", ref1(p), a, "AC=1;AF=0.1", ["0|1", "0|0", "0/1", "1"]),
+                 rec(p, "d2", ref1(p).lower(), a.lower(), "AC=1;AF=0.3", ["1|0", "0|0", "1|.", "1/1"]),
+                 rec(p, "d3", ref1(p), a.lower(), "AC=1;AF=0.2", ["0|0", "0|1", "0|0", "0"]),
+                 rec(q, "e1", REF[q - 1:q + 1], ref1(q), "AC=1;AF=0.1", ["0|1", "0|0", "0|0", "0|0"]),
+                 rec(q, "e2", REF[q - 1:q + 1].lower(), ref1(q).lower(), "AC=1;AF=0.2",
+                     ["0|0", "1|0", "0|0", "0|0"])]
+        r = self.run_enricher(lines)
+        self.assertEqual(r.entries(p), ["S1:1|1,S2:0|1,S3:0/1,S4:1/1;%s,%s;d2;0.3" % (ref1(p), a)])
+        self.assertEqual(r.base(p), code_of({ref1(p), a}))
+        log = r.raw("SNPs_genome/log%s.txt" % CHROM).decode().splitlines()
+        self.assertEqual([x.split("\t")[1:5] for x in log[1:]],
+                         [[s, e, af, "%s_%d_%s_%s" % (CHROM, q, REF[q - 1:q + 1], ref1(q))]
+                          for s, e, af in (("S1", "e1", "0.1"), ("S2", "e2", "0.2"))])
+        self.assert_same_outputs(r, self.run_enricher([recased(x, str.upper) for x in lines]),
+                                 "the records written alike")
+
+    def test_every_output_is_that_of_the_records_in_upper_case(self):
+        """A VCF of SNPs (split, joined, with '*', 'N' or '.' among the ALTs, at a
+        four-base site, at a reference N, outside FILTER PASS), indels and MNVs (joined
+        with SNPs too) and symbolic ALTs, each REF and ALT in a random mix of cases (a
+        symbolic ALT as written): the enriched genome, the dict, the indel log, the
+        fake-indel FASTA and stdout are byte for byte those of the same VCF in upper case,
+        in both modes."""
+        fasta = REF[:69] + "N" + REF[70:]
+        g1, g2 = ["0|1", "0|0", "0|0", "0|0"], ["1|2", "0|1", "2/2", "0|0"]
+        o = others
+        base = [
+            rec(40, "s1", ref1(40), o(40)[0], "AC=1;AF=0.1", g1),
+            rec(40, "s2", ref1(40), o(40)[1], "AC=1;AF=0.2", ["0|0", "1|0", "0|0", "0|0"]),
+            rec(50, "j1", ref1(50), o(50)[0] + "," + o(50)[1], "AC=1,1;AF=0.1,0.2", g2),
+            rec(60, "j2", ref1(60), o(60)[2] + ",*", "AC=1,1;AF=0.1,0.2", g2),
+            rec(65, "j3", ref1(65), "N," + o(65)[0], "AC=1,1;AF=0.1,0.2", g2),
+            rec(66, "j4", ref1(66), ".", "AC=0;AF=0", g1),
+            rec(70, "n1", "N", "A,C", "AC=1,1;AF=0.1,0.2", g2),
+            rec(80, "q1", ref1(80), ",".join(o(80)), "AC=1,1,1;AF=0.1,0.2,0.3", ["1|2", "3|0", "0|0", "0|0"]),
+            rec(90, "f1", ref1(90), o(90)[0], "AC=1;AF=0.1", g1, filt="LowQual"),
+            rec(100, "y1", ref1(100), o(100)[0] + ",<DEL>", "AC=1,1;AF=0.1,0.2", g2),
+            rec(105, "y2", ref1(105), "<del>," + o(105)[1], "AC=1,1;AF=0.1,0.2", g2),
+            rec(120, "i1", ref1(120), ref1(120) + "GAT", "AC=1;AF=0.1", g1),
+            rec(130, "d1", REF[129:136], ref1(130), "AC=1;AF=0.1", ["0|0", "1|1", "0|0", "0|0"]),
+            rec(140, "m1", REF[139:142], o(140)[0] + o(141)[0] + o(142)[0], "AC=1;AF=0.1", g1),
+            rec(150, "x1", ref1(150), o(150)[0] + "," + ref1(150) + "CC", "AC=1,1;AF=0.1,0.2", g2),
+            rec(160, "x2", REF[159:162], REF[159] + "," + REF[159:162] + "A", "AC=1,1;AF=0.1,0.2", g2),
+            rec(170, "t1", ref1(170), o(170)[0], "AC=1;AF=0.1", g1),
+            rec(170, "t2", ref1(170), ref1(170) + "TTT", "AC=1;AF=0.1", ["0|0", "1|0", "0|0", "0|0"]),
+        ]
+        rnd = random.Random(7)
+        cased = [recased(x, lambda s: "".join(c.lower() if rnd.random() < 0.5 else c for c in s))
+                 for x in base]
+        self.assertGreater(sum(x != y for x, y in zip(cased, base)), 12)
+        for mode in ("yes", "no"):
+            self.assert_same_outputs(self.run_enricher(cased, mode=mode, fasta=fasta),
+                                     self.run_enricher(base, mode=mode, fasta=fasta),
+                                     "mode %s, the VCF in upper case" % mode)
 
     # ---- the dictionary the documents describe -----------------------------------
 

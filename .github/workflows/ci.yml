@@ -49,20 +49,23 @@ jobs:
       # enricher.cpp is meant to be a faithful port of enricher.py, and the
       # packaged install silently falls back to the Python one when the binary is
       # absent, so the two must not drift. verify_enricher.sh synthesizes a VCF of
-      # 33 cases -- biallelic and multiallelic SNPs, a non-PASS record, insertions,
+      # 34 cases -- biallelic and multiallelic SNPs, a non-PASS record, insertions,
       # deletions, a site carrying TWO indel alleles (the case where a per-allele
       # window built on the previous allele's output compounds them), the SNP+indel
       # combinations, the chromosome edges, multiallelic SNPs whose ALTs include
       # '*', and multi-allelic sites split into one record per ALT (every record
       # order, all four bases coded Q, genotype shapes, SNP + indel at one position,
       # two ALTs on one haplotype slot), INFO/AF read by its key, the same REF>ALT on
-      # two records, ALTs on a reference N, X or '-'
+      # two records, ALTs on a reference N, X or '-', REF and ALTs in lower or mixed
+      # case (read upper-cased: VCF 4.x)
       # -- then diffs all four outputs byte-for-byte, plus the file set and the run log,
       # and checks them against what they must be: the enriched genome against an
       # independent reconstruction (the N-count invariant among it), the dict at cases
-      # 24 and 31-33 (merged carriers, AF by key, the records at a reference N, X or '-',
-      # a record listing three SNP ALTs), the indel log's AF at case 31, and a reference holding
-      # Q refused alike.
+      # 24 and 31-34 (merged carriers, AF by key, the records at a reference N, X or '-',
+      # a record listing three SNP ALTs, records in lower case; no REF or ALT in lower
+      # case), the indel log's AF at case 31 and its rows against the VCF's indel
+      # alleles upper-cased, the windows (no base in lower case), and a reference
+      # holding Q refused alike.
       - name: Build the C++ enricher
         run: g++ -std=c++11 -O2 sourceCode/Python_Scripts/Enrichment/enricher.cpp -o /tmp/enricher_opt -lz
 
