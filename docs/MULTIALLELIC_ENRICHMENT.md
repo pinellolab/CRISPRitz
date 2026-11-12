@@ -394,7 +394,7 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
 
 ## 5. Tests
 
-* `test/test_enricher_multiallelic.py` — 24 unit tests, each run against **both** ports (48
+* `test/test_enricher_multiallelic.py` — 26 unit tests, each run against **both** ports (52
   in all), with exact expected outputs: two and three ALTs in every order, split == joined,
   four bases coded `Q` (every order, whatever the AF fields, a record listing three ALTs, an
   ALT on two records), a reference holding `Q` or `q` refused, reference `N` and IUPAC bases
@@ -406,9 +406,14 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
   record, the same allele on two split records and on a split record and a record listing
   several (merged carriers), each record's AF by its key, a split record beside a multi-ALT
   record, `*`, non-adjacent records, the indel outputs, a position with one record, and a
-  SNP outside the chromosome. Against the branch's last commit (`f266eac`, the four-base
-  rule) 26 of the 48 fail, against 2.9.1 44 (the 4 that pass, mode `no` == mode `yes` and a
-  position with one record, pin what does not change).
+  SNP outside the chromosome; the fake-indel window of 30 / 30 (both ports' windows and
+  `crispritz.py`'s `INDEL_LEFT` / `INDEL_RIGHT`); and the entries of a record listing several
+  ALTs in split form, beside a split record and with phased, unphased and haploid calls.
+  Of the 24 tests the branch had, 26 of the 48 runs failed against its last commit
+  (`f266eac`, the four-base rule) and 44 against 2.9.1 (the 4 that pass, mode `no` == mode
+  `yes` and a position with one record, pin what does not change); the split-form test and
+  the three whose expectations it moved to split form fail against c18c575's ports (8 of
+  the 52).
 * `verify_enricher.sh` — grows from 17 to 33 cases (cases 18-30: split sites in every
   order, the same sites as one record, four bases, non-adjacent records, genotype shapes,
   SNP + indel at one position and in an indel's window, a split record beside a multi-ALT
@@ -419,7 +424,8 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
   log, and checked against what they must be: the enriched genome against an independent
   reconstruction from the FASTA and the VCF (with the N-count invariant), the dictionary at
   cases 24 and 31-33 (merged carriers, AF by key, the records at a reference `N`, `X` or
-  `-`, a record listing three SNP ALTs), the indel log's AF at case 31, every fake-indel
+  `-`, a record listing three SNP ALTs; every entry of a record listing several ALTs in
+  split form), the indel log's AF at case 31, every fake-indel
   window against the reference (30 bases on each side of its record, its log row's `CHR`
   field, `FAKEPOS` and `refseq`, the skips at the chromosome's start; cases 9 and 14 at the
   window's edges), and a reference holding `q` refused by both ports with one message. Earlier, on the branch, also checked
@@ -482,7 +488,13 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
 * An entry from a record listing several ALTs is written in split form (2.10.0; up to the
   integration it kept that record's raw genotypes, `1|2`, which `alt_index="1"` counted as 0
   copies of the second ALT, and which CRISPRme's readers had to tie to an allele number from
-  the position's other entries).
+  the position's other entries). CRISPRme 2.10.0's readers read it unchanged, as a split
+  record's: through its real CLI on the review's synthetic worlds an independent haplotype
+  oracle finds every carrier's target, phase and variants right, two such records at one
+  position included, where the raw genotypes listed carriers for targets their haplotypes do
+  not hold and lost one CFD-1.0 target; its real-data check verifies such positions where
+  the run's own dictionary is in split form (and refuses two such records at a position
+  only where a dictionary keeps raw numbers).
 * The mega registry is compiled from INFO/AF straight from the VCF
   (`compile_registry_from_info_af`), so it already lists every ALT — 20,517 chr22 positions
   with two or more SNP ALTs in the published `registry_hg38_mega` — while the mega enriched
@@ -502,11 +514,11 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
 * Legacy dictionary path, `iupac_decomposition` (lines 898-): each ALT is its own seed
   (`totalDict[...][(pos_c, elem)]`), and the lattice only combines strictly increasing
   columns (`if newkey[-2] > key[-2]`, line 1198), so two ALTs of one position never share a
-  haplotype. The per-haplotype test `allele != "0"` (lines 947-952) is right for split-record
-  entries (a slot holding the other ALT reads `0`). No change for split records (but see `Q`,
-  below); note it is **wrong for entries of a record listing several ALTs** (`1|2` puts the
-  sample on both slots of both ALTs) — pre-existing, not reachable on the published panels;
-  the observed path below resolves it per record and could be reused here. This path (and
+  haplotype. The per-haplotype test `allele != "0"` (lines 947-952) is right for every
+  entry (a slot holding the other ALT reads `0`): a split record's, a merged one's, and
+  since 2.10.0 a record listing several ALTs' too, whose entries are written in split form
+  (section 2.3; up to the integration their raw `1|2` put the sample on both slots of both
+  ALTs, a case no published panel reaches). No change (but see `Q`, below). This path (and
   its population-level greedy, `by_pos`, from line 1027) substitutes **every** ALT the
   dictionary lists, without checking the target's IUPAC column (with the four-base rule it
   also tried the ALT the code left out; with `Q` the column holds every ALT). Filtering by

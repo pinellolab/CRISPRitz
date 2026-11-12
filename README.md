@@ -279,7 +279,9 @@ Detailed input:
 `pam/pamNGG.txt/` is a text file containing the PAM sequence.  
 `-bMax 2` is the max number of bulges to allow for following searches when creating the
 database (e.g if -bMax 2, all the following searches with the created index can be performed
-with max 2 RNA bulges and 2 DNA bulges; at most 31)  
+with max 2 RNA bulges and 2 DNA bulges; at most 31; `crispritz.py search` lowers a larger
+`-bDNA` or `-bRNA` to it with a `WARNING`, and since 2.10.0 `searchTST` called directly with
+more refuses the search, naming both numbers, where it used to crash)  
 `-th 4` is the number of threads to use (Optional)
 
 **<a name="Index-Format">3.2.1</a> Index format 2 (CRISPRitz 2.10.0 and later).**  
@@ -538,9 +540,11 @@ exactly the lines it returns without the BED whose core meets no interval; with
 `--keep-bed`, exactly the others: the two partition it. The skipped subtrees of the index
 are never entered, so a skip of the variant-dense windows costs a fraction of the search
 it replaces (on chr22's IGL locus with HGDP + 1000 Genomes, one guide at 4 mismatches and
-2+2 bulges on the INDELS index: 3.3 s and 0.05 GB with the BED of its dense windows, 24
-minutes and 157 GB without). `--leaf-dump` (with `--skip-bed`) writes one line per skipped
-site: contig, window start, the letters the index stores for its window on the + strand
+2+2 bulges on the INDELS index of 2.10.0's 30/30 fake-indel windows: 3.4 s and 0.06 GB with
+the BED of its dense windows; without it, over 51 GB of lines and 166 GB of memory, where
+2.9.1's 25/27 windows took 24 minutes and 157 GB). `--leaf-dump` (with `--skip-bed`) writes
+one line per skipped site: contig, window start, the letters the index stores for its window
+on the + strand
 (`-` where it stores a placeholder: a bulge-pad base from the first one off the contig or
 on an `N` on, a flank base off the contig) and `L` or `R`, the window's side. A search
 given a BED prints `SKIPPED LEAVES <n> KEPT LEAVES <n>`, `crispritz.py version` lists

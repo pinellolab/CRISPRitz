@@ -323,7 +323,20 @@ count: as it loads the file):
 * and, depending on the search: a search PAM that does not fit the stored PAM width
   (the file name's PAM prefix; for format 2 also `pam_len`): it must be as wide, or
   under `--prune-pam` a narrower 3' PAM, N-padded to it (section 12); or, in format 2, a
-  PAM side (3'/5') other than the search PAM's.
+  PAM side (3'/5') other than the search PAM's;
+* more DNA or RNA bulges than the search can read (2.10.0): in format 2, more than the
+  header's `max_bulges` (the index holds each site's bases for that many bulges of either
+  kind, and no more), and in either format more than `searchTST`'s own `max_bulges`
+  argument (its 10th), which sizes its per-bulge tables and is the `max_bulges` a
+  format-1 file is read with. One line on stderr names the bulges asked for and the
+  `max_bulges` they exceed (the index-format test's, `ERROR: 'v2//NGG_f2_1.bin' was built
+  with max_bulges 2 and holds no alignment with more bulges of either kind, but the search
+  asks for 0 DNA and 3 RNA bulges (search with at most 2, or build the index with -bMax
+  3).`), and no output file is opened. `crispritz.py search` never makes such a call
+  (it lowers `-bDNA` and `-bRNA` to the `max_bulges` of the index directory's name,
+  with a `WARNING`); called directly, `searchTST` up to c18c575 crashed with a segfault
+  once the targets file was open (every call with more RNA bulges than the argument,
+  among others), or exited 0 without the alignments the index cannot hold.
 
 `crispritz.py index-info` makes every one of these checks that does not depend on the
 search (section 7). Loading a file, the search also refuses a node count below 1, and
@@ -332,9 +345,10 @@ or past the leaves, which `index-info` does not read.
 
 If `max_bulges` on the command line differs from a format-2 header's, the header
 wins for decoding coordinates and a note goes to stdout (stderr is fatal in
-CRISPRme). Before searching, `searchTST` prints the formats it found on stdout, e.g.
-`INDEX FORMAT: 2 x24`, `INDEX FORMAT: 1 (CRISPRitz <= 2.9.1) x501`, or, with files
-flagged `FOUR_ALLELE`, `INDEX FORMAT: 2 x24 (3 holding Q, the four-allele symbol)`.
+CRISPRme); the bulges searched must be within both (above). Before searching,
+`searchTST` prints the formats it found on stdout, e.g. `INDEX FORMAT: 2 x24`,
+`INDEX FORMAT: 1 (CRISPRitz <= 2.9.1) x501`, or, with files flagged `FOUR_ALLELE`,
+`INDEX FORMAT: 2 x24 (3 holding Q, the four-allele symbol)`.
 
 The guide length the index was built for, `G` (the header's `guide_len`; format 1:
 the body's `len_guide`), is read for each `.bin` and kept per search thread with its
@@ -867,8 +881,12 @@ compared for both versions; the other sizes agree to the byte).
 3. **Index format** (`test/run_index_format_test.sh`): header and trailer, `index-info`,
    `INDEX_FORMAT` against `CZI_FORMAT_VERSION` and the files `buildTST` writes, a
    directory mixing both formats, `max_bulges` from the header, the refusals (a
-   header guide length other than the body's among them), the stdout note for a
-   21- and a 19-nt search guide on a 20-nt index (none for a 20-nt one), and
+   header guide length other than the body's among them, and four direct `searchTST`
+   calls asking for more bulges than the header's or the argument's `max_bulges`, one
+   of them on the 2.9.1-built fixture: each one line on stderr, exit 1, no output file,
+   where c18c575's `searchTST` segfaulted on three and exited 0 on the other), the
+   stdout note for a 21- and a 19-nt search guide on a 20-nt index (none for a 20-nt
+   one), and
    `index-info` against `searchTST` on 20 files damaged in one way each (every check
    of section 5 that does not depend on the search, a reserved flag bit (bit 3),
    `max_bulges` 32 and -1, a header PAM other than the file name's, a leaf count of 0
@@ -1006,7 +1024,9 @@ per-sample search, the IUPAC search of the windows whose variants spell too many
 sequences by a search of the haplotypes that occur there. It needs three things of the
 search: to **skip** the sites of those windows, whose IUPAC lines explode (on the INDELS
 index of chr22's IGL locus with HGDP + 1000 Genomes, one guide at 4 mismatches and 2 + 2
-bulges gives 204,453,499 lines, 157 GB of RAM and 23 minutes); to enumerate **only** them
+bulges gives 204,453,499 lines, 157 GB of RAM and 23 minutes on 2.9.1's 25/27 fake-indel
+windows, and on 2.10.0's 30/30 had written 51.4 GB of lines with 166 GB of RAM when it was
+stopped, section 13.6); to enumerate **only** them
 (**keep**), for the release gates that check the scan; and the letters the index stores
 for the sites it skips (the **leaf dump**), since a downloaded index ships no genome.
 CRISPRitz 2.10.0 has all three, so that CRISPRme 2.10.1 can use them without a new
@@ -1198,10 +1218,14 @@ have neither, and their `crispritz.py search` ignores the three flags.
   index's, and a PAM it tests) loses none. Whatever the BED holds of the separators,
   `LEFT, RIGHT >= m - 1` suffice (an interval that reaches past a separator into the next
   window is outside this rule). The consumer reads LEFT and RIGHT from each window's own
-  record (the indel log's `CHR` field gives its start and end) or from the width recorded
-  with the INDELS index, never from a constant, and where the rule fails it refuses, or
-  scans the dense windows with their neighbours. 2.10.0's 30/30 windows hold it for every
-  `m <= 31` (`m <= 32` with `c = 2`), so for every search of CRISPRme's PAMs: `n <= 27` (a
+  record, never from a constant: LEFT is `POS - 1 - start`, the start of the indel log's
+  `CHR` field, and RIGHT the window's length (its `FAKEPOS` end less its start) less LEFT
+  and the ALT's length -- not from the `CHR` field's end, which is not cut where the
+  chromosome's end cuts a window short (section 8, item 9), nor from the width recorded
+  with the INDELS index, which such a window does not have -- and where the rule fails it
+  refuses, or scans the dense windows with their neighbours. 2.10.0's 30/30 windows hold
+  it for every `m <= 31` (`m <= 32` with `c = 2`; not at a window the chromosome's end
+  cuts short, whose RIGHT is smaller), so for every search of CRISPRme's PAMs: `n <= 27` (a
   21-nt guide with `NNGRRT` or `NNNRRT`, a 23-nt one with `TTTV` or `TTTN`), and
   `m = 23 + mb`, at most 31 up to `-bMax 8`, for its 20-nt `NNN` searched on a PAM-less
   index without `--prune-pam`. 2.9.1's 25/27 fail from `n = 27` with the design's BED
@@ -1288,7 +1312,11 @@ have neither, and their `crispritz.py search` ignores the three flags.
    lines, and under ASan (both engines instrumented) 143 calls with 14,525,735 lines, all
    identical; on arm64 the same lines in 372 and 142 calls, all identical (the
    index-format test skips its unreadable-file case when run as root, as in Docker).
-   Every such test passed through the stand-in as well.
+   Every such test passed through the stand-in as well. Merged into 2.10.0 (lane W's 30/30
+   window, the split-form dictionary and the bulge refusal of section 5), the same tests of
+   c18c575's tree ran through the stand-in with the merged `searchTST` and c18c575's: the
+   same 373 calls and 21,739,834 lines, and 143 and 14,525,735 under ASan, all identical
+   (amd64).
 3. **The suites**: every test of `test/` -- the enricher's (`verify_enricher.sh`, the unit
    tests, `add-variants`' exit status), four-allele, minimal, PAM filter, flank N, short
    contig, golden, format 1, index format, boundary and region hooks, and the ASan runs of
@@ -1296,7 +1324,12 @@ have neither, and their `crispritz.py search` ignores the three flags.
    image, g++ 14.2: 35 runs with the identity runs of item 2) and on arm64 (Docker on
    Apple Silicon, the same image: the same 35 runs). The region-hooks test takes 118 s
    plain and 374 s under ASan on amd64 (61 s and 724 s on arm64), and 169 s with
-   `QUICK=1` under ASan.
+   `QUICK=1` under ASan. Merged into 2.10.0, every test of `test/` passes on amd64 (ml008,
+   the same image and compiler: 77 runs, the identity runs of item 2 and CI's ASan job
+   among them, and a sanitizer census of the merged tree and of c18c575's alike, each test
+   compiled with UBSan and with ASan's leak detection on: the merged tree's findings are
+   c18c575's, the left shift of a negative `char` in `loadTST`'s flank reader and the leak
+   of `main`'s `temp_char_guide`, and none of its own); arm64 is PR #47's CI's.
 4. **Real data: test 5b** (the haplotype-scan design's review finding H-R2-9). chr22's IGL
    locus (21.99-22.96 Mb) and chr14's IGH locus (105.54-106.91 Mb) with HGDP + 1000
    Genomes, the inputs of the design's prototypes (each chromosome masked outside its
@@ -1343,6 +1376,32 @@ have neither, and their `crispritz.py search` ignores the three flags.
    4+2+2 runs are of the build before the last change (which only counts and dumps a 2.9.1
    index otherwise); the final build's skip and pruning-off outputs, dumps and counts are
    byte for byte that build's on the eight IGL cases both ran.
+
+   **On 2.10.0 as merged (30/30 fake-indel windows).** IGL built again by CRISPRme
+   2.10.0's `build-index-only` (NRG at 1 + 1 and 2 + 2, `--samplesID`) with the merged
+   CRISPRitz, from the same inputs: the masked chromosome, the locus's 74,916 records, the
+   enriched genome and the dense BED of the variant genome byte for byte the design's;
+   the fake-indel genome of 30/30 windows, its dense windows' intervals 1,431. Each case
+   ran as above (ml007 and ml008, amd64), the search without a BED with the merged
+   `searchTST` and with c18c575's (byte-identical in every case), and passed the same
+   streaming check; on every INDELS case run in full no dropped line lies wholly in a
+   window that is not dense and covers its ALT (section 13.5 at 30/30, `n` = 23 and 24,
+   counted with each window's left flank and ALT read from its indel log row). The variant
+   index's cases (4+1+1, 4+2+1, 4+2+2, the K=8 index, the 21-nt route and both adversarial
+   sets) gave the table's lines, counts and dumps exactly, their genome unchanged. The
+   INDELS index's:
+
+   | IGL INDELS (30/30) | lines without a BED | without: s, GB | skip: lines, s, GB | keep: lines | leaves dropped / kept | dump: letters (`-`) | no pruning: s |
+   |---|---|---|---|---|---|---|---|
+   | -bMax 2, 4+1+1 | 5,888,115 | 39, 3.86 | 96, 1.4, 0.06 | 5,888,019 | 59,703 / 57,134 | 1,488,098 (4,477) | 4.5 |
+   | -bMax 3, 4+2+1 | 41,530,049 | 197, 21.13 | 141, 1.1, 0.06 | 41,529,908 | 59,703 / 57,134 | 1,543,317 (8,961) | 16.3 |
+   | -bMax 3, 21-nt guide, 4+1+1 | 5,499,825 | 26, 3.59 | 51, 1.3, 0.06 | 5,499,774 | 59,713 / 57,124 | 1,543,547 (8,991) | 2.8 |
+   | -bMax 3, 4+2+2 | (stopped: 51.4 GB of lines, 166 GB) | -- | 792, 3.4, 0.06 | -- | 59,703 / 57,134 | 1,543,317 (8,961) | 127.7 |
+
+   The 4+2+2 search without a BED had written 51.4 GB of lines in 19 minutes, holding 166
+   GB of memory, when it was stopped (no room for it, nor for its keep): there the skip
+   alone was checked -- its lines and the pruning-off ones byte-identical, every line's
+   core outside the BED, the dump complete and the FASTA's letter for letter.
 
 ### 13.7 With no BED
 

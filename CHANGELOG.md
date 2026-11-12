@@ -126,9 +126,12 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   flagged as their tree is loaded and the search enters no subtree without another leaf, so
   skipping the dense windows costs a fraction of the search: on chr22's IGL locus with HGDP +
   1000 Genomes, one guide at 4 mismatches and 2+2 bulges, the INDELS index's search,
-  204,453,499 lines in 1,440 s and 157 GB without the BED of its dense windows, gives with it
-  the 728 lines outside them in 3.3 s and 0.05 GB, and the variant index's, 33,858,344 lines
-  in 241 s and 26.6 GB, gives 2,110 in 16.7 s and 0.17 GB. `--leaf-dump` writes, for every
+  204,453,499 lines in 1,440 s and 157 GB without the BED of its dense windows (the 25/27
+  fake-indel windows the hooks were first measured on; on 2.10.0's 30/30 windows it had
+  written 51.4 GB of lines, holding 166 GB of memory, when it was stopped), gives with it
+  the 728 lines outside them in 3.3 s and 0.05 GB (792 in 3.4 s and 0.06 GB on 30/30), and
+  the variant index's, 33,858,344 lines in 241 s and 26.6 GB, gives 2,110 in 16.7 s and
+  0.17 GB. `--leaf-dump` writes, for every
   leaf a skip drops, the letters the index stores for its window on the + strand (`-` where it
   stores a placeholder: a bulge-pad base past `pad_valid`, a flank base off the contig), which
   a reader needs to rewrite a line of a skipped site from an index downloaded without its
@@ -144,7 +147,10 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   before: every `searchTST` call of the boundary, golden, four-allele, PAM-filter, flank-N,
   format-1, index-format and minimal tests, run beside `4579026`'s and compared byte for byte
   (373 calls and 21,739,834 target lines on amd64, 143 and 14,525,735 under ASan, the same on
-  arm64), and every IGL and IGH search without a BED of docs/INDEX_FORMAT.md section 13.6.
+  arm64), and every IGL and IGH search without a BED of docs/INDEX_FORMAT.md section 13.6;
+  merged into 2.10.0, the same 373 and 143 calls beside c18c575's `searchTST`, identical, and
+  every IGL search of section 13.6 on 30/30 windows (the INDELS 4+2+2 one aside, too large to
+  keep).
   CRISPRme 2.10.1 uses the hooks (CRISPRme 2.10.0 does not); section 13.5 says what such a
   reader must hold to, among it the fake-indel window's width a scan of the dense fake-indel
   windows needs. With a search guide longer than the index's, `LEFT, RIGHT >= Gs + L - 1`,
@@ -257,11 +263,23 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   merged one's already did, so a reader no longer guesses an entry's allele number from the
   position's other entries: beside a split record of the position (`C>G`, `1|0`) CRISPRme's
   readers tied A of `C>A,CT` to allele `2` and read a `1|2` carrier's A on the insertion's
-  slot, losing its target of A (the CRISPRme review's world X; CRISPRme 2.10.0 reads such a
-  position without phase), and a carrier of two ALTs of one record with no other carrier to
-  tell their numbers is no longer read without phase. (This revisits owner decision B3,
-  which left such records' genotypes raw for CRISPRme to read.) A position whose records
-  each list one ALT is byte-identical. Both ports; `test/test_enricher_multiallelic.py`.
+  slot, losing its target of A (the CRISPRme review's world X, which CRISPRme 2.10.0 read
+  without phase on the raw numbers), and a carrier of two ALTs of one record with no other
+  carrier to tell their numbers is no longer read without phase. (This revisits owner decision B3,
+  which left such records' genotypes raw for CRISPRme to read; approved 2026-11-12.) A
+  position whose records each list one ALT is byte-identical: on hg38 chr22 built by
+  CRISPRme 2.10.0's `build-index-only` (NRG, 1 + 1, `--samplesID`, 16 threads on both sides)
+  with this CRISPRitz and with c18c575, HGDP + 1000 Genomes (24 files) and HPRC (29) are
+  byte-identical, the enriched and fake-indel genomes, the dict, the indel log, CRISPRme's
+  stores and every index `.bin` among them. Through CRISPRme's real CLI on the review's
+  synthetic worlds (per sample, 4 + 1 + 1), an independent haplotype oracle finds every
+  carrier's target, phase and variants right where records list several ALTs (two such
+  records at one position, worlds WMM and WMM2; beside a split record, worlds X and Y),
+  where with c18c575's dicts 8 or 9 rows a world listed a carrier for a target its
+  haplotypes do not hold, and WMM2 lost a CFD-1.0 target that 2.8.1 reported; the other 20
+  world runs (18 without such a record, and two whose record's genotypes tell its numbers
+  either way) give c18c575's rows byte for byte. Both ports; `test/test_enricher_multiallelic.py`
+  and `verify_enricher.sh` (both fail on c18c575's ports).
 - **The dict now shows the phase of split records as it was phased, conflicts included.**
   Each entry keeps its own record's genotypes verbatim (a merged one, above, the union of
   its records'), and records phased one by one can put two ALTs of a position on one
@@ -386,6 +404,24 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   now fails with an error naming the position, in both ports: `enricher.py` raised an
   `IndexError` past the end and coded the last base for POS 0, `enricher.cpp` read and wrote
   out of bounds.
+- **`searchTST` called directly with more bulges than an index's `max_bulges` crashed**
+  (`crispritz.py search` lowers `-bDNA` and `-bRNA` to the index directory's `max_bulges`
+  and never makes the call; CRISPRme neither). It now refuses, exit 1 with one line on stderr
+  naming the bulges asked for and the `max_bulges` they exceed, before it opens any output
+  file: more DNA or RNA bulges than a format-2 header's `max_bulges` (`'<file>' was built
+  with max_bulges 2 and holds no alignment with more bulges of either kind, but the search
+  asks for 0 DNA and 3 RNA bulges ...`), or than its own `max_bulges` argument (the 10th),
+  which sizes its per-bulge tables and is the one a format-1 index is read with. On the
+  golden genome's NGG and TTTV indexes built with `-bMax` 0, 1 and 2, searched with every
+  `max_bulges` argument 0-3 and every bDNA and bRNA 0-3 (384 calls), 174 of the 304 calls
+  asking for more ended in a segfault once the targets file was open, every one with more
+  RNA bulges than the argument among them, and the other 130 exited 0 without the
+  alignments the index cannot hold (a `-bMax 0` index searched with 3 DNA bulges: 4 rows,
+  where a `-bMax 3` index gives 82, 78 of them DNA-bulged); the 2.9.1-built format-1 fixture
+  segfaulted in 4 of its 5 such calls. Now those 309 calls are refused and the 93 others
+  give the exit status, targets and stdout they gave. Pre-existing (4579026, and 2.9.1 for
+  the argument); `test/run_index_format_test.sh` makes four such calls, which fail with
+  c18c575's `searchTST` (docs/INDEX_FORMAT.md section 5).
 
 ## [2.9.1] - 2026-10-30
 
