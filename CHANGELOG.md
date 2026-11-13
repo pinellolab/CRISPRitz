@@ -2,8 +2,10 @@
 
 All notable changes to CRISPRitz are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). From 2.10.0
+the version numbers follow the version policy of `docs/RELEASING.md`, not Semantic Versioning:
+CRISPRitz shares its major.minor with CRISPRme, and a breaking change in either package bumps
+the minor of both.
 
 When cutting a release, move items out of `[Unreleased]` into a new dated
 version section and update the link-reference footer. See `docs/RELEASING.md`
