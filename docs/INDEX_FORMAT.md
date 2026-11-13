@@ -1043,7 +1043,7 @@ CRISPRme's haplotype scan of dense regions (its design's "lane H", planned for C
 spell too many sequences by a search of the haplotypes that occur there. It needs three
 things of the search: to **skip** the sites of those windows, whose IUPAC lines explode (on
 the INDELS index of chr22's IGL locus with HGDP + 1000 Genomes, one guide at 4 mismatches
-and 2 + 2 bulges gives 204,453,499 lines, 157 GB of RAM and 23 minutes on 2.9.1's 25/27
+and 2 + 2 bulges gives 204,453,499 lines, 157 GB of RAM and 24 minutes on 2.9.1's 25/27
 fake-indel windows, and on 2.10.0's 30/30 had written 51.4 GB of lines with 166 GB of RAM
 when it was stopped, section 13.6); to enumerate **only** them (**keep**), for the release
 gates that check the scan; and the letters the index stores for the sites it skips (the
