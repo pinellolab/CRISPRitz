@@ -9,16 +9,19 @@ When cutting a release, move items out of `[Unreleased]` into a new dated
 version section and update the link-reference footer. See `docs/RELEASING.md`
 and the `release-crispritz` skill (`.claude/skills/release-crispritz/SKILL.md`).
 
-CRISPRitz is a compiled (C++/OpenMP) Bioconda package that CRISPRme pins to an
-exact version. Releasing therefore also drives a downstream repin in CRISPRme
-(see `docs/RELEASING.md` for the crispritz -> Bioconda -> CRISPRme chain).
+CRISPRitz is a compiled (C++/OpenMP) Bioconda package and the search engine of
+CRISPRme. From 2.10.0 the two share their major.minor version, with independent
+patch numbers: CRISPRme X.Y.z requires CRISPRitz X.Y.* (`docs/RELEASING.md`,
+Version policy). A new minor of CRISPRitz therefore comes with a CRISPRme release,
+and a patch may drive a repin of CRISPRme's Docker image (see `docs/RELEASING.md`
+for the crispritz -> Bioconda -> CRISPRme chain).
 
 ## [Unreleased]
 
 ## [2.10.0] - unreleased
 
 Not yet tagged: the date is set when it is. Released together with rebuilt indexes and the
-CRISPRme release that pins it (CRISPRme 2.10.0): the IDX-13, IDX-4 and IDX-15 fixes below
+CRISPRme release that requires it (CRISPRme 2.10.0): the IDX-13, IDX-4 and IDX-15 fixes below
 change what an index holds, and every allele of a split multi-allelic site, the
 four-allele symbol `Q`, the merged carriers, the split form of a record listing several
 ALTs and the wider fake-indel window change what an enrichment holds, so they take effect
@@ -99,9 +102,13 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
   and PAM-less flanks, beside `Q`: `buildTST` writes nothing to stderr, every search equals
   the oracle and, without bulges, `searchBruteForce`, and exactly the planted perfect sites
   are found.
-- `test/test_enricher_multiallelic.py`: 24 unit tests run against both ports (48), with
+- `test/test_enricher_multiallelic.py`: 32 unit tests run against both ports (64), with
   exact expected outputs (every ALT, `Q`, the N-count invariant, merged carriers, each
-  record's AF, a reference holding `Q` or `q`); 44 of them fail on 2.9.1. In CI with
+  record's AF, a reference holding `Q` or `q`, the split form, the 30/30 window, REF and
+  ALTs in lower or mixed case, and the dictionary examples of the README, this file and
+  docs/MULTIALLELIC_ENRICHMENT.md); 44 of the 48 runs of the 24 the multi-allelic branch
+  had fail on 2.9.1 (docs/MULTIALLELIC_ENRICHMENT.md section 5 says which fail on each
+  earlier build). In CI with
   `verify_enricher.sh`, which grows from 17 to 34 cases (split multi-allelic sites in every
   order, genotype shapes, SNP + indel at one position, four bases, two ALTs on one haplotype
   slot, AF by key, one allele on two records, ALTs on a reference `N`, `X` or `-`, REF and
@@ -138,7 +145,8 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
   stores a placeholder: a bulge-pad base past `pad_valid`, a flank base off the contig), which
   a reader needs to rewrite a line of a skipped site from an index downloaded without its
   genomes: on IGL they equal the enriched and fake-indel FASTAs at every letter. Every search
-  given a BED prints `SKIPPED LEAVES <n> KEPT LEAVES <n>` (and `LEAF DUMP <n>`), and
+  given a BED prints a line of four tab-separated fields, `SKIPPED LEAVES`, its count,
+  `KEPT LEAVES` and its count (and, with a dump, `LEAF DUMP` and its count), and
   `crispritz.py search` stops when its `searchTST` prints none (one without the hooks, which
   ignores the arguments); `crispritz.py version` lists
   `search hooks: skip-bed keep-bed leaf-dump`, `crispritz.py` states `SEARCH_HOOKS`, and
@@ -186,6 +194,15 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
   searches one mismatch fewer.
 
 ### Changed
+- **CRISPRitz and CRISPRme share their major.minor version from 2.10.0**, with independent
+  patch numbers (`docs/RELEASING.md`, Version policy): CRISPRme X.Y.z requires CRISPRitz
+  X.Y.*, and a breaking change in either package (an index format, the enricher's output)
+  bumps the minor of both. So CRISPRitz goes from 2.9.1 to 2.10.0, with CRISPRme 2.10.0,
+  whose Bioconda package pins `crispritz >=2.10.0,<2.11`. This CRISPRitz writes index
+  format 2, which CRISPRme 2.8.1 refuses and 2.8.0 aborts on, so its Bioconda package
+  declares `run_constrained: crisprme >=2.10.0`, and conda does not install it beside an
+  earlier CRISPRme: crisprme 2.8.1's build 1 pins `crispritz >=2.9.1,<2.10`, but older
+  crisprme builds set no upper bound (2.8.0's and 2.8.1's build 0: `crispritz >=2.9.0`).
 - **New indexes are format 2, which CRISPRitz 2.9.1 and earlier cannot search** (2.9.1
   refuses one: `not a valid CRISPRitz index (.bin) file (numLeaves=-28747197)`). Indexes
   built by earlier versions keep working (see Fixed, IDX-14) but lack, until rebuilt, the
@@ -218,9 +235,10 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
   Cas12a's 23-nt guide and `TTTV`) with a DNA bulge, and a 28-nt one (CEP290's 22-nt
   SaCas9 guide) at any budget, exceeded, whatever the index; now L + b <= 31: LEFT = RIGHT =
   Lmax - 1 + bmax, with Lmax = 29 (a 21-nt guide and a PAM of 8 nt, the longest the general
-  K=8 index serves) and bmax = 2 (the most DNA bulges CRISPRme's web offers). The log's `CHR` field records each window's
-  start and end as before, so a reader that takes the left flank as `POS - 1 - start`
-  (CRISPRme 2.10.0) reads the windows of either release. Measured on hg38 chr22 with
+  K=8 index serves) and bmax = 2 (the most DNA bulges CRISPRme's web offers). The log's
+  `CHR` field records each window's start and end as before, so a reader that takes the
+  left flank as `POS - 1 - start` (CRISPRme 2.10.0) reads the windows of either release.
+  Measured on hg38 chr22 with
   `add-variants` (compiled port; against the 881f761 build, whose 25/27 log and fake-indel
   FASTA are 2.9.1's byte for byte): on HGDP + 1000 Genomes the same 240,557 log rows in the
   same order with the same carriers, rsID and AF, each `CHR` start 5 less and end 3 more,
@@ -243,8 +261,8 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
   AF are the more frequent record's, and a merged entry's genotypes use `1` for its ALT (a
   record listing several ALTs is renumbered so). 362 such alleles genome-wide in the
   published panels; on HPRC chr22 the merge puts two ALTs on one haplotype slot for 37
-  sample-positions, which CRISPRme must take as PUTATIVE (owner decision B4; no CRISPRme
-  release does so yet, see below).
+  sample-positions, which CRISPRme must take as PUTATIVE (owner decision B4), as CRISPRme
+  2.10.0 does (see below).
 - **A reference `N` stays `N`**: the enriched genome holds an `N` exactly where the
   reference does. A record listing two or three SNP ALTs at a reference `N` (`N>A,C`) was
   coded over it (`M`), making a gap searchable, and merging split records (see Fixed) would
@@ -265,10 +283,11 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
   merged one's already did, so a reader no longer guesses an entry's allele number from the
   position's other entries: beside a split record of the position (`C>G`, `1|0`) CRISPRme's
   readers tied A of `C>A,CT` to allele `2` and read a `1|2` carrier's A on the insertion's
-  slot, losing its target of A (the CRISPRme review's world X, which CRISPRme 2.10.0 read
-  without phase on the raw numbers), and a carrier of two ALTs of one record with no other
-  carrier to tell their numbers is no longer read without phase. (This revisits owner decision B3,
-  which left such records' genotypes raw for CRISPRme to read; approved 2026-11-12.) A
+  slot, losing its target of A (the CRISPRme review's world X, which CRISPRme 2.10.0's tree
+  read without phase on the raw numbers of c18c575's dict, and reads right on the split
+  form), and a carrier of two ALTs of one record with no other carrier to tell their numbers
+  is no longer read without phase. (This revisits owner decision B3, which left such
+  records' genotypes raw for CRISPRme to read; approved 2026-11-12.) A
   position whose records each list one ALT is byte-identical: on hg38 chr22 built by
   CRISPRme 2.10.0's `build-index-only` (NRG, 1 + 1, `--samplesID`, 16 threads on both sides)
   with this CRISPRitz and with c18c575, HGDP + 1000 Genomes (24 files) and HPRC (29) are
@@ -297,13 +316,14 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
   Genomes chr22 (e.g. 10,661,629 NA18869: `0|1` under G and `0|1` under T). On HPRC chr22
   the records' own phase puts none there, and the merged carriers of one allele's two
   records (above) put 37, all at 38,152,965. Up to 2.9.1 the dict held one record's ALTs per
-  position, so no reader met one. CRISPRme's per-sample analysis builds a CONFIRMED
-  haplotype holding both ALTs from it, measured through `complete-search --per-sample` of
-  CRISPRme `a5379e0` on the multi-allelic branch's enrichment of chr22:1-10,700,000,
-  indexed by CRISPRitz 2.9.1 in format 1, as no CRISPRme release reads a 2.10.0 index yet;
-  2.10.0 enriches those inputs into the same dict and the same bases but one, a `Q` 13 kb
-  from the measured site. CRISPRme must handle these before it uses a 2.10.0 index
-  (`docs/MULTIALLELIC_ENRICHMENT.md` §6.3).
+  position, so no reader met one. CRISPRme's per-sample analysis, as of its 2.8.1
+  integration tree, built a CONFIRMED haplotype holding both ALTs from it, measured through
+  `complete-search --per-sample` of CRISPRme `a5379e0` on the multi-allelic branch's
+  enrichment of chr22:1-10,700,000, indexed by CRISPRitz 2.9.1 in format 1, as no CRISPRme
+  release before 2.10.0 reads a 2.10.0 index; 2.10.0 enriches those inputs into the same
+  dict and the same bases but one, a `Q` 13 kb from the measured site. CRISPRme 2.10.0 reads
+  a slot holding two ALTs of one position as no haplotype, and the sample as PUTATIVE in
+  that window (`docs/MULTIALLELIC_ENRICHMENT.md` §6.3).
 
 ### Fixed
 - **A site whose guide's far end (away from the PAM) lay within `max_bulges` nt of a contig
@@ -419,7 +439,8 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
   2.9). CRISPRme readers that read the VCF itself must read it in upper case too, while those
   that read the dictionary stay as they are (section 6.7): with this engine CRISPRme 6bff65b's
   mega recipe fails its check on each of chr3, chr4, chr5, chr10, chr12, chr18 and chr21
-  (measured on all seven) until three of its VCF readers do.
+  (measured on all seven) until three of its VCF readers do. CRISPRme 2.10.0's readers of
+  the VCF read REF and ALT in upper case (CRISPRme `47b1884`, section 6.7).
   Tests: five unit tests, run against both ports, and `verify_enricher.sh` case 34; each
   fails on `26ffe46`.
 - **`searchBruteForce` reported a window with an `N` in its guide region when the mismatch
@@ -457,24 +478,31 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
   now fails with an error naming the position, in both ports: `enricher.py` raised an
   `IndexError` past the end and coded the last base for POS 0, `enricher.cpp` read and wrote
   out of bounds.
-- **`searchTST` called directly with more bulges than an index's `max_bulges` crashed**
-  (`crispritz.py search` lowers `-bDNA` and `-bRNA` to the index directory's `max_bulges`
-  and never makes the call; CRISPRme neither). It now refuses, exit 1 with one line on stderr
+- **`searchTST` called directly with more bulges than an index's `max_bulges` crashed, or
+  searched an index not built for them.** `crispritz.py search`, which CRISPRme runs, lowers
+  `-bDNA` and `-bRNA` to the `max_bulges` its index directory's name states, so it makes
+  such a call only where that name states more than the files' headers (a directory renamed
+  or copied under another name). `searchTST` now refuses, exit 1 with one line on stderr
   naming the bulges asked for and the `max_bulges` they exceed, before it opens any output
   file: more DNA or RNA bulges than a format-2 header's `max_bulges` (`'<file>' was built
   with max_bulges 2 and holds no alignment with more bulges of either kind, but the search
   asks for 0 DNA and 3 RNA bulges ...`), or than its own `max_bulges` argument (the 10th),
-  which sizes its per-bulge tables and is the one a format-1 index is read with. On the
-  golden genome's NGG and TTTV indexes built with `-bMax` 0, 1 and 2, searched with every
-  `max_bulges` argument 0-3 and every bDNA and bRNA 0-3 (384 calls), 174 of the 304 calls
-  asking for more ended in a segfault once the targets file was open, every one with more
-  RNA bulges than the argument among them, and the other 130 exited 0 without the
-  alignments the index cannot hold (a `-bMax 0` index searched with 3 DNA bulges: 4 rows,
-  where a `-bMax 3` index gives 82, 78 of them DNA-bulged); the 2.9.1-built format-1 fixture
-  segfaulted in 4 of its 5 such calls. Now those 309 calls are refused and the 93 others
-  give the exit status, targets and stdout they gave. Pre-existing (4579026, and 2.9.1 for
-  the argument); `test/run_index_format_test.sh` makes four such calls, which fail with
-  c18c575's `searchTST` (docs/INDEX_FORMAT.md section 5).
+  which sizes its per-bulge tables and is the one a format-1 index is read with. For RNA
+  bulges the line's "holds no alignment" overstates: such an index is not built for them,
+  but can hold their alignments (below). On the golden genome's NGG and TTTV indexes built
+  with `-bMax` 0, 1 and 2, searched with every `max_bulges` argument 0-3 and every bDNA and
+  bRNA 0-3 (384 calls), 174 of the 304 calls asking for more ended in a segfault once the
+  targets file was open, every one with more RNA bulges than the argument among them, and
+  the other 130 exited 0: with more DNA bulges, without the alignments that need more pad
+  than the index stores (a `-bMax 0` index searched with 3 DNA bulges: 4 rows, where a
+  `-bMax 3` index gives 82, 78 of them DNA-bulged), and with more RNA bulges only, sometimes
+  with every row (in a review's matrix of direct calls on the format-1 fixtures' genome, 8
+  of the 271 calls the refusal turns away: an NGG `-bMax 1` index searched with 0 DNA and 2
+  RNA bulges gave the 58 rows of a `-bMax 3` index, 42 of them with 2 RNA bulges). The
+  2.9.1-built format-1 fixture segfaulted in 4 of its 5 such calls. Now those 309 calls are
+  refused and the 93 others give the exit status, targets and stdout they gave.
+  Pre-existing (4579026, and 2.9.1 for the argument); `test/run_index_format_test.sh` makes
+  four such calls, which fail with c18c575's `searchTST` (docs/INDEX_FORMAT.md section 5).
 
 ## [2.9.1] - 2026-10-30
 
