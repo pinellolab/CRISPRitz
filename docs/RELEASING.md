@@ -11,6 +11,34 @@ process different from a pure-Python one: the Bioconda recipe builds it from
 source, and that build must succeed on **both** `linux-64` and `linux-aarch64`
 before the package can ship.
 
+## Version policy
+
+CRISPRitz and CRISPRme+, which runs it as its search engine, are released together and
+**share their major.minor**: CRISPRitz 2.10.z goes with CRISPRme 2.10.z, then 2.11 with
+2.11, and so on (Luca, 2026-11-07). Patch numbers are independent.
+
+- **CRISPRme X.Y.z requires CRISPRitz X.Y.\***. The Bioconda `crisprme` recipe pins
+  `crispritz >=X.Y.0,<X.(Y+1)` (for 2.10.z, `crispritz >=2.10.0,<2.11`), and CRISPRme's
+  Dockerfile (`ARG crispritz_ref`) and `install_from_source.sh` (`CRISPRITZ_REF`) build the
+  CRISPRitz tag the CRISPRme release was tested with (`v2.10.0`).
+- **A breaking change in either package bumps the minor of both**: an index format, the
+  enricher's output (the variant genome, the dictionaries, the indel log), a command line
+  or a file one package reads of the other. CRISPRitz X.Y.0 is then released with CRISPRme
+  X.Y.0, and its Bioconda recipe declares `run_constrained: - crisprme >=X.Y.0`, so that
+  conda does not install it beside an earlier CRISPRme, which cannot read what it writes.
+- **A patch moves only its own package's patch number**, and needs no release of the other
+  while it keeps both packages' interfaces. When CRISPRitz gets a patch (decision D5, Luca,
+  2026-11-08), CRISPRme's Docker image and `install_from_source.sh` move to the exact tag
+  a CRISPRme release was tested with; the recipe's lower bound stays `X.Y.0` and moves up
+  only when the patch fixes something CRISPRme depends on, and then to that patch.
+
+2.10.0 is the first release under the policy: CRISPRitz goes from 2.9.1 to 2.10.0 (index
+format 2, every allele of a split site, the four-allele symbol `Q`, the 30/30 fake-indel
+window), with CRISPRme 2.10.0, which skips 2.9.x. CRISPRme 2.8.1 refuses an index of format
+2, and 2.8.0, on CRISPRitz 2.9.0, aborts on one: crisprme 2.8.1's Bioconda build 1 pins
+`crispritz >=2.9.1,<2.10`, but older crisprme builds set no upper bound, which is why the
+crispritz 2.10.0 recipe needs `run_constrained: - crisprme >=2.10.0`.
+
 ## Using the release skill (Claude Code)
 
 Day to day, the easiest way to cut a release is the `release-crispritz` skill from
@@ -56,15 +84,18 @@ published Bioconda package).
                             {% set version = "X.Y.Z" %}
                             source.sha256: <hash>
                             build.number: 0
+                            build.sh installs the compiled enricher
+                            a new minor: run_constrained: - crisprme >=X.Y.0
                             ── BUILD CI must PASS on linux-64 AND linux-aarch64 ──
-                            ── a Bioconda maintainer merges ──
+                            ── a green bot PR is auto-merged (about 72 h) ──
                                                                         │
                                           crispritz X.Y.Z live on Bioconda
                                                                         │
                     ┌───────────────────────────────────────────────────┘
                     ▼   (CROSS-REPO repin, in CRISPRme)
-   CRISPRme Dockerfile:            ARG crispritz_version=X.Y.Z
-   CRISPRme Bioconda recipe:       - crispritz X.Y.Z   (exact pin)
+   CRISPRme Dockerfile:            ARG crispritz_ref=vX.Y.Z   (built from the git tag)
+   CRISPRme install_from_source.sh CRISPRITZ_REF default vX.Y.Z
+   CRISPRme Bioconda recipe:       - crispritz >=X.Y.0,<X.(Y+1)
                     │
                     ▼
               cut a CRISPRme release (its own release tooling)
@@ -79,32 +110,40 @@ Because the Bioconda recipe compiles CRISPRitz from source:
   linux-aarch64**, not macOS.
 - The autobump bot can open the version-bump PR, but **it will not merge with a
   red build**. The most common blocker is the `linux-aarch64` job (arch-specific
-  compiler/OpenMP issues). A Bioconda maintainer merges once both builds are green.
+  compiler/OpenMP issues). A green bot PR is merged automatically: crispritz 2.9.1's
+  (#70997) was, and crisprme 2.8.1's (#71256) was merged by mergify about 72 h after it
+  opened. The bot moves only `version` and `sha256`, so push whatever else the recipe needs
+  (step 5) to its PR within that window, or hold it.
 - This is why a fresh version is not "released" the moment the tag exists — it is
   released when the compiled package for both arches is published on the channel.
-  CRISPRme must not be repinned until then.
+  CRISPRme's Bioconda recipe must not require it until then (CRISPRme's Docker image
+  builds CRISPRitz from the tag).
 
 ### The in-repo `conda/meta.yaml` is NOT the published recipe
 
 The authoritative Bioconda recipe lives in
 [`bioconda/bioconda-recipes`](https://github.com/bioconda/bioconda-recipes) at
 `recipes/crispritz/meta.yaml`. The `conda/meta.yaml` in *this* repo is a
-historical stub and has drifted from what Bioconda actually ships (different
-version, different `source.url` host). Treat the in-repo file as advisory: the
+historical stub and differs from what Bioconda actually ships (its requirements and
+`about` metadata; no `run_constrained` and no `additional-platforms`), and its
+version has lagged the released tag before. Treat the in-repo file as advisory: the
 helper script bumps it for tidiness, but the real recipe edit happens in
 bioconda-recipes. Likewise, historically the `crispritz.py` `VERSION` string has
-lagged the released tag — reconcile all of these in the pre-flight step.
+lagged the released tag — reconcile all of these in the pre-flight step. (A release
+branch may set both to the new version before the tag, as `feat/2.10.0` did: that is
+consistent.)
 
 ## The version-sync points
 
 | Location | What to change |
 |---|---|
-| `crispritz.py` | `VERSION = "X.Y.Z"` (surfaced by `crispritz.py version` / `--version`) |
+| `crispritz.py` | `VERSION = "X.Y.Z"` (surfaced by `crispritz.py version`) |
 | `conda/meta.yaml` | `{% set version = "X.Y.Z" %}` (in-repo stub; advisory) |
 | Git tag / GitHub release | tag `vX.Y.Z`, notes from the changelog |
-| `recipes/crispritz/meta.yaml` (in `bioconda/bioconda-recipes`) | `{% set version = "X.Y.Z" %}`, `source.sha256`, `build.number: 0` |
-| **CRISPRme** `Dockerfile` | `ARG crispritz_version=X.Y.Z` |
-| **CRISPRme** `recipes/crisprme/meta.yaml` (Bioconda) | `- crispritz X.Y.Z` (exact pin) |
+| `recipes/crispritz/meta.yaml` (in `bioconda/bioconda-recipes`) | `{% set version = "X.Y.Z" %}`, `source.sha256`, `build.number: 0`; for a new minor `run_constrained: - crisprme >=X.Y.0`; `build.sh` installs the compiled enricher |
+| **CRISPRme** `Dockerfile` | `ARG crispritz_ref=vX.Y.Z` (the tag CRISPRme was tested with) |
+| **CRISPRme** `install_from_source.sh` | the `CRISPRITZ_REF` default, equal to the Dockerfile's |
+| **CRISPRme** `recipes/crisprme/meta.yaml` (Bioconda) | `- crispritz >=X.Y.0,<X.(Y+1)` (Version policy) |
 
 The Bioconda `source.url` is templated
 (`.../archive/v{{ version }}.tar.gz` — note `v{{ version }}`, no `refs/tags/`) and
@@ -144,8 +183,10 @@ exists. Re-run without it in step 5.)
 
 CRISPRitz follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Move
 entries from `[Unreleased]` into a new `## [X.Y.Z] - YYYY-MM-DD` section, grouped
-under Added / Changed / Deprecated / Removed / Fixed / Security. Leave a fresh
-empty `[Unreleased]` at the top and update the link-reference footer.
+under Added / Changed / Deprecated / Removed / Fixed / Security. Where the release
+branch has written the section already, undated (`## [X.Y.Z] - unreleased`, as 2.10.0's
+is), set its date and drop its "Not yet tagged" line. Leave a fresh empty
+`[Unreleased]` at the top and update the link-reference footer.
 
 ### 4. Create the GitHub release and tag
 
@@ -179,7 +220,17 @@ curl -sL https://github.com/pinellolab/CRISPRitz/archive/vX.Y.Z.tar.gz | shasum 
 
 Get it into `bioconda/bioconda-recipes` (bump `version`, set `sha256`, reset
 `build.number` to `0`, keep `additional-platforms: [linux-aarch64]` and
-`skip: True # [osx]`):
+`skip: True # [osx]`), with two changes the autobump bot does not make:
+
+- **`build.sh` installs the compiled enricher**, as `conda/build.sh` does: `cp enricher`
+  to `${PREFIX}/bin/` and to `${PREFIX}/opt/crispritz/Python_Scripts/Enrichment/`, with a
+  `test -x "$PREFIX/bin/enricher"` test command. The published 2.9.0 and 2.9.1 recipes
+  install the other three binaries only, so their `add-variants` runs `enricher.py`,
+  1.6-1.8x slower with the same output.
+- **A new minor declares `run_constrained: - crisprme >=X.Y.0`** under `requirements:`
+  (Version policy, above).
+
+Then:
 
 - **Autobump (preferred).** The bot watches releases and opens
   `Update crispritz to X.Y.Z` PRs, often within a day. Verify it carries the right
@@ -210,16 +261,21 @@ conda create -n crispritz_xyz -c conda-forge -c bioconda crispritz=X.Y.Z -y \
 
 ### 7. Cross-repo: repin CRISPRme and release it
 
-Only after crispritz `X.Y.Z` is live on Bioconda for the arches CRISPRme builds
-on, bump BOTH crispritz pins in CRISPRme and cut a CRISPRme release with its own
-tooling:
+CRISPRme names its CRISPRitz in three places (Version policy, above):
 
-- CRISPRme `Dockerfile`: `ARG crispritz_version=X.Y.Z`
-- CRISPRme Bioconda recipe `recipes/crisprme/meta.yaml`: `- crispritz X.Y.Z`
+- CRISPRme `Dockerfile`: `ARG crispritz_ref=vX.Y.Z`, the tag the CRISPRme release was
+  tested with. The image builds CRISPRitz from source at that git tag, so it needs the
+  tag, not the Bioconda package.
+- CRISPRme `install_from_source.sh`: the `CRISPRITZ_REF` default, the same tag.
+- CRISPRme Bioconda recipe `recipes/crisprme/meta.yaml`: `- crispritz >=X.Y.0,<X.(Y+1)`,
+  bounded; within a minor its lower bound rises only to a patch that fixes something
+  CRISPRme depends on.
 
-See CRISPRme's own `release-crisprme` skill / `docs/RELEASING.md` for cutting that
-release. Do not repin early: CRISPRme's Docker build and Bioconda solve both fail
-on `crispritz=X.Y.Z` until the package is actually published.
+A new minor goes out with CRISPRme X.Y.0; a CRISPRitz patch needs a CRISPRme release only
+to move its Docker image to the patch. See CRISPRme's own `release-crisprme` skill /
+`docs/RELEASING.md` for cutting that release. CRISPRme's Bioconda recipe can require
+crispritz `X.Y.*` only once crispritz `X.Y.Z` is published on Bioconda for the arches
+CRISPRme builds on: until then its solve fails.
 
 ## Rollback / troubleshooting
 
@@ -227,5 +283,5 @@ on `crispritz=X.Y.Z` until the package is actually published.
 - **Premature/incorrect GitHub release:** `gh release delete vX.Y.Z --repo pinellolab/CRISPRitz --cleanup-tag`, then redo.
 - **sha256 mismatch in the Bioconda PR:** GitHub occasionally regenerates archive tarballs; recompute the hash from the live tarball and update `meta.yaml`.
 - **arm64 build fails on Bioconda:** the defining compiled-package blocker. Read the `linux-aarch64` log (arch-specific compiler flags / OpenMP linkage are common), fix in the recipe build deps or upstream source, push, re-run CI. Never merge with a red arch build.
-- **CRISPRme build fails on `crispritz=X.Y.Z`:** the crispritz Bioconda package for that version/arch has not published yet — wait for step 6, then repin/rebuild.
+- **CRISPRme's Bioconda solve fails on `crispritz >=X.Y.0,<X.(Y+1)`:** the crispritz Bioconda package for that version/arch has not published yet — wait for step 6, then repin/rebuild. **CRISPRme's Docker build fails building CRISPRitz:** check that `crispritz_ref` names a tag that exists.
 - **Version lag between files:** always run the step-1 pre-flight; historically `crispritz.py` `VERSION` and the in-repo `conda/meta.yaml` have trailed the released tag.
