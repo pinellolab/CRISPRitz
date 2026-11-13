@@ -199,10 +199,11 @@ their VCFs into `hg38_1000genomeproject_vcf/`.
 This tool is created to insert variants in a fasta genome.  
 Input:
 - Directory containing VCF files, need to be separated into single chromosome files
-(multi-sample files will be collapsed into one fake individual), each gzipped and named
-with its chromosome between dots (`ALL.chr22.<...>.vcf.gz`).
+  (multi-sample files will be collapsed into one fake individual), each gzipped and named
+  with its chromosome as a part between dots: the last part that holds `chr`
+  (`ALL.chr22.<...>.vcf.gz` is chr22's).
 - Directory containing a genome in fasta format, one `<chromosome>.fa` file per chromosome
-(`chr22.fa`).
+(`chr22.fa`), the chromosome as the VCF's name gives it.
 - `true`, to write the dictionaries and the fake-indel genome as well (Optional; CRISPRme+
 always passes it).
 
