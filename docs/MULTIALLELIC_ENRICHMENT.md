@@ -367,8 +367,25 @@ lower-case REF and ALT bases. HF's raw HPRC vcfwave VCFs hold none (0 of their 4
 records), but normalised as
 CRISPRme's HPRC panel is built (`bcftools norm -m -any -f`, then `+fill-tags`) they hold
 108,178 records in lower or mixed case over the 24 chromosomes, 1,546 of them on chr22, every
-one an indel or MNV of FILTER `PASS` or `.` (realignment moves no SNV). HGDP + 1000 Genomes
-holds none (0 of its 144.9 M records; measured again on chr22: 0 of 1,998,332).
+one an indel or MNV of FILTER `PASS` or `.` (realignment moves no SNV). The published HGDP +
+1000 Genomes VCFs (`hgdp1kgp.<chrom>.norm.vcf.gz`), normalised the same way from the re-phased
+BCFs (CRISPRme's `hgdp1kgp_build.sh`), hold 6 of their 144,858,810 records over the 23
+chromosomes, on chr1, chr2, chr10 (two), chr17 and chr21, the other 18 none (chr22: 0 of
+1,998,332). Each is a deletion of FILTER `.` whose REF of 229 to 283 bases is in mixed case
+and whose ALT is one base in lower case, carried by 1 to 5 of the 4,091 samples. Each was a
+deletion written in upper case in the re-phased BCF, which `bcftools norm -f` moved 2 to 41
+bases to the left, so that its REF starts in soft-masked bases (its first 2 to 33 bases, and
+so its ALT, in lower case). None is an SNV, and no other record at its position holds its
+REF>ALT in another case:
+
+| record | REF bases (in lower case) | ALT | AF | carriers |
+|---|---|---|---|---|
+| chr1:143,247,653 | 229 (14) | `c` | 0.000733 | 5 |
+| chr2:25,534,743 | 255 (22) | `g` | 0.000122 | 1 |
+| chr10:2,906,917 | 253 (33) | `a` | 0.000244 | 2 |
+| chr10:129,070,831 | 265 (3) | `a` | 0.000122 | 1 |
+| chr17:49,165,346 | 283 (2) | `t` | 0.000244 | 2 |
+| chr21:21,789,848 | 243 (18) | `g` | 0.000244 | 2 |
 
 The mega's merged VCFs hold 13, of their 66,913,681 records over the 24 chromosomes
 (`mega.<chrom>.afmax.vcf.gz`, the VCFs `mega_rebuild.sh` builds from), on seven chromosomes:
@@ -408,6 +425,8 @@ stores):
 | HPRC chr22 normalised as CRISPRme builds it (NRG, Tier-1 install) | 1,546 | 26 of 28 files byte-identical: the enriched genome, the dictionary, every `.bin` of the variant and `_INDELS` indexes, CRISPRme's stores; the indel log differs at exactly the 1,546 rows that name a record in lower case, in their `indel` field alone, upper-cased (`chr22_10515076_aaGG_a` → `chr22_10515076_AAGG_A`), and the fake-indel genome at exactly its 1,818 lower-case bases, upper-cased |
 | mega chr21 (as mega chr22) | 2 | 19 of 21 byte-identical: the log's 2 rows and the fake-indel genome's 2 lower-case bases, upper-cased |
 | mega, the whole recipe (`mega_rebuild.sh`, its defaults) on each of chr3, chr4, chr5, chr10, chr12, chr18 and chr21 | 13 | on each, every file byte-identical (the registry, the indel frequencies, every `.bin`) but the log, at its rows of those records, and the fake-indel genome, at their ALT bases, upper-cased: 13 rows and 13 bases in all; its check passes with `26ffe46` and fails with 2.10.0 (section 6.7) |
+| HGDP + 1000 Genomes chr21, `hgdp1kgp.chr21.norm.vcf.gz` (as chr22) | 1 | 20 of 22 byte-identical: the log's 1 row and the fake-indel genome's 1 lower-case base, upper-cased |
+| HGDP + 1000 Genomes, `crispritz.py add-variants` alone (indels on, as `build-index-only` runs it) on each of chr1, chr2, chr10, chr17 and chr21, then `index-genome` (NRG, `-bMax 1`) of the fake-indel genome it writes | 6 | on each, the enriched genome, the dictionary and every `.bin` byte-identical, the log at its rows of those records and the fake-indel genome at their ALT bases, upper-cased: 6 rows and 6 bases in all |
 
 So on these panels the change is one of text: the `_INDELS` index of each is byte-identical,
 as `buildTST` reads the fake-indel FASTA upper-cased (`26ffe46`'s windows held the ALT in the
@@ -1090,9 +1109,11 @@ byte-identical to 2.9.1's at its window. With REF and ALT read in upper case (se
 HPRC's logs change besides at the rows of its 108,178 records written in lower case (1,546
 on chr22), each with the fake-indel genome's bases of those ALTs. The mega's logs change at
 their 13 rows of such records, on chr3, chr4, chr5, chr10, chr12, chr18 and chr21 (section
-2.9 lists them), each with the fake-indel genome's one base of that deletion's ALT. Their
-`_INDELS` indexes do not change by it. Rebuild the logs with the rest rather than carry the
-published ones over. A classic (non-dict-less) publish's
+2.9 lists them), each with the fake-indel genome's one base of that deletion's ALT.
+HGDP + 1000 Genomes' logs change at their 6 rows of such records, on chr1, chr2, chr10 (two),
+chr17 and chr21 (section 2.9 lists them too), each with the fake-indel genome's one base of
+that deletion's ALT. Their `_INDELS` indexes do not change by it. Rebuild the logs with the
+rest rather than carry the published ones over. A classic (non-dict-less) publish's
 `Dictionaries/dictionaries_<vcf>/` changes and must be rebuilt with the rest.
 
 Then: `docs/INDEX_PROVENANCE.md` and `docs/PRECOMPUTED_INDEXES.md` record the rebuild and the
