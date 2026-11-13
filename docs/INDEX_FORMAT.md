@@ -328,18 +328,26 @@ count: as it loads the file):
   under `--prune-pam` a narrower 3' PAM, N-padded to it (section 12); or, in format 2, a
   PAM side (3'/5') other than the search PAM's;
 * more DNA or RNA bulges than the search can read (2.10.0): in format 2, more than the
-  header's `max_bulges` (the index holds each site's bases for that many bulges of either
-  kind, and no more), and in either format more than `searchTST`'s own `max_bulges`
-  argument (its 10th), which sizes its per-bulge tables and is the `max_bulges` a
-  format-1 file is read with. One line on stderr names the bulges asked for and the
-  `max_bulges` they exceed (the index-format test's, `ERROR: 'v2//NGG_f2_1.bin' was built
-  with max_bulges 2 and holds no alignment with more bulges of either kind, but the search
-  asks for 0 DNA and 3 RNA bulges (search with at most 2, or build the index with -bMax
-  3).`), and no output file is opened. `crispritz.py search` never makes such a call
-  (it lowers `-bDNA` and `-bRNA` to the `max_bulges` of the index directory's name,
-  with a `WARNING`); called directly, `searchTST` up to c18c575 crashed with a segfault
-  once the targets file was open (every call with more RNA bulges than the argument,
-  among others), or exited 0 without the alignments the index cannot hold.
+  header's `max_bulges` (the index stores each site's pad for that many DNA bulges, and is
+  built for no more bulges of either kind), and in either format more than `searchTST`'s
+  own `max_bulges` argument (its 10th), which sizes its per-bulge tables and is the
+  `max_bulges` a format-1 file is read with. One line on stderr names the bulges asked for
+  and the `max_bulges` they exceed (the index-format test's, `ERROR: 'v2//NGG_f2_1.bin' was
+  built with max_bulges 2 and holds no alignment with more bulges of either kind, but the
+  search asks for 0 DNA and 3 RNA bulges (search with at most 2, or build the index with
+  -bMax 3).`), and no output file is opened. For RNA bulges the line's "holds no alignment"
+  overstates: an RNA bulge consumes no pad base, and such an index, not built for them, can
+  hold their alignments (below). `crispritz.py search` lowers `-bDNA` and `-bRNA` to the
+  `max_bulges` of the index directory's name, with a `WARNING`, so it makes such a call only
+  where that name states more than the files' headers (a directory renamed or copied under
+  another name), and the refusal then answers it. Called directly, `searchTST` up to c18c575
+  crashed with a segfault once the targets file was open (every call with more RNA bulges
+  than the argument, among others), or exited 0: with more DNA bulges, without the
+  alignments that need more pad than the index stores, and with more RNA bulges only,
+  sometimes with every row (in a review's matrix of direct calls on the genome of
+  `test/format1/`, 8 of the 271 calls now refused: an NGG `-bMax 1` index searched with 0
+  DNA and 2 RNA bulges gave the 58 rows of a `-bMax 3` index, 42 of them with 2 RNA
+  bulges).
 
 `crispritz.py index-info` makes every one of these checks that does not depend on the
 search (section 7). Loading a file, the search also refuses a node count below 1, and
@@ -404,7 +412,10 @@ rebuild adds them.
 the `.bin` (`G`), and searches when they differ, as 2.9.1 did. CRISPRme does this: its
 `21bp-NNGRRT-SaCas9.txt` (21-nt guides) is served under `--prune-pam` by a PAM-less
 index built for 20-nt guides, and `23bp-TTTV-Cas12a.txt` (23-nt) by a 20-nt TTTV or
-NNNN index (section 8). The rules, for both formats:
+NNNN index (section 8, as of `a5379e0`). CRISPRme 2.10.0 prefers an index built for the
+search's guide length to one that merely fits (its METHODS, section 9), and the index set it
+publishes holds 20- and 23-nt Cas12a (TTTN) and 22-nt SaCas9 (NNGRRN) indexes. The rules,
+for both formats:
 
 1. **Sites are the index's**: a `G`-base guide region inside the contig with no N,
    and the PAM of section 3.1. When `Gs < G`, a target whose `Gs`-base guide fits but
@@ -625,8 +636,9 @@ def read_index_header(path):
 ## 8. CRISPRme changes needed
 
 CRISPRme (crisprme-plus) parses `.bin` files itself and mirrors `buildTST`'s rules
-in Python, so it must learn format 2 before it can use CRISPRitz 2.10.0 indexes. As
-of `a5379e0`:
+in Python, so it must learn format 2 before it can use CRISPRitz 2.10.0 indexes.
+CRISPRme 2.10.0 reads format 2 (its METHODS, section 9, says how); the list below was
+written against `a5379e0`, before it. As of `a5379e0`:
 
 1. **`PostProcess/crispritz_bins.py:bin_problem`** reads the first int as
    `numLeaves` and walks the leaf records by their `'0'`/`'_'` marker, so it calls
@@ -1026,19 +1038,18 @@ compared for both versions; the other sizes agree to the byte).
 
 ## 13. Region hooks: skip, keep and the leaf dump (2.10.0)
 
-CRISPRme's haplotype scan of dense regions (its design's "lane H") replaces, in a
-per-sample search, the IUPAC search of the windows whose variants spell too many
-sequences by a search of the haplotypes that occur there. It needs three things of the
-search: to **skip** the sites of those windows, whose IUPAC lines explode (on the INDELS
-index of chr22's IGL locus with HGDP + 1000 Genomes, one guide at 4 mismatches and 2 + 2
-bulges gives 204,453,499 lines, 157 GB of RAM and 23 minutes on 2.9.1's 25/27 fake-indel
-windows, and on 2.10.0's 30/30 had written 51.4 GB of lines with 166 GB of RAM when it was
-stopped, section 13.6); to enumerate **only** them
-(**keep**), for the release gates that check the scan; and the letters the index stores
-for the sites it skips (the **leaf dump**), since a downloaded index ships no genome.
-CRISPRitz 2.10.0 has all three, so that CRISPRme 2.10.1 can use them without a new
-CRISPRitz. They change no index and no file format, and a search given no BED runs none of
-them (section 13.7).
+CRISPRme's haplotype scan of dense regions (its design's "lane H", planned for CRISPRme
+2.10.1) replaces, in a per-sample search, the IUPAC search of the windows whose variants
+spell too many sequences by a search of the haplotypes that occur there. It needs three
+things of the search: to **skip** the sites of those windows, whose IUPAC lines explode (on
+the INDELS index of chr22's IGL locus with HGDP + 1000 Genomes, one guide at 4 mismatches
+and 2 + 2 bulges gives 204,453,499 lines, 157 GB of RAM and 23 minutes on 2.9.1's 25/27
+fake-indel windows, and on 2.10.0's 30/30 had written 51.4 GB of lines with 166 GB of RAM
+when it was stopped, section 13.6); to enumerate **only** them (**keep**), for the release
+gates that check the scan; and the letters the index stores for the sites it skips (the
+**leaf dump**), since a downloaded index ships no genome. CRISPRitz 2.10.0 has all three,
+so that CRISPRme 2.10.1 can use them without a new CRISPRitz. They change no index and no
+file format, and a search given no BED runs none of them (section 13.7).
 
 ### 13.1 The core of a site
 
@@ -1352,7 +1363,9 @@ have neither, and their `crispritz.py search` ignores the three flags.
    a BED whose core meets no interval and those whose core meets one, in their order, and
    the dump complete, every dumped core meeting an interval, and every letter the enriched
    FASTA's (variant index) or the fake-indel FASTA's (INDELS index), `-` where section 13.3
-   says. Wall seconds and peak RSS in GB (`/usr/bin/time -v`):
+   says. The table below was measured with the hooks' build on `4579026`, whose enricher
+   writes 2.9.1's 25/27 fake-indel windows: its INDELS rows are of those windows, while its
+   variant rows do not depend on them. Wall seconds and peak RSS in GB (`/usr/bin/time -v`):
 
    | locus, index, budget | lines without a BED | without: s, GB | skip: lines, s, GB | keep: lines | leaves dropped / kept | dump: letters (`-`) | no pruning: s |
    |---|---|---|---|---|---|---|---|
@@ -1408,7 +1421,9 @@ have neither, and their `crispritz.py search` ignores the three flags.
    The 4+2+2 search without a BED had written 51.4 GB of lines in 19 minutes, holding 166
    GB of memory, when it was stopped (no room for it, nor for its keep): there the skip
    alone was checked -- its lines and the pruning-off ones byte-identical, every line's
-   core outside the BED, the dump complete and the FASTA's letter for letter.
+   core outside the BED, the dump complete and the FASTA's letter for letter. IGH was not
+   built again on 30/30 windows: its INDELS rows in the first table are of 25/27 windows
+   only.
 
 ### 13.7 With no BED
 
