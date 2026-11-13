@@ -973,8 +973,8 @@ compared for both versions; the other sizes agree to the byte).
      132 single-tree contigs; the 6 multi-tree chromosomes interleave their trees in
      thread-completion order, the same rows).
    * 246 NGG contig-end sites on 171 alt/random/Un contigs, each searched with its own
-     perfect guide: a dedicated format-1 index finds 235 with 2.9.1 (11 come out on the
-     + strand) and 246 with 2.10.0; a format-1 K=8 index with `--prune-pam` finds 0; a
+     perfect guide: a dedicated format-1 index finds 235 with 2.9.1 (11 come out on
+     the + strand) and 246 with 2.10.0; a format-1 K=8 index with `--prune-pam` finds 0; a
      format-2 K=8 index with `--prune-pam` finds 246, and its rows equal the format-2
      dedicated index's (368,586 rows). 2.10.0 on the format-1 dedicated index changes the
      rows of 12 contigs only: the 11 move to the minus strand at base 0, and 6 rows of
