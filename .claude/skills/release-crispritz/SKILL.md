@@ -186,7 +186,7 @@ in, on the bot PR or in a manual one:
   `requirements:`, so that conda does not install it beside an earlier CRISPRme, which
   cannot read what it writes. It is the one guard that holds in existing environments too:
   for 2.10.0, crisprme 2.8.1's build 1 pins `crispritz >=2.9.1,<2.10`, but its build 0
-  and the older crisprme builds set no upper bound.
+  and the 2.8.0 and 2.7.9 builds set no upper bound.
 
 You have two routes. **Prefer autobump; fall back to a manual PR.**
 

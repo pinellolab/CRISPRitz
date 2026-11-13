@@ -201,8 +201,9 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
   whose Bioconda package pins `crispritz >=2.10.0,<2.11`. This CRISPRitz writes index
   format 2, which CRISPRme 2.8.1 refuses and 2.8.0 aborts on, so its Bioconda package
   declares `run_constrained: crisprme >=2.10.0`, and conda does not install it beside an
-  earlier CRISPRme: crisprme 2.8.1's build 1 pins `crispritz >=2.9.1,<2.10`, but older
-  crisprme builds set no upper bound (2.8.0's and 2.8.1's build 0: `crispritz >=2.9.0`).
+  earlier CRISPRme: crisprme 2.8.1's build 1 pins `crispritz >=2.9.1,<2.10`, but its build
+  0 and the 2.8.0 and 2.7.9 builds set no upper bound (2.8.1's build 0 and 2.8.0's:
+  `crispritz >=2.9.0`).
 - **New indexes are format 2, which CRISPRitz 2.9.1 and earlier cannot search** (2.9.1
   refuses one: `not a valid CRISPRitz index (.bin) file (numLeaves=-28747197)`). Indexes
   built by earlier versions keep working (see Fixed, IDX-14) but lack, until rebuilt, the

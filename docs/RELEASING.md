@@ -36,8 +36,8 @@ CRISPRitz and CRISPRme+, which runs it as its search engine, are released togeth
 format 2, every allele of a split site, the four-allele symbol `Q`, the 30/30 fake-indel
 window), with CRISPRme 2.10.0, which skips 2.9.x. CRISPRme 2.8.1 refuses an index of format
 2, and 2.8.0, on CRISPRitz 2.9.0, aborts on one: crisprme 2.8.1's Bioconda build 1 pins
-`crispritz >=2.9.1,<2.10`, but older crisprme builds set no upper bound, which is why the
-crispritz 2.10.0 recipe needs `run_constrained: - crisprme >=2.10.0`.
+`crispritz >=2.9.1,<2.10`, but its build 0 and the 2.8.0 and 2.7.9 builds set no upper
+bound, which is why the crispritz 2.10.0 recipe needs `run_constrained: - crisprme >=2.10.0`.
 
 ## Using the release skill (Claude Code)
 
