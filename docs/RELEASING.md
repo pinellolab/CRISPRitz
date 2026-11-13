@@ -179,6 +179,12 @@ git diff crispritz.py conda/meta.yaml     # sanity-check the change
 (`--no-download` skips the sha256 fetch, which cannot succeed until the tag
 exists. Re-run without it in step 5.)
 
+The helper's printed scaffolds predate the version policy (their text is to be updated
+after 2.10.0): its recipe block lists `version`, `sha256` and `build.number` only (add
+the `build.sh` enricher and, for a new minor, the `run_constrained` of step 5), and its
+cross-repo block still names an exact `ARG crispritz_version` and `- crispritz X.Y.Z`
+(follow step 7 instead).
+
 ### 3. Update the changelog
 
 CRISPRitz follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Move

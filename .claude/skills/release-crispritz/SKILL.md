@@ -107,6 +107,13 @@ git --no-pager diff crispritz.py conda/meta.yaml
 
 Rollback if wrong: `git checkout crispritz.py conda/meta.yaml`.
 
+> The helper's printed blocks predate the version policy (its text is to be updated after
+> 2.10.0). Its "Bioconda recipe changes" block lists `version`, `sha256` and
+> `build.number` only: add the `build.sh` enricher and, for a new minor, the
+> `run_constrained` of Step 4. Its "Cross-repo repin" block still names an exact
+> `ARG crispritz_version` and `- crispritz X.Y.Z`: follow Step 6 instead
+> (`crispritz_ref`, `CRISPRITZ_REF`, `crispritz >=X.Y.0,<X.(Y+1)`).
+
 ## Step 2 — Update CHANGELOG.md
 
 Move items from `## [Unreleased]` into a new dated section, using the script's
