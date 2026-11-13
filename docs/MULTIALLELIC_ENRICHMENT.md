@@ -12,7 +12,8 @@ the same inputs. The CRISPRme code cited is the tree at `a5379e0` of the CRISPRm
 integration branch; line numbers refer to that tree.
 
 **Decided by the owner:** these changes, and the index rebuild they require, go into
-CRISPRitz 2.10.0 and the CRISPRme release that pins it, **not** into CRISPRme+ 2.8.1.
+CRISPRitz 2.10.0 and the CRISPRme release that requires it (2.10.0), **not** into CRISPRme+
+2.8.1.
 
 ## 1. The short answer: were all ALTs of a multi-allelic site enriched?
 
@@ -40,10 +41,12 @@ base or IUPAC code, stays as it is (section 2.8). The dictionary lists every ALT
 character, each with its own record's genotypes as they were phased, in split form (`1` the
 entry's ALT; an allele on two records with the carriers of both, section 2.3). On HGDP +
 1000 Genomes that includes 672 chr22 sample-positions with two ALTs on one haplotype slot,
-which CRISPRme's per-sample analysis turns into a CONFIRMED haplotype holding both
-(measured through the CLI on the enrichment of `feat/multiallelic-enrich`, whose dictionary
-2.10.0 writes byte for byte, indexed by CRISPRitz 2.9.1, as no CRISPRme release reads a
-2.10.0 index yet): CRISPRme must handle them before it uses a 2.10.0 index (section 6.3).
+which CRISPRme's per-sample analysis turned into a CONFIRMED haplotype holding both
+(measured through the CLI of CRISPRme `a5379e0` on the enrichment of
+`feat/multiallelic-enrich`, whose dictionary 2.10.0 writes byte for byte, indexed by
+CRISPRitz 2.9.1, as no CRISPRme release before 2.10.0 reads a 2.10.0 index). CRISPRme had
+to handle them before it used a 2.10.0 index, and 2.10.0 does: it reads such a slot as no
+haplotype, and the sample as PUTATIVE in that window (section 6.3).
 
 ## 2. What the enricher does now
 
@@ -77,10 +80,22 @@ The VCF's REF and ALTs are read in upper case too, since 2.10.0, as VCF 4.x read
 bases whatever their case: each port upper-cases a record's REF and every ALT as it reads
 the line, before anything uses them (`enricher.py` `_upper_allele`, `enricher.cpp`
 `upperAllele`: ASCII `a`-`z` only; an ALT holding `<`, a symbolic allele, as written; `*` and
-`.` hold no letter). So a SNP ALT written in lower case is coded, a record that differs from
-another only by case is the same allele (section 2.3: one entry, as two records written
-alike), and the fake-indel window, its log row and every dictionary entry name the record
-in upper case (section 2.4). The REF is still found in the window case-insensitively, as
+`.` hold no letter). VCF 4.3 and 4.5 make the bases of REF and ALT case-insensitive and let
+a tool not keep an allele's case "except for IDs, which are case sensitive": hence a
+symbolic allele's `<ID>` is kept as written. A breakend ALT, holding `[` or `]`, is
+upper-cased whole, the name of its mate's contig with it (`t]chrT:5]` is logged and
+windowed as `T]CHRT:5]`, where `26ffe46` kept `t]chrT:5]`): that changes the text of its log
+row and window only, as `buildTST` reads the window upper-cased and a breakend's window was
+never a sequence, and no record of the published panels in lower case is a breakend
+(section 2.9). A byte outside ASCII, which no VCF allele may hold, is left as it is; in such
+an allele the two ports' `FAKEPOS` differ, `enricher.py` counting characters and
+`enricher.cpp` bytes, as before this change.
+
+So a SNP ALT written in lower case is coded; an SNV record that differs from another only by
+case is the same allele (section 2.3: one entry, as two records written alike), and two indel
+records that do keep a window and a log row each, now under one name, as two written alike
+do; and the fake-indel window, its log row and every dictionary entry name the record in
+upper case (section 2.4). The REF is still found in the window case-insensitively, as
 before. rsID, AF and genotypes are read as they were, and a VCF without a lower-case allele
 gives the same outputs as before, byte for byte (section 2.9). Up to 2.9.1, and in 2.10.0
 up to `26ffe46`, the alleles were read as written: a lower-case SNP ALT was no A, C, G or T,
@@ -189,6 +204,13 @@ unchanged. A key holding one record of one ALT is byte-identical to 2.9.1, but f
 carrier holding an allele number above 1, which the split form rewrites (7,088 of the
 529,585 keys of the raw HPRC vcfwave chr22 VCF's dictionary, section 2.6).
 
+A record that lists one ALT twice, the second time in another case (`G>c,C`), is read as
+`G>C,C`, an ALT listed twice, and both ports write what `26ffe46` wrote for `G>C,C`: two
+identical entries, each listing a `1|2` carrier twice (`S1:0|1,S1:1|0`), unless the position
+already has an entry of that allele, into which both merge (after a `G>C` record:
+`S1:1|1,S2:0|1`); and `A>AT,at` gives two log rows of one allele, each listing the carriers
+of both. Normalised panels never hold such a record.
+
 An example, as both ports write it (`test/test_enricher_multiallelic.py` runs it through
 each): a record of three ALTs and a record of one,
 
@@ -219,7 +241,7 @@ CRISPRme see section 6.3.
 Merging the carriers of an allele on two records can make such conflicts too (on HPRC
 chr22, 37 sample-positions at 38,152,965; section 7, decision 2): CRISPRme must resolve them
 by the same rule as the others (owner decision B4, section 7: two ALTs on one haplotype
-slot are PUTATIVE), which no CRISPRme release applies yet (section 6.3).
+slot are PUTATIVE), which CRISPRme 2.10.0 applies (section 6.3).
 
 ### 2.4 The indel log and the fake-indel genome
 
@@ -429,26 +451,34 @@ stores):
 | HGDP + 1000 Genomes, `crispritz.py add-variants` alone (indels on, as `build-index-only` runs it) on each of chr1, chr2, chr10, chr17 and chr21, then `index-genome` (NRG, `-bMax 1`) of the fake-indel genome it writes | 6 | on each, the enriched genome, the dictionary and every `.bin` byte-identical, the log at its rows of those records and the fake-indel genome at their ALT bases, upper-cased: 6 rows and 6 bases in all |
 
 So on these panels the change is one of text: the `_INDELS` index of each is byte-identical,
-as `buildTST` reads the fake-indel FASTA upper-cased (`26ffe46`'s windows held the ALT in the
-VCF's case, which the index read as its upper case). A guide whose target crosses a
-deletion's junction finds it either way: on the
-mega chr21, `GATGGTGGTGGTGATGGTGG` (PAM `TGG`, minus strand) lies with 0 mismatches across
-the junction of 41,806,097 in its window, `CAACCAAGACAGTGCGGTCA` (PAM `AAA`) across that of
-44,410,608, through both engines' `crispritz.py search` of the `_INDELS` index (both
-deletions lie in tandem repeats, so each 20-mer has perfect sites on the reference too: 30
-and 5). What changes is what a reader of the log takes: the row now names the deletion as
-VCF 4.x reads it, `chr21_41806097_CACCACCATCACC…ACT_C`, where `26ffe46` wrote
-`chr21_41806097_caccaccaTCACC…ACT_c`. CRISPRme 6bff65b already names an indel record in upper
-case: a per-sample search of a guide across the junction of one of HPRC chr22's (11,969,408,
-`aC>a`; `GAAAAAAAAATCCTCCTTTT`, 2 mismatches) gives the same rows and integrated results, byte
-for byte, on the two builds, the row naming it `chr22_11969408_AC_A` in both. A SNV in lower
-case changes the code too: none of
-these panels holds one, but CRISPRme's synthetic world WLOW (`C>g` beside a deletion) shows
-it, through `crisprme.py` 6bff65b: with `26ffe46` the enriched genome kept `C` at the SNV,
-the dictionary named it `C,g`, and two carriers' perfect target (the SNV and the deletion on
-one haplotype) was never reported; with 2.10.0 the genome codes `S`, the dictionary names it
+as `buildTST` reads the fake-indel FASTA upper-cased (`26ffe46`'s windows held the ALT in
+the VCF's case, which the index read as its upper case). A guide whose target crosses a
+deletion's junction finds it either way: on the mega chr21, `GATGGTGGTGGTGATGGTGG` (PAM
+`TGG`) lies with 0 mismatches across the junction of 41,806,097 in its window, and
+`CAACCAAGACAGTGCGGTCA` (PAM `AAA`) across that of 44,410,608, both on the minus strand,
+through both engines' `crispritz.py search` of the `_INDELS` index. Both deletions lie in
+tandem repeats, so neither changes a target of its window: every junction-crossing target is
+the reference at its own coordinates (at 41,806,097 the 22 bases after the deleted ones
+repeat the first 22 deleted ones; at 44,410,608 the repeat runs 123 bases, and the whole
+61-base window is the reference), and each 20-mer has perfect sites elsewhere on the
+reference too (30 and 5). So a CRISPRme `6bff65b` complete-search of junction guides, these
+two among them, reports their junction targets as reference rows (these two's at
+chr21:41,806,083 and 44,410,600, minus strand), byte for byte with either engine, and no row
+of it names either deletion; every junction-crossing 20-nt + NRR target of the two windows
+(6 and 9) has perfect reference sites. What changes is what a reader of the log takes: the
+row now names the deletion as VCF 4.x reads it, `chr21_41806097_CACCACCATCACC…ACT_C`, where
+`26ffe46` wrote `chr21_41806097_caccaccaTCACC…ACT_c`. CRISPRme 6bff65b already names an
+indel record in upper case: a per-sample search of a guide across the junction of one of
+HPRC chr22's (11,969,408, `aC>a`; `GAAAAAAAAATCCTCCTTTT`, 2 mismatches) gives the same rows
+and integrated results, byte for byte, on the two builds, the row naming it
+`chr22_11969408_AC_A` in both. A SNV in lower case changes the code too: none of these
+panels holds one, but CRISPRme's synthetic world WLOW (`C>g` beside a deletion) shows it,
+through `crisprme.py` 6bff65b: with `26ffe46` the enriched genome kept `C` at the SNV, the
+dictionary named it `C,g`, and two carriers' perfect target (the SNV and the deletion on one
+haplotype) was never reported; with 2.10.0 the genome codes `S`, the dictionary names it
 `C,G`, and both carriers are listed on that target, as an independent VCF 4.x haplotype
-oracle requires (section 6.7 says what CRISPRme's own VCF readers must change).
+oracle requires (section 6.7: CRISPRme's own readers of the VCF had to change too, and
+CRISPRme 2.10.0's did).
 
 ## 3. Cost
 
@@ -560,9 +590,9 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
   record, `*`, non-adjacent records, the indel outputs, a position with one record, and a
   SNP outside the chromosome; the fake-indel window of 30 / 30 (both ports' windows and
   `crispritz.py`'s `INDEL_LEFT` / `INDEL_RIGHT`); the entries of a record listing several
-  ALTs in split form, beside a split record and with phased, unphased and haploid calls;
-  and the dictionary the documents describe (the worked example of section 2.3, run whole,
-  and each "a `1|2` carrier of `C>A,T` reads `1|0` under A and `0|1` under T" of the README,
+  ALTs in split form, beside a split record and with phased, unphased and haploid calls; and
+  the dictionary the documents describe (the worked example of section 2.3, run whole, and
+  each "a `1|2` carrier of `C>A,T` reads `1|0` under A and `0|1` under T" of the README,
   this document and the CHANGELOG, each of which must give one); REF and ALTs in lower or
   mixed case (section 2.9: a lower-case SNP ALT coded, in both modes, and four of them `Q`;
   a lower-case REF; deletions, insertions and an MNV in lower or mixed case, their windows
@@ -571,13 +601,13 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
   windowed as two written alike; a VCF of 18 records, SNPs, `*`, `N`, `.`, symbolic ALTs, a
   four-base site, a reference `N`, a non-PASS record, indels and MNVs, its REF and ALTs in a
   seeded random mix of cases, whose every output is that of the VCF in upper case). The 5
-  case tests (10 runs) fail against `26ffe46`'s ports and the 27 others pass. Of the 24 tests the branch
-  had, 26 of the 48 runs failed against its last commit (`f266eac`, the four-base rule) and
-  44 against 2.9.1 (the 4 that pass, mode `no` == mode `yes` and a position with one record,
-  pin what does not change); the split-form test and the three whose expectations it moved
-  to split form fail against c18c575's ports (8 of the 52); the documents' test (2 of the 54
-  runs) fails against c18c575's ports too, and against the documents of 1a9812d, which gave
-  no example in the README or section 2.3.
+  case tests (10 runs) fail against `26ffe46`'s ports and the 27 others pass. Of the 24
+  tests the branch had, 26 of the 48 runs failed against its last commit (`f266eac`, the
+  four-base rule) and 44 against 2.9.1 (the 4 that pass, mode `no` == mode `yes` and a
+  position with one record, pin what does not change); the split-form test and the three
+  whose expectations it moved to split form fail against c18c575's ports (8 of the 52); the
+  documents' test (2 of the 54 runs) fails against c18c575's ports too, and against the
+  documents of 1a9812d, which gave no example in the README or section 2.3.
 * `verify_enricher.sh` — grows from 17 to 34 cases (cases 18-30: split sites in every
   order, the same sites as one record, four bases, non-adjacent records, genotype shapes,
   SNP + indel at one position and in an indel's window, a split record beside a multi-ALT
@@ -617,6 +647,11 @@ on one slot for 37 sample-positions, all at 38,152,965. Mega is sites-only: no g
 
 ## 6. What CRISPRme must change
 
+This section was written against CRISPRme `a5379e0`, before CRISPRme 2.10.0, and its line
+numbers are that tree's (6.7's are `6bff65b`'s). What CRISPRme 2.10.0 does about each item
+is in its METHODS (sections 2, 4, 8 and 9) and its CHANGELOG; 6.7 says which of its
+changes CRISPRme 2.10.0 made.
+
 Nothing in CRISPRme's file formats has to change: the Tier-0 registry and the Tier-1 store
 already hold one record per `(pos, alt)` and several per position, and every dictionary
 reader already splits a value on `$`. What changes is **content** (positions that held one
@@ -629,20 +664,25 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
 ### 6.1 Pin, provenance, and a guard against mixing
 
 * Pin CRISPRitz `2.10.0`: `Dockerfile:31` (`ARG crispritz_ref=v2.9.1`), `environment.yml`
-  and `install_from_source.sh` (which name 2.9.1), the Bioconda `crisprme` recipe.
+  and `install_from_source.sh` (which name 2.9.1), the Bioconda `crisprme` recipe. Under the
+  version policy (`docs/RELEASING.md`) CRISPRme 2.10.0 requires CRISPRitz 2.10.*: its
+  Dockerfile's `crispritz_ref` and `install_from_source.sh`'s `CRISPRITZ_REF` name
+  `v2.10.0`, its Bioconda recipe pins `crispritz >=2.10.0,<2.11`, and the crispritz
+  2.10.0 recipe declares `run_constrained: crisprme >=2.10.0`.
 * The enriched genome, its TST index, the fake-indel genome and its `_INDELS` index, the
   per-sample dictionaries, the indel logs and the Tier-0/Tier-1 stores must all come from
   **one** enrichment (an `_INDELS` index beside the log of another enrichment is mapped by
   windows it was not built from: CRISPRme 2.10.0 records each sub-index's window and refuses
-  one beside a log of another width, section 2.4). Mixed, the code and the genotype source disagree at ~2.5 % of SNP positions:
-  an old dictionary under a new genome has no carriers for a coded ALT (rows needing it are
-  not emitted), a new dictionary under an old genome offers ALTs the search never matched. Stamp the enrichment in the tier manifests
-  (`registry_<vcf>/reg_<chrom>.idx`, whose manifest `tier0_registry._write_registry`
-  already stamps with `data_type`/`phased`, line 1158, and `genotypes_<vcf>/gt_<chrom>.idx`,
-  written by `tier1_genotypes.compile_genotypes`) and in the index's `manifest.json`, e.g.
-  `"enricher": {"crispritz": "2.10.0", "multiallelic": "merged"}`, and refuse (or warn on)
-  a search whose index and tiers disagree. `add-variants` is called at `crisprme.py:4150`;
-  the tiers are emitted at `crisprme.py:4326-4475`
+  one beside a log of another width, section 2.4). Mixed, the code and the genotype source
+  disagree at ~2.5 % of SNP positions: an old dictionary under a new genome has no carriers
+  for a coded ALT (rows needing it are not emitted), a new dictionary under an old genome
+  offers ALTs the search never matched. Stamp the enrichment in the tier manifests
+  (`registry_<vcf>/reg_<chrom>.idx`, whose manifest `tier0_registry._write_registry` already
+  stamps with `data_type`/`phased`, line 1158, and `genotypes_<vcf>/gt_<chrom>.idx`, written
+  by `tier1_genotypes.compile_genotypes`) and in the index's `manifest.json`, e.g.
+  `"enricher": {"crispritz": "2.10.0", "multiallelic": "merged"}`, and refuse (or warn on) a
+  search whose index and tiers disagree. `add-variants` is called at `crisprme.py:4150`; the
+  tiers are emitted at `crisprme.py:4326-4475`
   (`build_dictless_tiers.emit_dictless_tiers_guarded`).
 
 ### 6.2 Dict-less tiers and registry
@@ -662,9 +702,13 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
   record's: through its real CLI on the review's synthetic worlds an independent haplotype
   oracle finds every carrier's target, phase and variants right, two such records at one
   position included, where the raw genotypes listed carriers for targets their haplotypes do
-  not hold and lost one CFD-1.0 target; its real-data check verifies such positions where
-  the run's own dictionary is in split form (and refuses two such records at a position
-  only where a dictionary keeps raw numbers).
+  not hold and lost one CFD-1.0 target. Its real-data check (CRISPRme `802a1da`) verifies
+  such positions where the run's own dictionary is in split form and the run tells that
+  every allele is coded (its enriched genome codes an earlier record's ALT at a split SNP
+  site, or its index flags `Q`); where the run tells nothing, it reads the line's raw
+  numbers, each listing there a documented limit (`limit-snp-row-unphased`), and it refuses
+  two such records at a position where a dictionary keeps raw numbers or the run has none
+  (CRISPRme's METHODS, section 8).
 * The mega registry is compiled from INFO/AF straight from the VCF
   (`compile_registry_from_info_af`), so it already lists every ALT — 20,517 chr22 positions
   with two or more SNP ALTs in the published `registry_hg38_mega` — while the mega enriched
@@ -685,10 +729,16 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
   (`totalDict[...][(pos_c, elem)]`), and the lattice only combines strictly increasing
   columns (`if newkey[-2] > key[-2]`, line 1198), so two ALTs of one position never share a
   haplotype. The per-haplotype test `allele != "0"` (lines 947-952) is right for every
-  entry (a slot holding the other ALT reads `0`): a split record's, a merged one's, and
-  since 2.10.0 a record listing several ALTs' too, whose entries are written in split form
-  (section 2.3; up to the integration their raw `1|2` put the sample on both slots of both
-  ALTs, a case no published panel reaches). No change (but see `Q`, below). This path (and
+  entry whose slots are called (a slot holding the other ALT reads `0`): a split record's, a
+  merged one's, and since 2.10.0 a record listing several ALTs' too, whose entries are
+  written in split form (section 2.3; up to the integration their raw `1|2` put the sample on
+  both slots of both ALTs, a case no published panel reaches). A missing allele `.` passed
+  the test too, so a `.|1` carrier was put on slot 0's seed as well (ENG-B-R1-2, since
+  CRISPRme 2.8.1); CRISPRme 2.10.0 reads `.` as carrying nothing on this path, as on the
+  Tier-1 path. No change otherwise (but see `Q`, below). An unphased call stays on both
+  slots, so the peel (lines 1242-1267) lists an unphased carrier only on the largest
+  combination of its variants, not on the subsets one of its phases holds, which the Tier-1
+  path lists: a known limit of CRISPRme 2.10.0's classic install (IR2A-R2-1). This path (and
   its population-level greedy, `by_pos`, from line 1027) substitutes **every** ALT the
   dictionary lists, without checking the target's IUPAC column (with the four-base rule it
   also tried the ALT the code left out; with `Q` the column holds every ALT). Filtering by
@@ -793,7 +843,12 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
   all-absent choice), or drop combinations whose columns repeat. The fallback for a sample
   carrying more than `max_putative` variants (`IUPAC_CAP`, default 10; line 243) emits the
   union of everything carried, both ALTs of a column included, and needs the same rule (e.g.
-  one union per choice of ALT at such a column).
+  one union per choice of ALT at such a column). CRISPRme 2.10.0 builds its combinations so,
+  at most one ALT of a column each. It still lists such a carrier on a combination that
+  leaves the column out, which needs the reference there, where both its slots hold an ALT
+  (a `1/2` carrier at p and `1/0` at q, on the row of q alone): the "every non-empty subset"
+  reading of an unphased call over-includes for a call of two ALTs, a known limit
+  (ENG-B-R1-3).
 * **Should change — `population_summary`** (the companion's frequencies). A single-variant
   row (k = 1) is read from the registry, exact per ALT. A combination row (k ≥ 2) on a phased
   panel counts a carrier's slot when it holds the ALT at every row position
@@ -860,18 +915,60 @@ as any base (docs/INDEX_FORMAT.md section 8, item 8; in the SNP path, 6.3, and t
 
 No format change: a row's variant columns list the ALT each haplotype holds, and two ALTs of
 one position appear in two rows, as they would for a record listing several ALTs
-(`resultIntegrator.py` splits the tokens per row, lines 455-520) — once 6.3 is fixed. Until
-then the per-sample report and its companions hold rows naming two ALTs of one position
-(measured on the branch's enrichment, indexed in format 1 by CRISPRitz 2.9.1, 6.3), and a
-2.10.0 index, whose enrichment holds the same dictionary, will put them there too once
-CRISPRme reads one. The SNP+SNP companion took such a row for a co-occurrence
-because `_record_snp_snp_cooc` (`new_simple_analysis.py`, lines 387-391) counts distinct
-variant tokens (`chr22_10661629_C_G`, `chr22_10661629_C_T`), not distinct positions; it
-should compare positions. Expect more variant rows and more carriers at the affected
-positions; the changelog and `METHODS.md` must say that earlier releases reported only the
-last ALT of a split site, and what `Q` is (a target may show it in its DNA column).
+(`resultIntegrator.py` splits the tokens per row, lines 455-520) — once 6.3 is fixed, as it
+is in CRISPRme 2.10.0. Until then the per-sample report and its companions held rows naming
+two ALTs of one position (measured with CRISPRme `a5379e0` on the branch's enrichment,
+indexed in format 1 by CRISPRitz 2.9.1, 6.3), and a 2.10.0 index, whose enrichment holds the
+same dictionary, would put them there too. The SNP+SNP companion took such a row for a
+co-occurrence because `_record_snp_snp_cooc` (`new_simple_analysis.py`, lines 387-391)
+counted distinct variant tokens (`chr22_10661629_C_G`, `chr22_10661629_C_T`), not distinct
+positions; CRISPRme 2.10.0's compares positions. Expect more variant rows and more carriers
+at the affected positions; the changelog and `METHODS.md` must say that earlier releases
+reported only the last ALT of a split site, and what `Q` is (a target may show it in its DNA
+column).
+
+### 6.6 Tests CRISPRme should add
+
+* A Tier-0/Tier-1 compile of a merged value (two ALTs, carriers on opposite slots): per-ALT
+  AC/AN and carriers (the measurement in 6.2, as a unit test).
+* The observed CONFIRMED fix (6.3): a phased sample `0|1` under G and `0|1` under T at one
+  position must not yield a set holding both (nor `1|0` + `1|0`, nor `1|1` + `0|1`, nor three
+  ALTs on one slot); it is a carrier of {G} and of {T}, neither CONFIRMED, while a sample
+  `1|0` under G and `0|1` under T keeps {G} and {T} CONFIRMED. Add a second column carried
+  on the conflicting slot, so the sets with it are checked too.
+* The observed PUTATIVE fix (6.3): an unphased `1/2` carrier yields {A}, {C}, never {A, C};
+  the same above `max_putative` (the union fallback).
+* The population summary of a k ≥ 2 row through a slot holding two ALTs of a row position
+  (6.3), and the SNP+SNP companion on a row with two ALTs of one position (6.5): no
+  co-occurrence.
+* End to end, the run of 6.3 as an acceptance test: on a 2.10.0 index, `complete-search
+  --per-sample` with guide `TTATTCCAGACAGATTATGC` (NRG) at chr22:10,661,610 must report no
+  row naming two ALTs of one position, in the per-haplotype report, the alternative
+  alignments and the companions, and list NA18869 under the G and the T rows, neither as
+  CONFIRMED.
+  The kit — hg38 chr22:1-10,700,000 and the 4,433 HGDP + 1000 Genomes records up to
+  10,699,000 — built in 15 s and searched in 5 min in the run of 6.3 (CRISPRitz 2.9.1's
+  index, in format 1).
+* SNP+indel co-occurrence on a column with two ALTs where the guide uses the non-first one
+  (6.4), dictionary and Tier-1 sources.
+* An end-to-end guide at a real split site whose earlier record carries a common ALT, e.g.
+  chr20:12296886 (G>A, 1,451 copies, absent from the 2.8.x Tier-1 store; G>C, 2 copies,
+  present), run through `complete-search` before and after the rebuild.
+* A guard test for 6.1: tiers and index from different enrichments are refused.
+* `Q` (6.3, 6.4): a target through a `Q` column, alone and beside another variant column,
+  yields each of the position's three ALTs in both SNP paths, and the overlay writes `Q` on
+  a fake-indel flank base at a four-allele position.
 
 ### 6.7 REF and ALT in lower case
+
+**Done in CRISPRme 2.10.0** (`47b1884`, on this engine's `4ded5e6`): the five readers of the
+VCF below read REF and every ALT in upper case. Its checker checks an SNV ALT in lower case
+on a genome of 2.10.0 (an index of format 2) and still refuses one on a genome that does not
+code it, and where nothing tells which. Its input validator keys every REF>ALT upper-cased
+and no longer warns. The six tests that pinned the 2.9.1 rule follow the 2.10.0 one, the
+readers of the dictionary stay as they are, their docstrings saying what a 2.10.0
+dictionary holds and how an earlier one is read, and CRISPRme's documents state the 2.10.0
+rule. The rest of this section is the list as it was written, against `6bff65b`.
 
 The enricher reads REF and ALT in upper case (section 2.1), so the enriched genome, the
 dictionary, the indel log and the fake-indel genome are all VCF 4.x's. CRISPRme's readers
@@ -964,51 +1061,27 @@ lower-case ALT, as 2.9.1 did: a 2.10.0 twin of the test (S05 on R's perfect targ
 S01, as the world WLOWALT gives with this engine, below) needs it to read the ALT
 upper-cased, in the genome and in the dictionary it writes. No test's verdict depends on the
 engine alone: the 145 modules give the same verdicts with `26ffe46` and with this engine.
+More readers of the dictionary, or of a store compiled from it, decide on case implicitly,
+and stay too: `new_simple_analysis.py:410` and `:415` (`_column_alleles` keeps an ALT only
+if it is in an upper-case IUPAC base set), `haplotype_prioritizer.py:664` and `:688` (the
+Tier-1 store's ALT as written, compared with a row's upper-cased ALT) and
+`targets_scoring.py:248` (the registry's REF, looked up by a row's ALT): a 2.10.0
+dictionary is all upper case. Two of the files that stay kept docstrings true of releases
+before 2.10.0 only: `site_alleles.py:209-213` and `indel_snp_cis.py:1291-1294`.
 
 Already case-blind: `build_mega_indel_af.py` (147-157, 216, 219), `build_indel_genotypes`'s
 `store_key` (279-287), `indel_snp_cis.record_name` (325-340, whose docstring says the log
 keeps the VCF's text: no longer), `haplotype_prioritizer.py:465-480`, the Tier-0 and
 Tier-1 filters (`tier0_compile.py:359`, `tier1_genotypes.py:247`). CRISPRme's documents say
-the 2.9.1 rule: `METHODS.md` 228-241, 2564-2569 and 2684-2687, `docs/INPUT_FORMATS.md`
-345-351, `test/benchmark/README.md` 195-198, the CHANGELOG's entries of 2.10.0 on it. Through
+the 2.9.1 rule: `METHODS.md` 228-241, 383-385 (the mega registry), 2564-2569 and 2684-2687,
+`docs/INPUT_FORMATS.md` 345-351, `test/benchmark/README.md` 195-198, the CHANGELOG's entries
+of 2.10.0 on it and its lines 1825-1827 (the mega registry). Through
 CRISPRme `6bff65b` with this engine, the synthetic worlds WLOW, WLOWALT (tier and classic
 installs) and WLOWR give the rows an independent VCF 4.x haplotype oracle requires (with
 `26ffe46`: WLOW misses two carriers' perfect target, WLOWALT one), as their rows come from the
 engine's dictionary and fake-indel genome; the checker refuses WLOW (the SNV ALT in lower
 case) and WLOWALT (it cannot tell how the run coded a site written as `C>G` and `C>g`, as for
 any one allele on two records).
-
-### 6.6 Tests CRISPRme should add
-
-* A Tier-0/Tier-1 compile of a merged value (two ALTs, carriers on opposite slots): per-ALT
-  AC/AN and carriers (the measurement in 6.2, as a unit test).
-* The observed CONFIRMED fix (6.3): a phased sample `0|1` under G and `0|1` under T at one
-  position must not yield a set holding both (nor `1|0` + `1|0`, nor `1|1` + `0|1`, nor three
-  ALTs on one slot); it is a carrier of {G} and of {T}, neither CONFIRMED, while a sample
-  `1|0` under G and `0|1` under T keeps {G} and {T} CONFIRMED. Add a second column carried
-  on the conflicting slot, so the sets with it are checked too.
-* The observed PUTATIVE fix (6.3): an unphased `1/2` carrier yields {A}, {C}, never {A, C};
-  the same above `max_putative` (the union fallback).
-* The population summary of a k ≥ 2 row through a slot holding two ALTs of a row position
-  (6.3), and the SNP+SNP companion on a row with two ALTs of one position (6.5): no
-  co-occurrence.
-* End to end, the run of 6.3 as an acceptance test: on a 2.10.0 index, `complete-search
-  --per-sample` with guide `TTATTCCAGACAGATTATGC` (NRG) at chr22:10,661,610 must report no
-  row naming two ALTs of one position, in the per-haplotype report, the alternative
-  alignments and the companions, and list NA18869 under the G and the T rows, neither as
-  CONFIRMED.
-  The kit — hg38 chr22:1-10,700,000 and the 4,433 HGDP + 1000 Genomes records up to
-  10,699,000 — built in 15 s and searched in 5 min in the run of 6.3 (CRISPRitz 2.9.1's
-  index, in format 1).
-* SNP+indel co-occurrence on a column with two ALTs where the guide uses the non-first one
-  (6.4), dictionary and Tier-1 sources.
-* An end-to-end guide at a real split site whose earlier record carries a common ALT, e.g.
-  chr20:12296886 (G>A, 1,451 copies, absent from the 2.8.x Tier-1 store; G>C, 2 copies,
-  present), run through `complete-search` before and after the rebuild.
-* A guard test for 6.1: tiers and index from different enrichments are refused.
-* `Q` (6.3, 6.4): a target through a `Q` column, alone and beside another variant column,
-  yields each of the position's three ALTs in both SNP paths, and the overlay writes `Q` on
-  a fake-indel flank base at a four-allele position.
 
 ## 7. Decisions of the owner
 
@@ -1032,11 +1105,11 @@ Taken for CRISPRitz 2.10.0 and CRISPRme 2.10.0 (CRISPRme plan, section 3, B1-B4)
 3. **Records listing several ALTs** (B3, revisited): their entries were to keep their
    multi-index genotypes (`1|2`), every CRISPRme reader learning to tie each to its ALT's
    index. A reader cannot, where the dictionary also lists a split record of the position:
-   its entry's `1` numbers its own record, and CRISPRme 2.10.0 then reads such an ALT without
-   phase. Each ALT's entry is now written in split form, as a merged entry (decision 2)
-   already was, so every entry's `1` is its own ALT.
-4. **Two ALTs on one haplotype slot are PUTATIVE** (B4), to be resolved in CRISPRme (6.3; no
-   CRISPRme release does so yet), which has the window and every ALT's carriers in hand: the
+   its entry's `1` numbers its own record, and CRISPRme 2.10.0's tree, given raw numbers,
+   read such an ALT without phase. Each ALT's entry is now written in split form, as a merged
+   entry (decision 2) already was, so every entry's `1` is its own ALT.
+4. **Two ALTs on one haplotype slot are PUTATIVE** (B4), to be resolved in CRISPRme (6.3;
+   CRISPRme 2.10.0 does), which has the window and every ALT's carriers in hand: the
    enricher passes them through verbatim (independently phased split records: 672
    sample-positions on HGDP + 1000 Genomes chr22, none on HPRC chr22), and merging an
    allele's carriers makes some (decision 2: 37 on HPRC chr22). Rejected: writing such a
@@ -1058,7 +1131,9 @@ dictionary and what is compiled from it; a SNP outside the chromosome), and ever
 derived from its enrichment. Reference-only indexes (`NRG_3_hg38`, `NRR_3_hg38`,
 `NGG_3_hg38`, `NNN_3_hg38`, `NNNNNNNN_3_hg38`) are not affected by the enricher, but are
 rebuilt too, in index format 2 (docs/INDEX_FORMAT.md; owner decision C1: one format on the
-Hub, and the sites at contig ends and N runs format 2 adds).
+Hub, and the sites at contig ends and N runs format 2 adds): in CRISPRme 2.10.0,
+`20-NRG_3_hg38`, `20-NRR_3_hg38`, `20-NGG_3_hg38` and the general `20-NNNNNNNN_3_hg38`, which
+serves `NNN_3_hg38`'s searches.
 
 Panels, each measured on its published chr22 source VCF (`vcfs/<panel>/` of
 `lucapinello/crisprme-data`): **HGDP + 1000 Genomes** (`hg38_HGDP1kGP`) — 43,389 positions
@@ -1069,52 +1144,68 @@ with `bcftools norm -m -any` before enrichment; an HPRC registry compiled from a
 dictionary (ml008 `allidx/`) holds 535,488 chr22 positions, none with two ALTs. All three
 are affected.
 
-`lucapinello/crisprme-data`, `indexes/`:
+These are the archives of 2.8.1 that the enricher's changes reach, and what CRISPRme 2.10.0
+publishes in their place. The archives of 2.8.1 stay where they are, unchanged, for CRISPRme
+2.8.1, which reads index format 1 only (owner decision C2). The rebuilt ones are CRISPRme
+2.10.0's index set (its `seq_script/rebuild/index_set_2.10.0.tsv`), built by this CRISPRitz
+in index format 2, and go to a Hugging Face dataset repo of their own,
+`lucapinello/crisprme-indexes-format2`, where no earlier CRISPRme looks:
 
-| Archive | Rebuild | Members that change |
+| 2.8.1 archive (`lucapinello/crisprme-data`, `indexes/`) | Members the enricher changes | In CRISPRme 2.10.0 |
 |---|---|---|
-| `NRG_3_hg38+hg38_HGDP1kGP` | yes | index bins; `_INDELS` bins (overlay); `Dictionaries/registry_hg38_HGDP1kGP`; `manifest.json` |
-| `genotypes_hg38_HGDP1kGP` | yes | the Tier-1 store |
-| `NRR_3_hg38+hg38_HGDP1kGP` | yes | as NRG |
-| `NGG_3_hg38+hg38_HGDP1kGP` | yes | as NRG |
-| `NNN_3_hg38+hg38_HGDP1kGP` | yes | as NRG |
-| `NRG_3_hg38+hg38_mega` | yes | index bins; `_INDELS` bins; `manifest.json` (registry unchanged) |
-| `NRR_3_hg38+hg38_mega` | yes | as NRG mega |
-| `NRG_3_hg38+hg38_HPRC`, `NRR_3_hg38+hg38_HPRC` | yes | as NRG HGDP1kGP, and `Dictionaries/log_indels_hg38_HPRC` (its chrY log, below) |
-| `genotypes_hg38_HPRC` | yes | the Tier-1 store |
-| `SHA256SUMS` | yes | every rebuilt archive |
+| `NRG_3_hg38+hg38_HGDP1kGP` | index bins; `_INDELS` bins (overlay); `Dictionaries/registry_hg38_HGDP1kGP`; `manifest.json` | `20-NRG_3_hg38+hg38_HGDP1kGP` |
+| `NRR_3_hg38+hg38_HGDP1kGP` | as NRG | `20-NRR_3_hg38+hg38_HGDP1kGP` |
+| `NGG_3_hg38+hg38_HGDP1kGP` | as NRG | `20-NGG_3_hg38+hg38_HGDP1kGP` |
+| `NNN_3_hg38+hg38_HGDP1kGP` | as NRG | not built again: the general index, `20-NNNNNNNN_3_hg38+hg38_HGDP1kGP`, serves its searches |
+| `genotypes_hg38_HGDP1kGP` | the Tier-1 store | `genotypes_hg38_HGDP1kGP` and `dictionaries-bundle_hg38_HGDP1kGP`, once for the panel |
+| `NRG_3_hg38+hg38_mega`, `NRR_3_hg38+hg38_mega` | index bins; `_INDELS` bins; `manifest.json` (registry unchanged) | `20-NRR_3_hg38+hg38_mega`, which serves NRG too, and `dictionaries-bundle_hg38_mega` |
+| `NRG_3_hg38+hg38_HPRC`, `NRR_3_hg38+hg38_HPRC` | as NRG HGDP1kGP, and `Dictionaries/log_indels_hg38_HPRC` (its chrY log, below) | `20-NRR_3_hg38+hg38_HPRC`, which serves NRG too, and `dictionaries-bundle_hg38_HPRC` |
+| `genotypes_hg38_HPRC` | the Tier-1 store | `genotypes_hg38_HPRC` |
+| `SHA256SUMS` | every rebuilt archive | the new repo's |
 
 `lucapinello/crisprme-data-general-index`, `indexes/`: `NNNNNNNN_3_hg38+hg38_HGDP1kGP` and
-its `genotypes_hg38_HGDP1kGP` (the same companion), and `SHA256SUMS`.
+its `genotypes_hg38_HGDP1kGP` (the same companion), and `SHA256SUMS`; in CRISPRme 2.10.0,
+`20-NNNNNNNN_3_hg38+hg38_HGDP1kGP`.
 
 `lucapinello/crisprme-data`, `build-inputs/`: `hg38_HGDP1kGP.tar.gz` and `hg38_mega.tar.gz`
 (the enriched genome `Genomes/hg38+hg38_<ds>/` and the overlaid fake-indel genome
-`Genomes/hg38+hg38_<ds>_INDELS/`) and their `.SHA256SUMS`.
+`Genomes/hg38+hg38_<ds>_INDELS/`) and their `.SHA256SUMS`; in CRISPRme 2.10.0,
+`build-inputs/hg38_HGDP1kGP`, `build-inputs/hg38_HPRC` and `build-inputs/hg38_mega`.
+
+The set adds indexes of its own on the reference and HGDP + 1000 Genomes (SaCas9
+`22-NNGRRN_3_*`, Cas12a `TTTN-20_3_*` and `TTTN-23_3_*`), and CRISPRme 2.10.0 rebuilds the
+whole mega dataset, its registry and indel frequencies included, for reasons of its own (its
+METHODS, section 2). Its indexes of HGDP + 1000 Genomes hold, like its reference indexes, all
+455 contigs of hg38, for every PAM (2.8.1's NRG index of the panel held 24); its indexes of
+HPRC and mega hold chr1-22, X and Y, as 2.8.1's did.
 
 Unchanged by the enricher (measured on chr22 or derived from the VCF directly):
 `indel_genotypes_<vcf>/`, `indel_af_hg38_mega/`, `samplesIDs/` and the source VCFs under
-`vcfs/`. Every `log_indels_<vcf>/` log changes with the wider window (each row's `CHR`
-field, `FAKEPOS` and `refseq`, section 2.4) and is rebuilt with its `_INDELS` index; up to
-that change, the logs of HGDP + 1000 Genomes and mega were unchanged by the merge and `Q`.
-HPRC's changed besides: a log's AF column changes wherever a record lists `INFO/AF` at
-another place than its VCF's first record, as each record's AF is now read by its key (section 2.5), and of the 24 HPRC
-VCFs (the normalised build input) chrY's has such records (96,853 of its 108,023 indel
-records), the 23 others none. With 2.10.0, `log_indels_hg38_HPRC/logchrY` gains the AF of
-91,950 of its 102,665 rows (the published one leaves exactly those empty), every other
-column identical and each AF its record's (0 mismatches against the VCF), and 47,911 of the
-chrY dictionary's 109,033 values change in their AF alone. None of the 23 HGDP + 1000
-Genomes VCFs has such a record, and mega's VCF lists no `AF` key (chr22: only `AF_<panel>`
-and `AF_max`), so their logs keep their AF; on chr22 the logs of all three panels were
-byte-identical to 2.9.1's at its window. With REF and ALT read in upper case (section 2.9),
-HPRC's logs change besides at the rows of its 108,178 records written in lower case (1,546
-on chr22), each with the fake-indel genome's bases of those ALTs. The mega's logs change at
-their 13 rows of such records, on chr3, chr4, chr5, chr10, chr12, chr18 and chr21 (section
-2.9 lists them), each with the fake-indel genome's one base of that deletion's ALT.
-HGDP + 1000 Genomes' logs change at their 6 rows of such records, on chr1, chr2, chr10 (two),
-chr17 and chr21 (section 2.9 lists them too), each with the fake-indel genome's one base of
-that deletion's ALT. Their `_INDELS` indexes do not change by it. Rebuild the logs with the
-rest rather than carry the published ones over. A classic (non-dict-less) publish's
-`Dictionaries/dictionaries_<vcf>/` changes and must be rebuilt with the rest.
+`vcfs/` (CRISPRme 2.10.0 rebuilds its indel genotype stores all the same, to hold only the
+records whose FILTER the search reads, and the mega's indel frequencies with the rest of the
+mega: its CHANGELOG). Every `log_indels_<vcf>/` log changes with the wider window (each
+row's `CHR` field, `FAKEPOS` and `refseq`, section 2.4) and is rebuilt with its `_INDELS`
+index; up to that change, the logs of HGDP + 1000 Genomes and mega were unchanged by the
+merge and `Q`. HPRC's changed besides: a log's AF column changes wherever a record lists
+`INFO/AF` at another place than its VCF's first record, as each record's AF is now read by
+its key (section 2.5), and of the 24 HPRC VCFs (the normalised build input) chrY's has such
+records (96,853 of its 108,023 indel records), the 23 others none. With 2.10.0,
+`log_indels_hg38_HPRC/logchrY` gains the AF of 91,950 of its 102,665 rows (the published one
+leaves exactly those empty), every other column identical and each AF its record's (0
+mismatches against the VCF), and 47,911 of the chrY dictionary's 109,033 values change in
+their AF alone. None of the 23 HGDP + 1000 Genomes VCFs has such a record, and mega's VCF
+lists no `AF` key (chr22: only `AF_<panel>` and `AF_max`), so their logs keep their AF; on
+chr22 the logs of all three panels were byte-identical to 2.9.1's at its window. With REF
+and ALT read in upper case (section 2.9), HPRC's logs change besides at the rows of its
+108,178 records written in lower case (1,546 on chr22), each with the fake-indel genome's
+bases of those ALTs. The mega's logs change at their 13 rows of such records, on chr3, chr4,
+chr5, chr10, chr12, chr18 and chr21 (section 2.9 lists them), each with the fake-indel
+genome's one base of that deletion's ALT. HGDP + 1000 Genomes' logs change at their 6 rows
+of such records, on chr1, chr2, chr10 (two), chr17 and chr21 (section 2.9 lists them too),
+each with the fake-indel genome's one base of that deletion's ALT. Their `_INDELS` indexes
+do not change by it. Rebuild the logs with the rest rather than carry the published ones
+over. A classic (non-dict-less) publish's `Dictionaries/dictionaries_<vcf>/` changes and
+must be rebuilt with the rest.
 
 Then: `docs/INDEX_PROVENANCE.md` and `docs/PRECOMPUTED_INDEXES.md` record the rebuild and the
 CRISPRitz version, and the release notes say a 2.10.0-built index must not be mixed with
