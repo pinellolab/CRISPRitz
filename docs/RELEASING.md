@@ -151,6 +151,10 @@ must not be edited by hand — bumping `version` repoints it automatically.
 
 ## Step-by-step
 
+The commands below are written for bash. In zsh, the default shell of macOS, run
+`setopt interactive_comments` first: an interactive zsh reads a `#` as a word, and passes a
+command's trailing comment to it as arguments.
+
 ### 1. Pre-flight consistency check
 
 Confirm the repo, the latest tag, and the live recipe agree on the *current*
