@@ -34,7 +34,7 @@ jobs:
         run: bash test/run_pam_filter_test.sh
 
   enricher-ports:
-    name: enricher.py and enricher.cpp agree (incl. multiallelic indels)
+    name: enricher.py and enricher.cpp agree (incl. multiallelic sites, split and joined)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,12 +49,23 @@ jobs:
       # enricher.cpp is meant to be a faithful port of enricher.py, and the
       # packaged install silently falls back to the Python one when the binary is
       # absent, so the two must not drift. verify_enricher.sh synthesizes a VCF of
-      # 17 cases -- biallelic and multiallelic SNPs, a non-PASS record, insertions,
+      # 34 cases -- biallelic and multiallelic SNPs, a non-PASS record, insertions,
       # deletions, a site carrying TWO indel alleles (the case where a per-allele
       # window built on the previous allele's output compounds them), the SNP+indel
-      # combinations, the chromosome edges, and multiallelic SNPs whose ALTs include
-      # '*' -- then diffs all four outputs byte-for-byte, plus the file set and the
-      # run log.
+      # combinations, the chromosome edges, multiallelic SNPs whose ALTs include
+      # '*', and multi-allelic sites split into one record per ALT (every record
+      # order, all four bases coded Q, genotype shapes, SNP + indel at one position,
+      # two ALTs on one haplotype slot), INFO/AF read by its key, the same REF>ALT on
+      # two records, ALTs on a reference N, X or '-', REF and ALTs in lower or mixed
+      # case (read upper-cased: VCF 4.x)
+      # -- then diffs all four outputs byte-for-byte, plus the file set and the run log,
+      # and checks them against what they must be: the enriched genome against an
+      # independent reconstruction (the N-count invariant among it), the dict at cases
+      # 24 and 31-34 (merged carriers, AF by key, the records at a reference N, X or '-',
+      # a record listing three SNP ALTs, records in lower case; no REF or ALT in lower
+      # case), the indel log's AF at case 31 and its rows against the VCF's indel
+      # alleles upper-cased, the windows (no base in lower case), and a reference
+      # holding Q refused alike.
       - name: Build the C++ enricher
         run: g++ -std=c++11 -O2 sourceCode/Python_Scripts/Enrichment/enricher.cpp -o /tmp/enricher_opt -lz
 
@@ -62,9 +73,18 @@ jobs:
         working-directory: sourceCode/Python_Scripts/Enrichment
         run: bash verify_enricher.sh /tmp/enricher_opt
 
+      # Agreement is not correctness: both ports kept only the last record's ALT of a
+      # split multi-allelic site for years, in agreement. These tests run each port on
+      # small inputs and check the exact enriched base, dict entries and indel outputs.
+      - name: multi-allelic enrichment, exact outputs of both ports
+        run: ENRICHER_BIN=/tmp/enricher_opt python3 test/test_enricher_multiallelic.py -v
+
       # add-variants runs one enricher per chromosome in a Pool and used to ignore
       # their exit status, so a crashed or killed enricher left it at exit 0 with
       # that chromosome missing. A stub enricher on PATH makes each outcome exact.
+      # With the shipped enricher: a chromosome it copies (no VCF) holding Q is
+      # refused, and a README, .DS_Store, .fai or macOS ._<name>.fa beside the
+      # chromosomes is ignored.
       - name: add-variants fails when an enricher fails
         run: bash test/run_add_variants_status_test.sh
 
@@ -98,6 +118,34 @@ jobs:
       - name: buildTST on a contig too short for a target
         run: bash test/run_short_contig_test.sh
 
+  four-allele:
+    name: four-allele symbol Q end to end (add-variants, index-genome, search == oracle and brute force)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # python3-pandas: add-variants runs enricher.py too (the test compares both ports)
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1 zlib1g-dev python3-pandas
+
+      # A position whose SNP ALTs, with an A/C/G/T reference base, cover all four bases is
+      # written Q, which buildTST, searchTST and searchBruteForce read as any base (N
+      # stays a gap).
+      # Synthetic contigs put Q in guides, in PAMs that exist only through it, in the
+      # pad, beside N runs and on contig ends; through crispritz.py add-variants (both
+      # ports), index-genome (3' and 5', dedicated and PAM-less) and search, every
+      # search must equal test/boundary/oracle.py, every 0-bulge one searchBruteForce,
+      # no row may hold an N, a .bin is flagged four_allele exactly when it holds Q, and
+      # the brute force at -mm 120 reports no window with an N in its guide (a guide
+      # with one N is planted beside a PAM: an N used to cost 101 mismatches). Last, a
+      # contig holding bytes that are no base, IUPAC code, N or Q (X, '.', '-'), which are
+      # read as N, in guide regions, pads and PAM-less flanks: nothing on stderr, and the
+      # searches equal the oracle and the brute force.
+      - name: Run four-allele test
+        run: bash test/run_four_allele_test.sh
+
   golden:
     name: golden search regression (Cas9 NGG + Cas12a TTTV)
     runs-on: ubuntu-latest
@@ -121,6 +169,80 @@ jobs:
         env:
           OMP_NUM_THREADS: "1"
 
+  format1:
+    name: index formats (2.9.1 indexes search as before but index 0; format-2 header and refusals)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+
+      # test/fixtures/format1 holds small indexes built by the 2.9.1 buildTST and the
+      # 2.9.1 searchTST's output on them. Every row away from a contig's index-0 leaf
+      # must stay byte-identical, order included; the index-0 rows must equal the
+      # independent oracle (test/boundary/oracle.py): the reverse-strand PAM at a
+      # contig's first base on the minus strand, and the builder's index-0 artefact gone.
+      - name: Run format-1 compatibility test
+        run: bash test/run_format1_test.sh
+
+      # Format 2's header and trailer, crispritz.py index-info, a directory mixing the
+      # two formats, max_bulges taken from the header, and the reader's refusals
+      # (cut-short file, PAM side mismatch, unknown version; buildTST -bMax > 31);
+      # index-info must refuse each of 20 damaged files searchTST refuses, for the
+      # same reason, and docs/INDEX_FORMAT.md section 7's reader must agree with it.
+      - name: Run index-format test
+        run: bash test/run_index_format_test.sh
+
+  boundary:
+    name: sites at contig ends and N runs == independent brute-force oracle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+
+      # Perfect, 1-4-mismatch and 1-bulge sites at every distance 0..4 from a contig
+      # start, a contig end and an N run, both strands, 3' and 5' PAMs, the PAM 0..9
+      # bases from an end; dedicated indexes at -bMax 0-3 and PAM-less K=3/K=8 (and
+      # 5' K=4) indexes with and without --prune-pam; search guides longer and shorter
+      # than the index's (CRISPRme's 21-nt SaCas9 and 23-nt Cas12a guides off 20-nt
+      # indexes). Every indexed search, run through crispritz.py, must equal
+      # test/boundary/oracle.py (a brute-force aligner over the FASTA) as a set of
+      # rows, every row its contig's own bases, every 0-bulge one searchBruteForce too,
+      # and every --prune-pam one the dedicated index of the same guide length.
+      - name: Run boundary test (full matrix)
+        run: bash test/run_boundary_test.sh
+
+  region-hooks:
+    name: region hooks (search --skip-bed / --keep-bed / --leaf-dump) == THE core, line by line
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ libgomp1
+
+      # Synthetic genomes with a BED base on, and just beside, each planted site's core
+      # (its pad, the edges of its guide region and PAM, the distal flank of an 8-wide
+      # window); dedicated 3' and 5' indexes, PAM-less K=8 and 5' K=4 indexes under
+      # --prune-pam, search guides longer and shorter than the index's (the pad route),
+      # fake-indel genomes of 25/27 and 30/30 windows. For each search: the skip keeps
+      # exactly the lines whose core (read from the line) meets no interval, the keep
+      # exactly the others, in order; pruning off changes no line; the leaf dump holds
+      # every dropped leaf, letter for letter the FASTA's ('-' at a pad base past
+      # pad_valid and a flank base off the contig); the rule of INDEX_FORMAT 13.5 for a
+      # scan of the dense fake-indel windows alone; the refusals; the capability.
+      - name: Run region-hooks test
+        run: bash test/run_region_hooks_test.sh
+
   asan:
     name: AddressSanitizer (#105 regression guard, WTN + DNA bulge)
     runs-on: ubuntu-latest
@@ -130,7 +252,7 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends g++ libgomp1
+          sudo apt-get install -y --no-install-recommends g++ libgomp1 zlib1g-dev python3-pandas
 
       # searchOnTST.cpp had a heap-buffer-overflow (CRISPRme #105) that
       # AddressSanitizer aborts on when combined with a degenerate odd-length
@@ -146,6 +268,25 @@ jobs:
           CXXFLAGS: "-fsanitize=address -g -O1"
           # No leak detection: we only guard against memory-safety errors
           # (heap-buffer-overflow / invalid free), and abort on any ASan error.
+          ASAN_OPTIONS: "detect_leaks=0:abort_on_error=1"
+
+      # The boundary suite under ASan: all three binaries (buildTST, searchTST,
+      # searchBruteForce) instrumented, over index format 2's boundary sites (pad
+      # and flank off the contig, signed window starts), the format-1 reader, the
+      # damaged files of the index-format test and the four-allele symbol Q (its
+      # slot-dependent tree nibbles; the enricher instrumented too), and the region
+      # hooks (the leaf marking, the subtree pruning, the leaf dump; QUICK=1: one
+      # mismatch fewer in its widest searches).
+      - name: Run ASan boundary, format-1, index-format, four-allele and region-hooks tests
+        run: |
+          QUICK=1 bash test/run_boundary_test.sh
+          bash test/run_format1_test.sh
+          bash test/run_index_format_test.sh
+          bash test/run_four_allele_test.sh
+          QUICK=1 bash test/run_region_hooks_test.sh
+        env:
+          OMP_NUM_THREADS: "1"
+          CXXFLAGS: "-fsanitize=address -g -O1"
           ASAN_OPTIONS: "detect_leaks=0:abort_on_error=1"
 
   arm64-build:

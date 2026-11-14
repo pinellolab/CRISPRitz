@@ -14,11 +14,42 @@
 # mixing SNP and indel ALTs, unphased / missing / haploid genotypes, indels at
 # the chromosome start (window floor) and end, a REF that does not match the
 # FASTA, and same-POS SNP/indel orders beyond case 8. Case 17 covers multiallelic
-# SNP records whose ALTs include a non-A/C/G/T member ('*', 'N', a lowercase base)
-# or whose FASTA base is N. Besides the four outputs, the file set and the run log
-# (stdout+stderr, e.g. the skip warnings) must match.
+# SNP records whose ALTs include a non-A/C/G/T member ('*', 'N') or a lowercase base,
+# or whose FASTA base is N. Cases 18-30 cover multi-allelic sites SPLIT into one
+# record per ALT, as `bcftools norm -m -any` writes them: two and three ALTs in
+# every record order, the same sites as one record, the all-four-bases rule, split
+# records that are not adjacent, haploid / unphased / missing genotypes, SNP + indel
+# at one position and inside an indel's window, a split record beside a multi-ALT
+# record, a non-PASS split record, the same ALT twice, AF spellings and AF_<x>
+# fields, a reference IUPAC base and N, '*', the chromosome edges, and split records
+# phased so that one haplotype slot holds two ALTs. Cases 31-33 cover each record's
+# INFO/AF read by its key wherever it stands, the same REF>ALT on two records merged
+# into one dict entry, and ALTs on a reference N and on reference bytes that are no
+# base or IUPAC code (X, '-'). Case 34 covers REF and ALTs written in lower or mixed
+# case, which VCF 4.x reads whatever their case and the enricher upper-cases since
+# 2.10.0: a SNP ALT in lower case (coded, as at 1234 and 1585), a REF in lower case,
+# four bases in lower case (Q), a record listing several ALTs, deletions, insertions and
+# an MNV, and records that differ from one another only by case (one allele: one dict
+# entry, as two records written alike). Besides the four outputs, the file
+# set and the run log (stdout+stderr, e.g. the skip warnings and the four-base note)
+# must match.
 #
-# Prints "BYTE-IDENTICAL: PASS" only if every output diff is empty.
+# Agreement is not correctness, so the outputs are also checked against what they
+# must be: the enriched genome against an independent reconstruction from the FASTA
+# and the VCF (its ALTs read upper-cased; all four bases are Q, the search's any-base
+# symbol, and an N stays an N, as does a byte that is no base or IUPAC code: the
+# enriched genome holds an N exactly where the reference does -- the N-count
+# invariant), the dict at cases 24 and 31-34 (merged carriers, AF by key, the records
+# at a reference N, X or '-', a record listing three SNP ALTs, records in lower case)
+# and no dict entry naming a REF or ALT in lower case, the indel log's AF at case 31,
+# the indel log's rows against the VCF (each carried indel or MNV allele, its REF and
+# ALT upper-cased, in file order), and every fake-indel window against the reference:
+# 30 bases on each side of the record (25 before and 27 after up to 2.9.1), its log
+# row's CHR field, FAKEPOS and refseq, no base in lower case, and the skips at the
+# chromosome's start.
+# A reference holding 'Q' must be refused by both ports alike.
+#
+# Prints "BYTE-IDENTICAL: PASS" only if every check passes.
 #
 # Usage: verify_enricher.sh [path-to-enricher-binary]
 #        (defaults to ./enricher, then /tmp/enricher_opt)
@@ -49,19 +80,26 @@ trap 'rm -rf "$WORK"' EXIT
 echo "Work dir: $WORK"
 
 # ---------------------------------------------------------------------------
-# synthetic chromosome FASTA (1,800 bp, mixed case to exercise upper()). The
+# synthetic chromosome FASTA (2,800 bp, mixed case to exercise upper()). The
 # first 400 bp -- all that cases 1-8 touch -- are the same draws as when the
-# chromosome was 400 bp long; the rest holds cases 9-16.
+# chromosome was 400 bp long, the first 1,800 -- cases 9-17 -- the same as when it
+# was 1,800 bp long, and the first 2,400 -- cases 18-30 -- the same as when it was
+# 2,400 bp long; the rest holds cases 31-34 (case 14 follows the end).
 # ---------------------------------------------------------------------------
 CHR_FA="$WORK/chrTest.fa"
 python3 - "$CHR_FA" <<'PY'
 import sys, random
 random.seed(1234)
-seq = [random.choice('ACGTacgt') for _ in range(1800)]
+seq = [random.choice('ACGTacgt') for _ in range(2800)]
 # case 15: a hard-masked N run and an IUPAC base in the reference itself
 for i in range(1610, 1621):
     seq[i - 1] = 'N'
 seq[1650 - 1] = 'R'
+# case 26: another reference IUPAC base, for split records
+seq[2200 - 1] = 'Y'
+# case 33: bytes that are no base or IUPAC code (RepeatMasker -x masks with X)
+seq[2420 - 1] = 'X'
+seq[2425 - 1] = '-'
 seq = ''.join(seq)
 with open(sys.argv[1], 'w') as f:
     f.write(">chrTest\n")
@@ -168,9 +206,10 @@ lines.append(row(p, "rs801", b(p), b(p)+"CC",
                  "AC=1;AF=0.1", ["0|0","0|1","0|0","0|0","0|0"]))
 
 # ---- cases 9-16: SNP + indel COMBINATIONS ------------------------------------
-# The enricher cuts each indel's contig from the PLAIN reference: a 25 bp left
-# flank, REF->ALT at offset 25, a 27 bp right flank, i.e. the 1-based window
-# [POS-25, POS+26+len(REF)]. A SNP in that window goes into the enriched genome
+# The enricher cuts each indel's contig from the PLAIN reference: a 30-base left
+# flank, REF->ALT at offset 30, a 30-base right flank, i.e. the 1-based window
+# [POS-30, POS+29+len(REF)] (25 / 27 bases up to 2.9.1, [POS-25, POS+26+len(REF)]).
+# A SNP in that window goes into the enriched genome
 # and the dict but never into the contig (CRISPRme overlays it later, in
 # overlay_indel_snps.py, and judges cis/trans from the genotypes), so here the
 # two ports must agree on all of: where the SNP lands, what the contig holds, and
@@ -182,17 +221,17 @@ lines.append(row(p, "rs801", b(p), b(p)+"CC",
 #    outside each edge; around an insertion (450) and a 4-bp deletion (550).
 p=450
 lines.append(row(p, "rs900", b(p), b(p)+"AG", "AC=4;AF=0.4", ["1|0","0|1","1|1","0|0","0|0"]))
-for s, gts in ((424, ["1|0","0|0","0|0","0|1","0|0"]), (425, ["1|0","1|0","0|0","0|0","0|0"]),
+for s, gts in ((419, ["1|0","0|0","0|0","0|1","0|0"]), (420, ["1|0","1|0","0|0","0|0","0|0"]),
                (440, ["1|0","1|0","0|0","0|1","0|0"]), (451, ["0|1","0|1","1|0","0|0","0|0"]),
-               (465, ["1|0","0|0","0|1","1|1","0|0"]), (477, ["1|0","1|0","0|0","0|0","0|0"]),
-               (478, ["1|0","0|0","0|0","0|0","1|0"])):
+               (465, ["1|0","0|0","0|1","1|1","0|0"]), (480, ["1|0","1|0","0|0","0|0","0|0"]),
+               (481, ["1|0","0|0","0|0","0|0","1|0"])):
     lines.append(row(s, "rsW%d" % s, b(s), other(s), "AC=1;AF=0.1", gts))
 p=550
 lines.append(row(p, "rs901", ref[p-1:p+3], b(p), "AC=2;AF=0.2", ["1|0","0|1","0|0","0|0","0|0"]))
-for s, gts in ((524, ["1|0","0|0","0|0","0|1","0|0"]), (525, ["1|0","1|0","0|0","0|0","0|0"]),
+for s, gts in ((519, ["1|0","0|0","0|0","0|1","0|0"]), (520, ["1|0","1|0","0|0","0|0","0|0"]),
                (540, ["1|0","1|0","0|0","0|1","0|0"]), (554, ["1|0","0|1","0|0","0|0","0|0"]),
-               (570, ["0|1","1|0","0|0","1|1","0|0"]), (580, ["1|0","0|0","0|0","0|0","0|0"]),
-               (581, ["1|0","0|0","0|0","0|0","0|1"])):
+               (570, ["0|1","1|0","0|0","1|1","0|0"]), (583, ["1|0","0|0","0|0","0|0","0|0"]),
+               (584, ["1|0","0|0","0|0","0|0","0|1"])):
     lines.append(row(s, "rsW%d" % s, b(s), other(s), "AC=1;AF=0.1", gts))
 
 # 10) A DELETION SPANNING SNP positions: a 6-bp deletion at 650 with SNPs at its
@@ -276,16 +315,17 @@ lines.append(row(p, "rs1307", b(p), other(p)+","+b(p)+"TT", "AC=1,4;AF=0.1,0.4",
 #     FASTA base at POS but occurs later in the window, so the first-occurrence
 #     substitution lands there (1500); a 3-bp deletion whose REF occurs nowhere in
 #     the window, so the contig stays reference (1540); lowercase REF/ALT on an
-#     insertion (1580) and a lowercase ALT on a biallelic SNP (1585); a biallelic
+#     insertion (1580) and a lowercase ALT on a biallelic SNP (1585), read upper-cased
+#     since 2.10.0 (case 34); a biallelic
 #     SNP on a FASTA N (1615) next to an insertion whose window holds the N run
 #     (1600); a biallelic SNP and an insertion on a FASTA IUPAC base 'R' (1650).
 p=1460
 lines.append(row(p, "rs1500", other(p,0), other(p,1), "AC=1;AF=0.1", ["0|1","1|0","0|0","0|0","0|0"]))
 p=1500
-wrong=[x for x in "ACGT" if x != b(p) and x in ref[p:p+27]][0]
+wrong=[x for x in "ACGT" if x != b(p) and x in ref[p:p+30]][0]
 lines.append(row(p, "rs1501", wrong, wrong+"TT", "AC=1;AF=0.1", ["1|0","0|0","0|0","0|0","0|0"]))
 p=1540
-win=ref[p-26:p+29]
+win=ref[p-31:p+32]
 bad=next(x+y+z for x in "ACGT" for y in "ACGT" for z in "ACGT" if x+y+z not in win)
 lines.append(row(p, "rs1502", bad, bad[0], "AC=1;AF=0.1", ["0|1","0|0","0|0","0|0","0|0"]))
 p=1580
@@ -298,10 +338,9 @@ lines.append(row(1650, "rs1508", b(1650), b(1650)+"T", "AC=1;AF=0.1", ["0|0","1|
 
 # 16) SAME-POS SNP and indel records beyond case 8: the indel record FIRST (1700);
 #     a SNP + a 3-bp deletion (1730); two SNP records -- a split multiallelic SNP --
-#     + an insertion (1760). For the latter BOTH ports keep only the LAST SNP
-#     record's ALT in the enriched genome and the dict (each record rebuilds the
-#     code from the reference base and overwrites the dict key); that is
-#     enricher.py's long-standing behaviour, pinned here only for port agreement.
+#     + an insertion (1760). Up to 2.9.1 both ports kept only the LAST SNP record's
+#     ALT there (each record rebuilt the code from the reference base and overwrote
+#     the dict key); both now code both ALTs and list both in the dict (cases 18-30).
 p=1700
 lines.append(row(p, "rs1600", b(p), b(p)+"TG", "AC=2;AF=0.2", ["0|1","1|0","0|0","0|0","0|0"]))
 lines.append(row(p, "rs1601", b(p), other(p), "AC=2;AF=0.2", ["1|0","0|0","0|1","0|0","0|0"]))
@@ -315,7 +354,8 @@ lines.append(row(p, "rs1605", b(p), b(p)+"CC", "AC=1;AF=0.1", ["0|0","0|0","1|0"
 
 # 17) MULTIALLELIC SNP records whose single-character ALTs include a member that is
 #     not A/C/G/T: the '*' of a GATK spanning deletion (1228, and with two real
-#     ALTs at 1230), an 'N' (1232), a lowercase base (1234); a FASTA N carrying
+#     ALTs at 1230), an 'N' (1232); a lowercase base (1234), not A/C/G/T up to 2.9.1
+#     and coded since 2.10.0, which reads it upper-cased (case 34); a FASTA N carrying
 #     two ALTs (1618, in the planted N run); and a split SNP record followed by a
 #     multiallelic '*' record at the same POS (1229). The A/C/G/T subset is coded
 #     and the other member adds nothing, so the real SNP is kept (enricher.py used
@@ -336,23 +376,257 @@ lines.append(row(p, "rs1705", b(p), other(p,0)+","+other(p,1).lower(), "AC=1,1;A
 p=1618
 lines.append(row(p, "rs1706", b(p), "A,C", "AC=1,1;AF=0.1,0.1", ["0|1","0|2","0|0","0|0","0|0"]))
 
+# ---- cases 18-30: multi-allelic sites SPLIT into one record per ALT --------------
+# `bcftools norm -m -any` writes a site with several ALTs as one record per ALT, its
+# genotypes recoded so 1 is that record's ALT. Each record must ADD its ALT to the
+# position's code and dict entry (2.9.1 and earlier rebuilt the code from the
+# reference base and overwrote the entry, so the last record won). A position whose
+# reference base (A, C, G or T) and ALTs cover all four bases is Q, which the search
+# reads as any base (N, the IUPAC letter for the four, is a gap to buildTST and
+# searchTST).
+import itertools
+G1 = ["0|1","0|0","0|0","0|0","0|0"]
+
+# 18) Two ALTs in both orders (1830, 1834); three ALTs -- all four bases -- in all six
+#     orders (1840..1865), Q whatever the order and the AFs (the middle ALT is the
+#     rarest); the same sites as ONE record (1870: two ALTs, 1875: three), whose codes
+#     the split sites equal; three ALTs whose AFs tie (1880: Q too).
+p=1830
+lines.append(row(p, "rs1800", b(p), other(p,0), "AC=1;AF=0.1", G1))
+lines.append(row(p, "rs1801", b(p), other(p,1), "AC=2;AF=0.2", ["0|0","1|0","0|1","0|0","0|0"]))
+p=1834
+lines.append(row(p, "rs1802", b(p), other(p,1), "AC=2;AF=0.2", ["0|0","1|0","0|1","0|0","0|0"]))
+lines.append(row(p, "rs1803", b(p), other(p,0), "AC=1;AF=0.1", G1))
+afs3 = ["0.3", "0.002", "0.05"]
+gts3 = [["0|1","0|0","1|0","0|0","0|0"], ["0|0","1|0","0|0","0|0","0|0"], ["0|0","0|0","0|1","1|1","0|0"]]
+for k, perm in enumerate(itertools.permutations(range(3))):
+    p = 1840 + 5*k
+    for j in perm:
+        lines.append(row(p, "rs%d" % (1810 + 3*k + j), b(p), other(p,j), "AC=1;AF=" + afs3[j], gts3[j]))
+p=1870
+lines.append(row(p, "rs1830", b(p), other(p,0)+","+other(p,1), "AC=1,2;AF=0.1,0.2",
+                 ["0|1","2|0","0|2","0|0","0|0"]))
+p=1875
+lines.append(row(p, "rs1831", b(p), ",".join(other(p,j) for j in range(3)), "AC=1,1,3;AF=0.3,0.002,0.05",
+                 ["0|1","2|0","1|3","3|3","0|0"]))
+p=1880
+for j in (2, 0, 1):
+    lines.append(row(p, "rs%d" % (1832 + j), b(p), other(p,j), "AC=1;AF=0.01", G1))
+
+# 19) SPLIT RECORDS NOT ADJACENT: interleaved with another position's records and with
+#     an insertion at the same POS (1900, 1905).
+lines.append(row(1900, "rs1840", b(1900), other(1900,0), "AC=1;AF=0.1", G1))
+lines.append(row(1905, "rs1841", b(1905), other(1905,0), "AC=1;AF=0.1", ["1|0","0|0","0|0","0|0","0|0"]))
+lines.append(row(1900, "rs1842", b(1900), b(1900)+"TT", "AC=1;AF=0.1", ["0|0","0|0","1|0","0|0","0|0"]))
+lines.append(row(1905, "rs1843", b(1905), other(1905,2), "AC=1;AF=0.1", ["0|0","0|1","0|0","0|0","0|0"]))
+lines.append(row(1900, "rs1844", b(1900), other(1900,1), "AC=1;AF=0.2", ["0|0","1|0","0|0","0|0","0|0"]))
+
+# 20) GENOTYPE SHAPES on split records: haploid, unphased, missing, partially missing
+#     (1930: two ALTs), and GT:DP on three ALTs (1935).
+lines.append(row(1930, "rs1850", b(1930), other(1930,0), "AC=2;AF=0.2", ["0/1","./.",".|1","1","0"]))
+lines.append(row(1930, "rs1851", b(1930), other(1930,1), "AC=2;AF=0.2", ["1/0","1|.","0|0",".","1"]))
+for j, gts in enumerate((["0|1:9","./.:0","1/1:30",".:5","1:7"], ["1|0:3","0|0:2","./1:4","0:6","0:1"],
+                         ["0|0:1",".|1:2","0|0:3","1:8","0/1:5"])):
+    lines.append(row(1935, "rs%d" % (1852 + j), b(1935), other(1935,j), "AC=2;AF=0.%d" % (j + 1), gts,
+                     fmt="GT:DP"))
+
+# 21) SNP + INDEL AT ONE POSITION with split SNPs: three SNP ALTs, an insertion and a
+#     4-bp deletion at 1980; split SNP sites inside those indels' windows (1990: two
+#     ALTs, 2005: three). The contigs are cut from the reference, so they stay those
+#     of the indels alone.
+p=1980
+lines.append(row(p, "rs1860", b(p), other(p,0), "AC=1;AF=0.1", G1))
+lines.append(row(p, "rs1861", b(p), b(p)+"GA", "AC=2;AF=0.2", ["1|0","0|1","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1862", b(p), other(p,1), "AC=1;AF=0.3", ["0|0","1|0","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1863", ref[p-1:p+3], b(p), "AC=1;AF=0.2", ["0|0","0|0","1|0","0|0","0|0"]))
+lines.append(row(p, "rs1864", b(p), other(p,2), "AC=1;AF=0.05", ["0|0","0|0","0|1","0|0","0|0"]))
+for j in (1, 0):
+    lines.append(row(1990, "rs%d" % (1865 + j), b(1990), other(1990,j), "AC=1;AF=0.1",
+                     [["1|0","0|0","0|0","0|0","0|0"], ["0|0","0|1","0|0","0|0","0|0"]][j]))
+for j in (0, 2, 1):
+    lines.append(row(2005, "rs%d" % (1867 + j), b(2005), other(2005,j), "AC=1;AF=0.%d" % (j + 1),
+                     [["1|0","0|0","0|0","0|0","0|0"], ["0|0","1|0","0|0","0|0","0|0"],
+                      ["0|0","0|0","1|1","0|0","0|0"]][j]))
+
+# 22) A RECORD LISTING SEVERAL ALTS and a split record at ONE position, both orders
+#     (2050: the multi-ALT record first; 2055: the split record first).
+p=2050
+lines.append(row(p, "rs1870", b(p), other(p,0)+","+other(p,1), "AC=1,1;AF=0.1,0.2", ["0|1","2|0","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1871", b(p), other(p,2), "AC=1;AF=0.05", ["0|0","0|0","1|0","0|0","0|0"]))
+p=2055
+lines.append(row(p, "rs1872", b(p), other(p,2), "AC=1;AF=0.3", ["0|0","0|0","1|0","0|0","0|0"]))
+lines.append(row(p, "rs1873", b(p), other(p,0)+","+other(p,1), "AC=1,1;AF=0.1,0.002", ["0|1","2|0","0|0","0|0","0|0"]))
+
+# 23) A NON-PASS split record at a multi-allelic position adds nothing (2100).
+p=2100
+lines.append(row(p, "rs1880", b(p), other(p,0), "AC=1;AF=0.1", G1))
+lines.append(row(p, "rs1881", b(p), other(p,1), "AC=5;AF=0.5", ["1|1","1|1","1|0","0|0","0|0"], filt="LowQual"))
+lines.append(row(p, "rs1882", b(p), other(p,2), "AC=1;AF=0.2", ["0|0","0|1","0|0","0|0","0|0"]))
+
+# 24) THE SAME ALT ON TWO RECORDS: one entry with the carriers of both, and the rsID and
+#     AF of the more frequent record (2130; up to 2.9.1 the later record's entry
+#     replaced the earlier).
+p=2130
+lines.append(row(p, "rs1890", b(p), other(p,0), "AC=1;AF=0.1", G1))
+lines.append(row(p, "rs1891", b(p), other(p,1), "AC=1;AF=0.2", ["0|0","0|1","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1892", b(p), other(p,0), "AC=1;AF=0.3", ["0|0","0|0","1|0","0|0","0|0"]))
+
+# 25) AF SPELLINGS at four-base sites: an exponent, '.', no AF value (2160); an ALT on
+#     two records, whose one entry takes the rsID and AF of the more frequent (2170).
+#     Both are Q whatever the AFs (the four-base rule ranked the ALTs by them).
+p=2160
+lines.append(row(p, "rs1900", b(p), other(p,0), "AC=1;AF=2e-1", G1))
+lines.append(row(p, "rs1901", b(p), other(p,1), "AC=1;AF=.", ["0|0","0|1","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1902", b(p), other(p,2), "AC=1", ["0|0","0|0","0|1","0|0","0|0"]))
+p=2170
+lines.append(row(p, "rs1903", b(p), other(p,0), "AC=1;AF=0.001", G1))
+lines.append(row(p, "rs1904", b(p), other(p,1), "AC=1;AF=0.01", ["0|0","0|1","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1905", b(p), other(p,2), "AC=1;AF=0.1", ["0|0","0|0","0|1","0|0","0|0"]))
+lines.append(row(p, "rs1906", b(p), other(p,0), "AC=1;AF=0.5", ["0|0","0|0","0|0","0|1","0|0"]))
+
+# 26) A REFERENCE IUPAC base with two split ALTs (2200, planted 'Y'): it adds no base
+#     of its own, as for one record; a reference N with four split ALTs (1614, in the
+#     planted N run): it stays N, as in case 33.
+lines.append(row(2200, "rs1910", "Y", "A", "AC=1;AF=0.1", G1))
+lines.append(row(2200, "rs1911", "Y", "G", "AC=1;AF=0.2", ["0|0","0|1","0|0","0|0","0|0"]))
+for j, (alt, af) in enumerate((("T", "0.2"), ("A", "0.4"), ("G", "0.01"), ("C", "0.3"))):
+    lines.append(row(1614, "rs%d" % (1912 + j), "N", alt, "AC=1;AF=" + af, G1))
+
+# 27) A '*' split record after a SNP record (2230): listed in the dict, not coded.
+p=2230
+lines.append(row(p, "rs1920", b(p), other(p,0), "AC=1;AF=0.1", G1))
+lines.append(row(p, "rs1921", b(p), "*", "AC=1;AF=0.2", ["0|0","1|0","0|0","0|0","0|0"]))
+
+# 29) FOUR-BASE sites whose records carry AF_<x> fields: no AF, only per-dataset AF_<x>
+#     and AF_max as a sites-only merge (CRISPRme's mega) writes them (2260), and an
+#     AF_pop above every AF at its position (2270). Both are Q whatever these fields
+#     say: the four-base rule ranked the ALTs by AF and every AF_<x>, 2.10.0 ranks
+#     nothing.
+p=2260
+for j, info in enumerate(("AF_one=0.01;AF_max=0.01", "AF_two=0.0002;AF_max=0.0002",
+                          "AF_one=0.2;AF_two=0.3;AF_max=0.3")):
+    lines.append(row(p, "rs%d" % (1930 + j), b(p), other(p,j), info, G1))
+p=2270
+for j, info in enumerate(("AC=1;AF=0.001;AF_pop=0.4", "AC=1;AF=0.01", "AC=1;AF=0.002")):
+    lines.append(row(p, "rs%d" % (1933 + j), b(p), other(p,j), info, G1))
+
+# 30) SPLIT RECORDS PHASED INDEPENDENTLY, as HGDP + 1000 Genomes is: one haplotype slot
+#     holds two ALTs of one position -- S1 0|1 and 0|1 (chr22:10661629, NA18869), S2 1|0
+#     and 1|0, S3 more ALT copies than slots (1|1 and 0|1), S4 one ALT per slot (2300);
+#     three ALTs on one slot at a four-base position (2305). Every entry keeps its own
+#     record's genotypes verbatim, in both ports: resolving the conflict is CRISPRme's
+#     (docs/MULTIALLELIC_ENRICHMENT.md, section 6.3).
+p=2300
+lines.append(row(p, "rs1940", b(p), other(p,0), "AC=5;AF=0.5", ["0|1","1|0","1|1","1|0","0|0"]))
+lines.append(row(p, "rs1941", b(p), other(p,1), "AC=4;AF=0.4", ["0|1","1|0","0|1","0|1","0|0"]))
+p=2305
+for j, af in enumerate(("0.3", "0.001", "0.2")):
+    lines.append(row(p, "rs%d" % (1942 + j), b(p), other(p,j), "AC=1;AF=" + af, G1))
+
+# 31) INFO/AF READ BY ITS KEY in every record: the file's first record (case 1) has AF
+#     second in INFO, as up to 2.9.1 every record's AF was looked for there; here AF
+#     stands first (2330), after a gnomAD-style AF_afr (2335), third on an insertion
+#     (2340, the indel log's AF) and nowhere, beside AF_max (2345: no AF).
+lines.append(row(2330, "rs1950", b(2330), other(2330), "AF=0.3;AC=1", G1))
+lines.append(row(2335, "rs1951", b(2335), other(2335), "DP=7;AC=1;AF_afr=0.5;AF=0.15", G1))
+lines.append(row(2340, "rs1952", b(2340), b(2340)+"GT", "AN=10;AC=1;AF=0.05", G1))
+lines.append(row(2345, "rs1953", b(2345), other(2345), "AF_max=0.2;AC=1", G1))
+
+# 32) THE SAME REF>ALT ON TWO SPLIT RECORDS with carriers on both, one of them on the
+#     same slot and one on the other (2360), and on a record listing several ALTs then
+#     a split record (2365): one entry each, genotypes in split form (1 = that ALT), a
+#     record listing several ALTs' every entry too (2365, 2380, 1616, 2425).
+p=2360
+lines.append(row(p, "rs1960", b(p), other(p,0), "AC=2;AF=0.1", ["0|1","0|0","0|1","0|0","0|0"]))
+lines.append(row(p, "rs1961", b(p), other(p,1), "AC=1;AF=0.2", ["0|0","1|0","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1962", b(p), other(p,0), "AC=3;AF=0.4", ["1|0","0|0","0|1","1|1","0|0"]))
+p=2365
+lines.append(row(p, "rs1963", b(p), other(p,0)+","+other(p,1), "AC=1,2;AF=0.1,0.2",
+                 ["1|2","0|2","0|0","0|0","0|0"]))
+lines.append(row(p, "rs1964", b(p), other(p,1), "AC=1;AF=0.05", ["0|0","0|0","1|0","0|0","0|0"]))
+
+# 33) ALTS ON A REFERENCE N (the planted N run 1610-1620): three split ALTs (1612) and
+#     a record listing all four (1616) leave the N; and on reference bytes that are no
+#     base or IUPAC code, which the search reads as N: two split ALTs (the X at 2420)
+#     and a record listing two (the '-' at 2425) leave them; the four-base sites
+#     elsewhere are Q, here one record listing three SNP ALTs (2380).
+for j, alt in enumerate("ACG"):
+    lines.append(row(1612, "rs%d" % (1970 + j), "N", alt, "AC=1;AF=0.1", G1))
+lines.append(row(1616, "rs1973", "N", "A,C,G,T", "AC=1,1,1,1;AF=0.1,0.1,0.1,0.1",
+                 ["0|1","2|3","0|4","0|0","0|0"]))
+lines.append(row(2420, "rs1975", "A", "C", "AC=1;AF=0.1", G1))
+lines.append(row(2420, "rs1976", "A", "G", "AC=1;AF=0.2", ["0|0","1|0","0|0","0|0","0|0"]))
+lines.append(row(2425, "rs1977", "A", "C,T", "AC=1,1;AF=0.1,0.2", ["0|1","2|0","0|0","0|0","0|0"]))
+p=2380
+lines.append(row(p, "rs1974", b(p), ",".join(other(p,j) for j in range(3)), "AC=1,1,1;AF=0.1,0.2,0.3",
+                 ["0|1","0|2","3|0","0|0","0|0"]))
+
+# 34) REF AND ALTS IN LOWER OR MIXED CASE, which VCF 4.x reads whatever their case
+#     (bcftools norm -f writes a soft-masked reference's case into an indel it
+#     realigns). Since 2.10.0 the enricher upper-cases REF and every ALT as it reads a
+#     record (a symbolic ALT as written; '*' and '.' hold no letter); up to 2.9.1 a
+#     lower-case SNP ALT was not coded, a record that differed from another only by
+#     case was another allele, and an indel's window and log row held the VCF's case.
+#     A SNP ALT in lower case (2450), a REF in lower case (2455), three split ALTs in
+#     lower case, all four bases (2460: Q); a record listing two SNP ALTs and an
+#     insertion, in lower and upper case (2470); a deletion in mixed case (2500), an
+#     insertion in lower case (2540), an MNV in mixed case (2580); C>G, c>g and C>g at
+#     one position (2620: one entry with the carriers of the three) and an indel on two
+#     records differing by case (2650: a window and a log row each, in upper case); a
+#     record listing '*', a lower-case base and a symbolic ALT in lower case (2690); a
+#     lower-case REF with the ALT '.' (2695).
+def mixed(s):
+    return "".join(c.lower() if k % 2 == 0 else c for k, c in enumerate(s))
+p=2450
+lines.append(row(p, "rs2000", b(p), other(p,0).lower(), "AC=3;AF=0.3", ["0|1","1|1","0|0","0|0","0|0"]))
+p=2455
+lines.append(row(p, "rs2001", b(p).lower(), other(p,1), "AC=1;AF=0.1", ["0|0","1|0","0|0","0|0","0|0"]))
+p=2460
+for j in (2, 0, 1):
+    lines.append(row(p, "rs%d" % (2002 + j), b(p).lower(), other(p,j).lower(), "AC=1;AF=0.1", G1))
+p=2470
+lines.append(row(p, "rs2005", b(p).lower(), other(p,0).lower()+","+other(p,1)+","+(b(p)+"tt").lower(),
+                 "AC=1,2,1;AF=0.1,0.2,0.3", ["1|2","0|3","2|0","0|0","0|0"]))
+p=2500
+lines.append(row(p, "rs2006", mixed(ref[p-1:p+5]), b(p).lower(), "AC=2;AF=0.2", ["1|0","0|1","0|0","0|0","0|0"]))
+p=2540
+lines.append(row(p, "rs2007", b(p).lower(), (b(p)+"gac").lower(), "AC=1;AF=0.1", ["0|0","0|0","1|0","0|0","0|0"]))
+p=2580
+lines.append(row(p, "rs2008", mixed(ref[p-1:p+2]), mixed(other(p,0)+other(p+1,0)+other(p+2,0)), "AC=1;AF=0.1",
+                 ["0|0","0|0","0|0","0|1","0|0"]))
+p=2620
+lines.append(row(p, "rs2009", b(p), other(p,0), "AC=1;AF=0.1", G1))
+lines.append(row(p, "rs2010", b(p).lower(), other(p,0).lower(), "AC=1;AF=0.3", ["0|0","1|0","0|0","0|0","0|0"]))
+lines.append(row(p, "rs2011", b(p), other(p,0).lower(), "AC=1;AF=0.2", ["0|0","0|0","0|1","0|0","0|0"]))
+p=2650
+lines.append(row(p, "rs2012", ref[p-1:p+1], b(p), "AC=1;AF=0.1", G1))
+lines.append(row(p, "rs2013", ref[p-1:p+1].lower(), b(p).lower(), "AC=1;AF=0.2", ["0|0","0|1","0|0","0|0","0|0"]))
+p=2690
+lines.append(row(p, "rs2014", b(p).lower(), "*,"+other(p,1).lower()+",<del>", "AC=1,2,1;AF=0.1,0.2,0.3",
+                 ["1|2","0|2","0|3","0|0","0|0"]))
+p=2695
+lines.append(row(p, "rs2015", b(p).lower(), ".", "AC=0;AF=0", ["0|0","0|0","0|0","0|0","0|0"]))
+
 # 14) THE CHROMOSOME EDGES (records listed last; the enricher does not need
-#     sorted input): an insertion at POS 1 and a 2-bp deletion at POS 25 have
-#     POS-26 < 0, so BOTH ports must skip them with the same stdout warning; an
-#     insertion at POS 26 (window start exactly 0) with SNPs at 26 and at 1; at
+#     sorted input): an insertion at POS 1 and a 2-bp deletion at POS 30 have
+#     POS-31 < 0, so BOTH ports must skip them with the same stdout warning; an
+#     insertion at POS 31 (window start exactly 0) with SNPs at 31 and at 1; at
 #     the END, a deletion whose REF runs past the last base (cannot match), a
 #     deletion of the last two bases, and a SNP + an insertion on the last base
-#     (windows truncated by the chromosome end).
+#     (windows truncated by the chromosome end). 28) A second SNP record at POS 1
+#     and at the last base makes each a split multi-allelic site.
 L=len(ref)
 lines.append(row(1, "rs1400", b(1), other(1), "AC=1;AF=0.1", ["0|1","0|0","0|0","0|0","0|0"]))
 lines.append(row(1, "rs1401", b(1), b(1)+"A", "AC=2;AF=0.2", ["1|0","0|1","0|0","0|0","0|0"]))
-lines.append(row(25, "rs1402", ref[24:26], b(25), "AC=1;AF=0.1", ["1|0","0|0","0|0","0|0","0|0"]))
-lines.append(row(26, "rs1403", b(26), b(26)+"CC", "AC=2;AF=0.2", ["0|1","1|0","0|0","0|0","0|0"]))
-lines.append(row(26, "rs1404", b(26), other(26), "AC=2;AF=0.2", ["1|0","0|0","0|1","0|0","0|0"]))
+lines.append(row(30, "rs1402", ref[29:31], b(30), "AC=1;AF=0.1", ["1|0","0|0","0|0","0|0","0|0"]))
+lines.append(row(31, "rs1403", b(31), b(31)+"CC", "AC=2;AF=0.2", ["0|1","1|0","0|0","0|0","0|0"]))
+lines.append(row(31, "rs1404", b(31), other(31), "AC=2;AF=0.2", ["1|0","0|0","0|1","0|0","0|0"]))
 lines.append(row(L-2, "rs1405", ref[L-3:L]+"AA", b(L-2), "AC=1;AF=0.1", ["0|0","0|0","0|0","1|0","0|0"]))
 lines.append(row(L-1, "rs1406", ref[L-2:L], b(L-1), "AC=1;AF=0.1", ["0|0","0|0","0|0","0|0","1|0"]))
 lines.append(row(L, "rs1407", b(L), other(L), "AC=1;AF=0.1", ["0|0","0|0","1|0","0|0","0|0"]))
 lines.append(row(L, "rs1408", b(L), b(L)+"GGG", "AC=2;AF=0.2", ["0|0","0|0","0|0","1|1","0|0"]))
+lines.append(row(1, "rs1409", b(1), other(1,1), "AC=1;AF=0.3", ["0|0","1|0","0|0","0|0","0|0"]))
+lines.append(row(L, "rs1410", b(L), other(L,1), "AC=1;AF=0.3", ["0|0","0|0","0|1","0|0","0|0"]))
 
 open(out,"w").write("\n".join(lines)+"\n")
 PY
@@ -430,6 +704,212 @@ if diff "$WORK/log_py.txt" "$WORK/log_cpp.txt" > /dev/null 2>&1; then
 else
     echo "  DIFF : run log"
     diff "$WORK/log_py.txt" "$WORK/log_cpp.txt" | head -20
+    FAIL=1
+fi
+
+# ---------------------------------------------------------------------------
+# agreement is not correctness: the outputs against what they must be
+# ---------------------------------------------------------------------------
+echo "Checking outputs against an independent reconstruction:"
+if python3 - "$CHR_FA" "$VCF_PLAIN" "$PYDIR" "$CPPDIR" "$ENRICHED" "$JSON" "$LOG" "$FAKE" <<'PY'
+import json, re, sys
+fa, vcf, pydir, cppdir, enriched, jsn, log, fake = sys.argv[1:]
+ref = "".join(open(fa).read().splitlines()[1:]).upper()
+BIT = {"A": 1, "C": 2, "G": 4, "T": 8}
+CODE = {3: "M", 5: "R", 9: "W", 6: "S", 10: "Y", 12: "K", 14: "B", 13: "D", 11: "H", 7: "V", 15: "Q"}
+# every PASS record with a one-base REF codes its one-character A/C/G/T ALTs at POS, in
+# either case (VCF 4.x reads REF and ALT whatever their case), added to the reference
+# base when that is A/C/G/T; a reference N, or a byte that is no base or IUPAC code,
+# stays as it is; one base leaves the reference letter
+mask = {}
+for line in open(vcf):
+    if line.startswith("#"):
+        continue
+    f = line.rstrip("\n").split("\t")
+    if f[6] not in ("PASS", ".") or len(f[3]) != 1:
+        continue
+    pos = int(f[1]) - 1
+    m = mask.get(pos, BIT.get(ref[pos], 0))
+    for alt in f[4].split(","):
+        if len(alt) == 1:
+            m |= BIT.get(alt.upper(), 0)
+    mask[pos] = m
+want = list(ref)
+for pos, m in mask.items():
+    if ref[pos] in "ACGTRYSWKMBDHV" and m in CODE:
+        want[pos] = CODE[m]
+want = "".join(want)
+bad = 0
+for port, d in (("enricher.py", pydir), ("enricher.cpp", cppdir)):
+    got = "".join(open("%s/%s" % (d, enriched)).read().splitlines()[1:])
+    diff = [i + 1 for i in range(max(len(got), len(want))) if got[i:i + 1] != want[i:i + 1]]
+    nref = [i for i, c in enumerate(ref) if c == "N"]
+    ngot = [i for i, c in enumerate(got) if c == "N"]
+    print("  %s  : %s enriched genome == the reconstruction (%d bases, %d coded, %d Q)%s"
+          % ("OK  " if not diff else "DIFF", port, len(want), len(mask),
+             want.count("Q"), "" if not diff else ": differs at %s" % diff[:10]))
+    print("  %s  : %s N-count invariant: %d N in the reference, %d in the enriched genome%s"
+          % ("OK  " if nref == ngot else "DIFF", port, len(nref), len(ngot),
+             ", at the same positions" if nref == ngot else ""))
+    bad += bool(diff) + (nref != ngot)
+assert want.count("Q") >= 13 and "N" not in [want[p] for p in mask if ref[p] != "N"]
+assert [want[2419], want[2424]] == ["X", "-"] and 2419 in mask and 2424 in mask
+# the lower-case SNP ALTs of cases 15, 17 and 34 are coded
+assert all(want[p - 1] not in "ACGT" for p in (1234, 1585, 2450, 2460, 2470, 2620, 2690))
+# the dict at the cases that pin merged alleles, per-record AF, the records at a
+# reference N, X or '-', a record listing three SNP ALTs and records in lower case; no
+# entry names a REF or ALT in lower case; the indel log's AF read by key
+d = json.load(open("%s/%s" % (pydir, jsn)))
+def entries(p):
+    v = d.get("chrTest,%d" % p)
+    return [] if v is None else v.split("$")
+def other(p, k):
+    return [x for x in "ACGT" if x != ref[p - 1]][k]
+r = lambda p: ref[p - 1]
+expect = {
+    1612: ("listed at a reference N",
+           ["S1:0|1;N,A;rs1970;0.1", "S1:0|1;N,C;rs1971;0.1", "S1:0|1;N,G;rs1972;0.1"]),
+    1616: ("listed at a reference N",
+           ["S1:0|1;N,A;rs1973;0.1", "S2:1|0;N,C;rs1973;0.1", "S2:0|1;N,G;rs1973;0.1",
+            "S3:0|1;N,T;rs1973;0.1"]),
+    2420: ("listed at a reference X", ["S1:0|1;A,C;rs1975;0.1", "S2:1|0;A,G;rs1976;0.2"]),
+    2425: ("listed at a reference '-'", ["S1:0|1;A,C;rs1977;0.1", "S2:1|0;A,T;rs1977;0.2"]),
+    2130: ("carriers merged",
+           ["S1:0|1,S3:1|0;%s,%s;rs1892;0.3" % (r(2130), other(2130, 0)),
+            "S2:0|1;%s,%s;rs1891;0.2" % (r(2130), other(2130, 1))]),
+    2330: ("AF by key", ["S1:0|1;%s,%s;rs1950;0.3" % (r(2330), other(2330, 0))]),
+    2335: ("AF by key", ["S1:0|1;%s,%s;rs1951;0.15" % (r(2335), other(2335, 0))]),
+    2345: ("AF by key", ["S1:0|1;%s,%s;rs1953;" % (r(2345), other(2345, 0))]),
+    2360: ("carriers merged",
+           ["S1:1|1,S3:0|1,S4:1|1;%s,%s;rs1962;0.4" % (r(2360), other(2360, 0)),
+            "S2:1|0;%s,%s;rs1961;0.2" % (r(2360), other(2360, 1))]),
+    2365: ("carriers merged",
+           ["S1:1|0;%s,%s;rs1963;0.1" % (r(2365), other(2365, 0)),
+            "S1:0|1,S2:0|1,S3:1|0;%s,%s;rs1963;0.2" % (r(2365), other(2365, 1))]),
+    2380: ("a record listing three SNP ALTs",
+           ["S1:0|1;%s,%s;rs1974;0.1" % (r(2380), other(2380, 0)),
+            "S2:0|1;%s,%s;rs1974;0.2" % (r(2380), other(2380, 1)),
+            "S3:1|0;%s,%s;rs1974;0.3" % (r(2380), other(2380, 2))]),
+    2450: ("an ALT in lower case", ["S1:0|1,S2:1|1;%s,%s;rs2000;0.3" % (r(2450), other(2450, 0))]),
+    2455: ("a REF in lower case", ["S2:1|0;%s,%s;rs2001;0.1" % (r(2455), other(2455, 1))]),
+    2460: ("four bases in lower case",
+           ["S1:0|1;%s,%s;rs%d;0.1" % (r(2460), other(2460, j), 2002 + j) for j in (2, 0, 1)]),
+    2470: ("a record listing several ALTs in lower and upper case",
+           ["S1:1|0;%s,%s;rs2005;0.1" % (r(2470), other(2470, 0)),
+            "S1:0|1,S3:1|0;%s,%s;rs2005;0.2" % (r(2470), other(2470, 1))]),
+    2620: ("records differing only by case merged",
+           ["S1:0|1,S2:1|0,S3:0|1;%s,%s;rs2010;0.3" % (r(2620), other(2620, 0))]),
+    2690: ("'*' and a lower-case base", ["S1:1|0;%s,*;rs2014;0.1" % r(2690),
+                                         "S1:0|1,S2:0|1;%s,%s;rs2014;0.2" % (r(2690), other(2690, 1))]),
+    2695: ("a REF in lower case, ALT '.'", [";%s,.;rs2015;0" % r(2695)]),
+}
+for p, (what, e) in sorted(expect.items()):
+    ok = entries(p) == e
+    bad += not ok
+    print("  %s  : dict at %d (%s)" % ("OK  " if ok else "DIFF", p,
+                                       what if ok else "$".join(entries(p)) or "no such key"))
+lower = sorted(k for k, v in d.items() for e in v.split("$")
+               if e.rsplit(";", 3)[1] != e.rsplit(";", 3)[1].upper())
+bad += bool(lower)
+print("  %s  : no dict entry names a REF or ALT in lower case%s"
+      % ("OK  " if not lower else "DIFF", "" if not lower else " (%s)" % lower[:5]))
+rows = [x.split("\t") for x in open("%s/%s" % (pydir, log)).read().splitlines()[1:]]
+af = [x[3] for x in rows if x[4].startswith("chrTest_2340_")]
+bad += af != ["0.05"]
+print("  %s  : indel log AF at 2340 by key (%s)" % ("OK  " if af == ["0.05"] else "DIFF", af))
+# the indel log's rows against the VCF: a row for each indel or MNV allele -- an ALT of
+# another length than REF, or of the same length when both are longer than one base, not
+# symbolic -- that some sample carries, of each PASS record whose window starts on the
+# chromosome, in file order, its REF and ALT upper-cased (VCF 4.x reads them whatever
+# their case); up to 2.9.1 the row named the record as the VCF writes it
+def carries(gts, k):
+    return any(t.isdigit() and int(t) == k for g in gts for t in re.split(r"[|/]", g.split(":")[0]))
+want_rows = []
+for line in open(vcf):
+    if line.startswith("#"):
+        continue
+    f = line.rstrip("\n").split("\t")
+    if f[6] not in ("PASS", ".") or "<" in f[3] or int(f[1]) - 1 - 30 < 0:
+        continue
+    for k, alt in enumerate(f[4].split(","), 1):
+        if "<" not in alt and (len(alt) != len(f[3]) or (len(alt) > 1 and len(f[3]) > 1)) \
+                and carries(f[9:], k):
+            want_rows.append("chrTest_%s_%s_%s" % (f[1], f[3].upper(), alt.upper()))
+assert len(want_rows) >= 50
+for port, dd in (("enricher.py", pydir), ("enricher.cpp", cppdir)):
+    got = [x.split("\t")[4] for x in open("%s/%s" % (dd, log)).read().splitlines()[1:]]
+    ok = got == want_rows
+    bad += not ok
+    print("  %s  : %s indel log rows == the VCF's carried indel and MNV alleles, upper-cased (%d)%s"
+          % ("OK  " if ok else "DIFF", port, len(want_rows), "" if ok else
+             ": %d rows, first differences %s" % (len(got), [(g, w) for g, w in zip(got, want_rows)
+                                                              if g != w][:3])))
+# the fake-indel windows: 30 reference bases on each side (25 before and 27 after up to
+# 2.9.1). Each log row's CHR field holds its window's real start and end, 0-based
+# (POS - 31 and POS - 1 + len(REF) + 30, the end not clipped), its FAKEPOS its contig on
+# the fake chromosome, one N after each contig: the reference over the window (cut at the
+# chromosome's end) with the first match of REF from POS on, in any case, replaced by the
+# ALT; its refseq the reference from the window's start, as long as the contig. An indel
+# whose window would start before base 0 is in no row (case 14: POS 1 and 30).
+LEFT = RIGHT = 30
+for port, d in (("enricher.py", pydir), ("enricher.cpp", cppdir)):
+    with open("%s/%s" % (d, fake)) as fh:
+        head, body = fh.readline(), fh.read()
+    flat = body.replace("\n", "")
+    prows = [x.split("\t") for x in open("%s/%s" % (d, log)).read().splitlines()[1:]]
+    wrong, nxt, contigs = [], 0, []
+    for x in prows:
+        pos, r_, a_ = x[4].rsplit("_", 3)[1:]
+        pos = int(pos)
+        start, stop = (int(v) for v in x[0].rsplit("_", 1)[0].rsplit("_", 1)[1].split("-"))
+        tail = ref[pos - 1:pos - 1 + len(r_) + RIGHT]
+        k = tail.upper().find(r_.upper())
+        if k >= 0:
+            tail = tail[:k] + a_ + tail[k + len(r_):]
+        contig = ref[max(pos - 1 - LEFT, 0):pos - 1] + tail
+        f0, f1 = (int(v) for v in x[5].split(","))
+        if not (pos - 1 - LEFT >= 0 and start == pos - 1 - LEFT
+                and stop == pos - 1 + len(r_) + RIGHT and f0 == nxt
+                and flat[f0:f1] == contig and flat[f1:f1 + 1] == "N"
+                and x[6] == ref[start:start + len(contig)]):
+            wrong.append(x[4])
+        contigs.append(contig)
+        nxt = f1 + 1
+    whole = head == ">fakechrTest\n" and body == "".join(c + "\nN\n" for c in contigs)
+    upper = body == body.upper()
+    ok = not wrong and whole and upper and len(prows) >= 30
+    bad += not ok
+    print("  %s  : %s fake-indel windows of 30 bases on each side, in upper case (%d log rows%s)"
+          % ("OK  " if ok else "DIFF", port, len(prows), "" if ok else
+             ": wrong at %s%s%s" % (wrong[:5], "" if whole else "; the FASTA is not its contigs",
+                                   "" if upper else "; the FASTA holds a base in lower case")))
+skips = [l for l in open("%s/run.log" % pydir).read().splitlines() if "skipping indel" in l]
+want = ["WARNING: skipping indel at chrTest:%d -- fewer than 31 bases from the chromosome start"
+        % p for p in (1, 30)]
+bad += sorted(skips) != sorted(want)
+print("  %s  : the indels at POS 1 and 30 skipped with a warning (%s)"
+      % ("OK  " if sorted(skips) == sorted(want) else "DIFF", skips))
+sys.exit(1 if bad else 0)
+PY
+then :; else FAIL=1; fi
+
+# a reference holding Q, the four-allele symbol, is refused by both ports alike
+QDIR="$WORK/refQ"
+mkdir -p "$QDIR/py/SNPs_genome" "$QDIR/cpp/SNPs_genome"
+sed '3s/^\(.\{10\}\)./\1q/' "$CHR_FA" > "$QDIR/chrTest.fa"
+for port in py cpp; do
+    if [ "$port" = py ]; then cmd=(python3 "$ENRICHER_PY"); else cmd=("$ENRICHER_BIN"); fi
+    ( cd "$QDIR/$port" && "${cmd[@]}" "$VCF_GZ" "$QDIR/chrTest.fa" "resultTest" "yes" "$VCF_PLAIN" ) \
+        > "$QDIR/$port.out" 2> "$QDIR/$port.err"
+    echo $? > "$QDIR/$port.rc"
+done
+QMSG="ERROR: chrTest holds 'Q' at 71: a reference FASTA must not hold Q, which is reserved for four-allele SNP positions"
+if [ "$(cat "$QDIR/py.rc")" = 1 ] && [ "$(cat "$QDIR/cpp.rc")" = 1 ] \
+   && [ "$(cat "$QDIR/py.err")" = "$QMSG" ] && [ "$(cat "$QDIR/cpp.err")" = "$QMSG" ]; then
+    echo "  OK   : a reference holding 'q' is refused by both ports (exit 1, the same message)"
+else
+    echo "  DIFF : a reference holding 'q': exit $(cat "$QDIR/py.rc") / $(cat "$QDIR/cpp.rc")"
+    cat "$QDIR/py.err" "$QDIR/cpp.err"
     FAIL=1
 fi
 

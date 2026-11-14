@@ -34,8 +34,28 @@ genomeStr = inGenomeFile.read()
 genomeStr = genomeStr.replace('\n', '')
 genomeStr = genomeStr.upper()
 
+# Q is the symbol written where a position's SNP ALTs, with its reference base when that
+# is A, C, G or T, cover all four bases (SNPsProcess), and buildTST, searchTST and
+# searchBruteForce read it as any base: a FASTA that already holds one would pass a base
+# of its own off as such a position.
+if 'Q' in genomeStr:
+    sys.stderr.write("ERROR: %s holds 'Q' at %d: a reference FASTA must not hold Q, which is "
+                     "reserved for four-allele SNP positions\n"
+                     % (currentChr, genomeStr.index('Q') + 1))
+    sys.exit(1)
+
 #genome str is listed to be modified faster and easier
 genomeList = list(genomeStr)
+
+# The A/C/G/T bases coded so far at each position, as a 4-bit mask (0 = no SNP record
+# here yet). A multi-allelic site normalised with `bcftools norm -m -any` arrives as one
+# record per ALT, so each record must add its ALT to what the earlier ones coded instead
+# of rebuilding the code from the reference base. The mask is kept beside genomeList
+# because a letter there cannot tell a code this script wrote from an ambiguity code the
+# reference FASTA already holds.
+snp_mask = bytearray(len(genomeStr))
+# positions coded Q (all four bases), counted for the stdout note
+four_base_count = 0
 
 iupac_code = {}
 
@@ -145,31 +165,91 @@ iupac_code_scomposition = {
 
 # base SET -> IUPAC letter, order-independent: the A/C/G/T bases present as a 4-bit
 # mask. Built from iupac_code, which has no single-base key, so one base maps to
-# nothing and leaves the genome unchanged.
+# nothing and leaves the genome unchanged. All four bases are Q, not N: N is what
+# buildTST and searchTST read as an assembly gap, which matches nothing, so writing it
+# removed every target through the position from the index, the reference one too.
 _BASE_BIT = {'A': 1, 'C': 2, 'G': 4, 'T': 8}
 _IUPAC_BY_MASK = {sum(_BASE_BIT[c] for c in spellings[0]): letter
                   for letter, spellings in iupac_code.items()}
+_IUPAC_BY_MASK[15] = 'Q'
+# the reference letters a SNP is coded over: A/C/G/T and the IUPAC ambiguity codes. N is
+# a gap, and so is any other byte (buildTST and searchBruteForce read it as N); Q is
+# refused when the FASTA is read.
+_REFERENCE_CODES = frozenset('ACGTRYSWKMBDHV')
+
+
+# A plain decimal number (what an AF value is). Spelled out rather than left to float(),
+# which also takes 'nan', 'inf', '1_000' and surrounding spaces, so that enricher.cpp
+# (strtod behind the same check) reads every AF string the same way.
+_AF_NUMBER = re.compile(r'[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\Z')
+
+
+def _af_rank(af):
+    """An AF value string as a number, to tell which of two records of one allele is the
+    more frequent (_dict_put): 0 when it is missing or not a plain decimal number."""
+    return float(af) if _AF_NUMBER.match(af) else 0.0
+
+
+# ASCII a-z to A-Z and nothing else, byte for byte what enricher.cpp's upperAllele does
+# (str.upper() would also change a non-ASCII letter).
+_ASCII_UPPER = str.maketrans('abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+
+
+def _upper_allele(allele):
+    """A REF or ALT with its bases in upper case: VCF 4.x reads the bases of REF and ALT
+    whatever their case. A symbolic allele (<DEL>, <INS:ME>: it holds '<') stays as it is;
+    '*' and '.' hold no letter."""
+    return allele if '<' in allele else allele.translate(_ASCII_UPPER)
 
 
 def SNPsProcess(line):
+    global four_base_count
     if len(line[3]) > 1: #se len ref > 1 significa che non è snp
         return
     line[1] = str(int(line[1])-1)  # taaac per corregere conta posizione da zero/uno
+    pos = int(line[1])
+    if not 0 <= pos < len(genomeStr):
+        # A POS past the end raised IndexError here; POS 0 read and coded the LAST base
+        # (index -1), and enricher.cpp read and wrote out of bounds. Fail, both ports alike.
+        sys.stderr.write("ERROR: %s:%d is outside the chromosome (%d bp): is the VCF on "
+                         "another assembly?\n" % (currentChr, pos + 1, len(genomeStr)))
+        sys.exit(1)
     altAlleles = line[4].strip().split(',') #list di tutti gli alleli alternative
-    referenceNucleotide = genomeStr[int(line[1])] #nucleotide reference preso dalla stringa del fasta
-    # The reference base and every single-character ALT, as A/C/G/T bits. A member
-    # that is not A/C/G/T -- the '*' of a spanning deletion, an 'N', a lowercase
-    # base, an IUPAC reference base -- adds nothing, so the real SNP alleles beside
-    # it are still coded. Building the code from the whole set instead left the base
-    # unchanged whenever such a member was present, dropping a real SNP at every
-    # multiallelic '*' site. This is enricher.cpp's rule (baseBit/iupacFromMask).
-    mask = _BASE_BIT.get(referenceNucleotide, 0)
+    referenceNucleotide = genomeStr[pos] #nucleotide reference preso dalla stringa del fasta
+    if referenceNucleotide not in _REFERENCE_CODES:
+        # An N is an assembly gap, which buildTST and searchTST match to nothing, and a
+        # variant record does not make it a base: the enriched genome holds exactly the
+        # reference's N (2.9.1 coded a record listing two or three ALTs over an N, making
+        # a gap searchable, and merging split records would have too). Any other byte
+        # that is no base or IUPAC code (such as the X of RepeatMasker -x) is a gap too,
+        # which buildTST and searchBruteForce read as N, and stays as it is. The dict
+        # still lists the record.
+        return
+    # The reference base and every single-character ALT, as A/C/G/T bits (an ALT written
+    # in lower case was upper-cased when the line was read). A member that is not
+    # A/C/G/T -- the '*' of a spanning deletion, an 'N', an IUPAC reference base -- adds
+    # nothing, so the real SNP alleles beside it are still coded. Building the code from
+    # the whole set instead left the base unchanged whenever such a member was present,
+    # dropping a real SNP at every multiallelic '*' site. This is enricher.cpp's rule
+    # (baseBit/iupacFromMask).
+    #
+    # The set starts from what earlier records coded HERE, not from the reference base
+    # alone. A normalised VCF (`bcftools norm -m -any`, how every CRISPRme panel is
+    # built) splits a multi-allelic site into one record per ALT, and rebuilding the
+    # code from the reference on each record kept only the LAST record's ALT in the
+    # file: the others reached neither the enriched genome nor the search. Now the
+    # code is that of the site written as one record with every ALT, in any order;
+    # all four bases are Q (_IUPAC_BY_MASK), which the search reads as any base.
+    mask = snp_mask[pos] or _BASE_BIT.get(referenceNucleotide, 0)
     for alt in altAlleles:
         if len(alt) == 1:
             mask |= _BASE_BIT.get(alt, 0)
+    if mask == 15 and snp_mask[pos] != 15:
+        four_base_count += 1
+    snp_mask[pos] = mask
     letter = _IUPAC_BY_MASK.get(mask)
     if letter is not None:
-        genomeList[int(line[1])] = letter #inserisco il IUPAC nt nel genoma enriched
+        genomeList[pos] = letter #inserisco il IUPAC nt nel genoma enriched
 
 
 # def SNPsProcess(line):
@@ -239,25 +319,114 @@ def _gt_alt_alleles(gt):
     return alleles
 
 
-def _af_value(line, pos_AF):
-    # Raw AF value string for this record, or "" if unavailable. Handles three
-    # cases uniformly: no AF-like field found anywhere in the file (pos_AF is
-    # None); this record's INFO field has fewer entries than the position
-    # cached from record 1 (variable-length INFO across records); and, as a
-    # defensive re-check on every call (not just the initial scan), the cached
-    # position pointing at a non-AF key in this particular record. "" is the
-    # deliberate placeholder (not "."): it's the only value besides "0" that
-    # pandas.to_numeric() parses as NaN instead of raising downstream.
-    if pos_AF is None:
-        return ""
-    splitted = line[7].split(";")
-    if pos_AF >= len(splitted):
-        return ""
-    key, sep, value = splitted[pos_AF].partition("=")
-    return value if key == "AF" else ""
+def _af_value(line):
+    # Raw INFO/AF value string of this record, found by its key, or "" if the record
+    # has none. "" is the deliberate placeholder (not "."): it's the only value besides
+    # "0" that pandas.to_numeric() parses as NaN instead of raising downstream. The key
+    # must be exactly "AF" (not a prefix match, which would take a gnomAD-style AF_afr).
+    # Until 2.9.1 the AF field's place was taken from the FIRST record only, so every
+    # record whose INFO lists its fields in another order or number got "": a merged VCF
+    # lost the AF of 224,981 of 232,384 chr22 indels that way, and HPRC chrY 91,950 of
+    # its 102,665 indel AFs.
+    for entry in line[7].split(";"):
+        key, sep, value = entry.partition("=")
+        if key == "AF":
+            return value
+    return ""
 
 
-def add_to_dict_snps(line, pos_AF):
+def _entry_refalt(entry):
+    """The "<REF>,<ALT>" of one dict entry "<samples>;<REF>,<ALT>;<rsID>;<AF>", read from
+    the right, so a ';' in a sample name cannot move it (the rsID's ';' is already ',')."""
+    return entry.rsplit(';', 3)[1]
+
+
+def _gt_for_allele(gt, k):
+    """GT ``gt`` with allele k written 1 and every other called allele 0 (the REF or
+    another ALT), missing ones and separators as they were: the form a split record's
+    genotypes have, where 1 is its one ALT."""
+    return ''.join(('1' if int(a) == k else '0') if a.isdigit() else a
+                   for a in re.split(r'([|/])', gt))
+
+
+def _gt_union(gt1, gt2):
+    """One sample's genotypes of one allele on two records, the earlier first, both in
+    split form (1 = the allele). Phased alike (as many alleles, every separator '|'): a
+    slot holds the allele if either record puts it there, else a called 0 if either has
+    one. Otherwise, as unphased slots cannot be matched up, the genotype with more copies
+    of the allele (on a tie, the earlier)."""
+    t1, t2 = re.split(r'([|/])', gt1), re.split(r'([|/])', gt2)
+    if len(t1) != len(t2) or '/' in t1 or '/' in t2:
+        return gt2 if t2.count('1') > t1.count('1') else gt1
+    out = []
+    for x, y in zip(t1, t2):
+        if x == '|':
+            out.append(x)
+        elif '1' in (x, y):
+            out.append('1')
+        elif '0' in (x, y):
+            out.append('0')
+        else:
+            out.append(x)
+    return ''.join(out)
+
+
+def _merge_entries(old, k_old, new, k_new):
+    """One allele's dict entries from two records (the same REF>ALT twice): every carrier
+    of either, with genotypes in split form (_gt_for_allele) and a carrier of both
+    getting the union of its two (_gt_union); the rsID and AF of the more frequent
+    record (highest INFO/AF; on a tie, the earlier). Until 2.9.1 the later record's
+    entry replaced the earlier, dropping the earlier record's carriers."""
+    s_old, refalt, rsid, af = old.rsplit(';', 3)
+    s_new, _, rsid_new, af_new = new.rsplit(';', 3)
+    gts = {}
+    for samples, k in ((s_old, k_old), (s_new, k_new)):
+        for carrier in samples.split(',') if samples else []:
+            name, gt = carrier.rsplit(':', 1)
+            gt = _gt_for_allele(gt, k)
+            gts[name] = _gt_union(gts[name], gt) if name in gts else gt
+    if _af_rank(af_new) > _af_rank(af):
+        rsid, af = rsid_new, af_new
+    return ','.join(sorted(n + ':' + g for n, g in gts.items())) + ';' + refalt + ';' + rsid + ';' + af
+
+
+def _dict_put(key, entries, alleles):
+    """Store one record's per-ALT entries under "chr,pos", MERGED with what earlier
+    records stored there; alleles[i] is the allele index of entries[i]'s ALT the
+    entry's genotypes use (1: add_to_dict_snps writes every entry in split form).
+
+    A position's value is its ALTs' entries joined by '$', the form a record listing
+    several ALTs has always produced, so every reader of multi-ALT values reads it. Each
+    entry keeps its own record's carriers, genotypes, rsID and AF: its genotypes use 1
+    for its ALT (a record listing several ALTs' too, written in split form), as
+    tier0_registry's default alt_index expects.
+    Assigning instead let a later record at the position overwrite the earlier ones, so
+    a split multi-allelic site kept only its last ALT. An allele already listed here
+    (the same REF>ALT on two records) gets the carriers of both (_merge_entries); any
+    other ALT is appended, in file order."""
+    old = chr_dict_snps.get(key)
+    if old is None:
+        chr_dict_snps[key] = '$'.join(entries)
+        for e, k in zip(entries, alleles):
+            if k != 1:
+                entry_allele[(key, _entry_refalt(e))] = k
+        return
+    merged = old.split('$')
+    refalts = [_entry_refalt(e) for e in merged]
+    for e, k in zip(entries, alleles):
+        ra = _entry_refalt(e)
+        if ra in refalts:
+            j = refalts.index(ra)
+            merged[j] = _merge_entries(merged[j], entry_allele.pop((key, ra), 1), e, k)
+        else:
+            merged.append(e)
+            refalts.append(ra)
+            if k != 1:
+                entry_allele[(key, ra)] = k
+    chr_dict_snps[key] = '$'.join(merged)
+
+
+def add_to_dict_snps(line):
     list_samples = []
     list_chars = []
     if len(line[3]) == 1 and len(line[4]) == 1:
@@ -273,11 +442,11 @@ def add_to_dict_snps(line, pos_AF):
         rsID = line[2]
         list_chars.append(line[3])
         list_chars.append(line[4])
-        af = _af_value(line, pos_AF)
+        af = _af_value(line)
         if len(list_samples) > 0:
-            chr_dict_snps[chr_pos_string] = ','.join(sorted(list_samples)) + ';' + ','.join(list_chars) + ";" + rsID + ";" + af
+            _dict_put(chr_pos_string, [','.join(sorted(list_samples)) + ';' + ','.join(list_chars) + ";" + rsID + ";" + af], [1])
         else:
-            chr_dict_snps[chr_pos_string] = ';' + ','.join(list_chars) + ";" + rsID + ";" + af #None
+            _dict_put(chr_pos_string, [';' + ','.join(list_chars) + ";" + rsID + ";" + af], [1]) #None
         # print(chr_dict_snps[chr_pos_string])
     elif len(line[3]) == 1:
         variants = line[4].split(",")
@@ -292,15 +461,23 @@ def add_to_dict_snps(line, pos_AF):
             dict_of_lists_samples[snp] = []
         if len(snps) > 0:		
             for pos, sample in enumerate(line[9:]):
-                alleles = _gt_alt_alleles(sample.split(':')[0])
-                # no break: a sample carrying two different ALTs belongs to BOTH
+                gt = sample.split(':')[0]
+                alleles = _gt_alt_alleles(gt)
+                # no break: a sample carrying two different ALTs belongs to BOTH. Each entry
+                # holds its carriers' genotypes in split form (_gt_for_allele: 1 is the
+                # entry's own ALT, 0 the reference or another ALT), as a split record's
+                # entry and a merged entry do: a 1|2 carrier of C>A,T reads 1|0 under A
+                # and 0|1 under T. Kept raw (1|2 under both), a reader had to guess each
+                # entry's allele number from the position's other entries, which a split
+                # record's entry beside the line numbers otherwise (C>G 1|0 beside C>A,CT
+                # 1|2 read A as allele 2, the insertion's slot).
                 for idx, value in enumerate(values_for_allele_info):
                     if value in alleles:
-                        dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 9]+':'+sample.split(':')[0]) #add to correct entry of dict the sample with such snp
+                        dict_of_lists_samples[snps[idx]].append(VCFheader[ pos + 9]+':'+_gt_for_allele(gt, value)) #add to correct entry of dict the sample with such snp
                     
             chr_pos_string = currentChr + ',' + line[1]
             rsID = line[2].split(',')
-            af = _af_value(line, pos_AF).split(',')
+            af = _af_value(line).split(',')
 
             final_entry = []
             for idx, snp in enumerate(snps):
@@ -312,7 +489,8 @@ def add_to_dict_snps(line, pos_AF):
                     final_entry.append(','.join(sorted(dict_of_lists_samples[snp])) + ';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af_val)
                 else:
                     final_entry.append(';' + ','.join(list_chars) + ";" + rsID[0] + ";" + af_val)
-            chr_dict_snps[chr_pos_string] = '$'.join(final_entry)
+            # every entry in split form: its ALT is allele 1 for _dict_put's merge
+            _dict_put(chr_pos_string, final_entry, [1] * len(final_entry))
 
 def dictSave():
     #os.chdir("./SNPs_genome/")
@@ -320,7 +498,22 @@ def dictSave():
         json.dump(chr_dict_snps, f) 
 
 
-def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
+# The fake-indel window (enricher.cpp's INDEL_LEFT / INDEL_RIGHT): each indel allele's
+# contig is INDEL_LEFT reference bases, then the record's REF (from POS on) with the ALT
+# written in its place, then INDEL_RIGHT reference bases (fewer where the chromosome
+# ends); one N stands between two contigs. A target of L bases (guide + PAM) with b DNA
+# bulges holds a record's change only where L + b <= INDEL_LEFT + 2 and
+# L + b <= INDEL_RIGHT + 1 (INDEL_LEFT + 1 for a record whose REF and ALT differ at their
+# first base), so LEFT = RIGHT = Lmax - 1 + bmax: Lmax = 29 (a 21-nt guide and a PAM of 8
+# nt, the longest the general K=8 index serves), bmax = 2 (the most DNA bulges CRISPRme's
+# web offers). Up to 2.9.1 the
+# window was 25 / 27 (L + b <= 27). The log's CHR field records each window's real start,
+# from which a reader derives the left flank (POS - 1 - start).
+INDEL_LEFT = 30
+INDEL_RIGHT = 30
+
+
+def indel_to_fasta(line, id_indel, start_fake_pos):
     if (len(line[3]) > 1 or len(line[4]) > 1) and '<' not in line[3]:
         #print(''.join(line[3:5]))
         indels = []
@@ -349,17 +542,18 @@ def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
                         dict_of_lists_samples[indels[idx]].append(VCFheader[ pos + 9]) #add to correct entry of dict the sample with such snp
             if len(indels) > 0:
                 rsID = line[2].split(',')
-                af = _af_value(line, pos_AF).split(',')
+                af = _af_value(line).split(',')
 
-                start_position = int(line[1])-26
-                end_position = int(line[1])+26+len(line[3])
+                start_position = int(line[1]) - 1 - INDEL_LEFT
+                end_position = int(line[1]) - 1 + len(line[3]) + INDEL_RIGHT
                 if start_position < 0:
-                    # The window is anchored so the REF base lands at index 25, which a
-                    # negative start cannot satisfy: Python would slice from the far end
-                    # of the chromosome and hand back an EMPTY window, so the contig and
-                    # the coordinates logged for it would disagree. (enricher.cpp throws
-                    # instead, so the two ports only agree if both skip.)
-                    print(f"WARNING: skipping indel at {currentChr}:{line[1]} -- fewer than 26 bases from the chromosome start")
+                    # The window is anchored so the REF base lands at index INDEL_LEFT,
+                    # which a negative start cannot satisfy: Python would slice from the
+                    # far end of the chromosome and hand back an EMPTY window, so the
+                    # contig and the coordinates logged for it would disagree.
+                    # (enricher.cpp throws instead, so the two ports only agree if both
+                    # skip.)
+                    print(f"WARNING: skipping indel at {currentChr}:{line[1]} -- fewer than {INDEL_LEFT + 1} bases from the chromosome start")
                     return id_indel, start_fake_pos
                 sub_fasta = genomeStr[start_position:end_position]
                 for idx, indel in enumerate(indels):
@@ -378,7 +572,7 @@ def indel_to_fasta(line, id_indel, pos_AF, start_fake_pos):
                         # gnomAD-converter --multiallelic) does not. Dropping the `break`
                         # in the carrier scan made it worse, by letting more alleles reach
                         # this gate.
-                        allele_fasta = sub_fasta[0:25] + re.sub(line[3], indel, sub_fasta[25:], 1, flags=re.IGNORECASE)
+                        allele_fasta = sub_fasta[0:INDEL_LEFT] + re.sub(line[3], indel, sub_fasta[INDEL_LEFT:], 1, flags=re.IGNORECASE)
 
                         #fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
                         list_fasta_indels.append(allele_fasta+'\n'+"N\n")
@@ -408,6 +602,9 @@ print('START ENRICHMENT WITH SNVs AND SVs')
 
 if sys.argv[4] == 'yes':
     chr_dict_snps = dict()
+    # (key, "REF,ALT") -> the allele index of that entry's ALT in its record, for an
+    # entry of a record listing several ALTs (1, a split record's, is not stored)
+    entry_allele = dict()
     log_indels = []
     id_indel = 1
     start_fake_pos = 0
@@ -418,8 +615,6 @@ if sys.argv[4] == 'yes':
     fasta_out.write(f">fake{currentChr}\n")
     list_fasta_indels = []
 
-first_line = True
-pos_AF = None  # stays None if no exact "AF=" INFO key is found in the first record
 for line in inAltFile:
     if ('#CHROM') in line:
         VCFheader = line.strip().split('\t')   #Save this header for retrieving sample id
@@ -434,29 +629,28 @@ for line in inAltFile:
     # multi-value convention) once, so all rsID uses below stay a single field.
     if len(line) > 2:
         line[2] = line[2].replace(";", ",")
-    if first_line:
-        first_line = False
-        splitted = line[7].split(";")
-        for pos, ele in enumerate(splitted):
-            # exact key match, not a prefix match: a prefix match would also
-            # accept e.g. gnomAD-style "AF_afr=", and either garble that value
-            # (the "AF="-only extraction below) or -- worse -- lock onto it and
-            # skip a later, real "AF=" field in the same record. Since the
-            # `break` only fires on a real match, this still keeps scanning
-            # past a non-matching population-specific field to find the true
-            # "AF=" wherever it appears in the record.
-            if ele.split("=", 1)[0] == "AF":
-                pos_AF = pos
-                break
+    # REF and every ALT in upper case, before anything reads them (VCF 4.x: their bases are
+    # case-insensitive). Up to 2.9.1 the alleles were read as written: a lower-case SNP ALT
+    # (C>g) was no A, C, G or T to SNPsProcess, so it was not coded while the dict listed
+    # it, a record that differed from another only by case (C>G and c>g) was another allele
+    # in the dict, and an indel's window and log row held the VCF's case. Now each is the
+    # record written in upper case, whose REF the window finds in the upper-cased genome as
+    # before (re.IGNORECASE).
+    if len(line) > 4:
+        line[3] = _upper_allele(line[3])
+        line[4] = ','.join(_upper_allele(a) for a in line[4].split(','))
     if line[6] not in ('PASS', '.'):  # '.' = no filter applied (e.g. HPRC vcfwave VCFs)
         continue
     if sys.argv[4] == 'yes': #if true do all the creation, if false do only genome enrichment with SNPs
         #print(sys.argv[4])
-        add_to_dict_snps(line, pos_AF)
-        id_indel, start_fake_pos = indel_to_fasta(line, id_indel, pos_AF, start_fake_pos)
+        add_to_dict_snps(line)
+        id_indel, start_fake_pos = indel_to_fasta(line, id_indel, start_fake_pos)
     SNPsProcess(line)
-    
 
+
+if four_base_count:
+    print("NOTE: %d position(s) of %s are coded Q, the four-allele symbol, which the search "
+          "reads as any base (N stays a gap)" % (four_base_count, currentChr))
 #saving chr after enrichment with snps
 chromosomeSave()
 if sys.argv[4] == 'yes':
