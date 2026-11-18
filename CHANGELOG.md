@@ -506,6 +506,17 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   Pre-existing (4579026, and 2.9.1 for the argument); `test/run_index_format_test.sh` makes
   four such calls, which fail with c18c575's `searchTST` (docs/INDEX_FORMAT.md section 5).
 
+### Known issues
+- **On Python 3.13 and later, `enricher.py` prints a `DeprecationWarning` to stderr**
+  (`re.sub`'s `count` passed by position). `enricher.py` is the Python port of the enricher,
+  which `add-variants` runs only when no compiled `enricher` is installed. Its outputs are
+  unchanged, and `add-variants` reads only the enricher's exit status. The Docker image and
+  the 2.10.0 Bioconda recipe, which installs the compiled enricher and pins Python 3.11, do
+  not run it. A later Python is to refuse `count` by position, which would make that port
+  fail: 2.10.1 passes it by keyword. Until then CI runs the job that compares the two ports
+  on ubuntu-24.04 (Python 3.12), as every run before 2026-11-18 did; that job compares their
+  stderr, so the warning fails it on ubuntu-26.04 (Python 3.14).
+
 ## [2.9.1] - 2026-10-30
 
 ### Added

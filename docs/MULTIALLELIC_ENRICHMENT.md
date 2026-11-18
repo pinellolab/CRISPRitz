@@ -1149,7 +1149,7 @@ publishes in their place. The archives of 2.8.1 stay where they are, unchanged, 
 2.8.1, which reads index format 1 only (owner decision C2). The rebuilt ones are CRISPRme
 2.10.0's index set (its `seq_script/rebuild/index_set_2.10.0.tsv`), built by this CRISPRitz
 in index format 2, and go to a Hugging Face dataset repo of their own,
-`lucapinello/crisprme-indexes-format2`, where no earlier CRISPRme looks:
+`lucapinello/crisprme_plus_indices`, where no earlier CRISPRme looks:
 
 | 2.8.1 archive (`lucapinello/crisprme-data`, `indexes/`) | Members the enricher changes | In CRISPRme 2.10.0 |
 |---|---|---|
