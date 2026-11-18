@@ -195,7 +195,7 @@ CRISPRitz follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Move
 entries from `[Unreleased]` into a new `## [X.Y.Z] - YYYY-MM-DD` section, grouped
 under Added / Changed / Deprecated / Removed / Fixed / Security. Where the release
 branch has written the section already, undated (`## [X.Y.Z] - unreleased`, as 2.10.0's
-is), set its date and drop its "Not yet tagged" line. Leave a fresh empty
+was), set its date and drop its "Not yet tagged" line. Leave a fresh empty
 `[Unreleased]` at the top and update the link-reference footer.
 
 ### 4. Create the GitHub release and tag

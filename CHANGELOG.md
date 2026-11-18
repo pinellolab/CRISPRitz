@@ -20,15 +20,14 @@ for the crispritz -> Bioconda -> CRISPRme chain).
 
 ## [Unreleased]
 
-## [2.10.0] - unreleased
+## [2.10.0] - 2026-11-19
 
-Not yet tagged: the date is set when it is. Released together with rebuilt indexes and the
-CRISPRme release that requires it (CRISPRme 2.10.0): the IDX-13, IDX-4 and IDX-15 fixes below
-change what an index holds, and every allele of a split multi-allelic site, the
-four-allele symbol `Q`, the merged carriers, the split form of a record listing several
-ALTs and the wider fake-indel window change what an enrichment holds, so they take effect
-only on genomes enriched and indexes built by this version (the brute-force scan gains
-IDX-15 at once, and IDX-14 applies to existing indexes).
+Released together with rebuilt indexes and the CRISPRme release that requires it
+(CRISPRme 2.10.0): the IDX-13, IDX-4 and IDX-15 fixes below change what an index holds, and
+every allele of a split multi-allelic site, the four-allele symbol `Q`, the merged carriers,
+the split form of a record listing several ALTs and the wider fake-indel window change what
+an enrichment holds, so they take effect only on genomes enriched and indexes built by this
+version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existing indexes).
 
 ### Added
 - **`Q`, the four-allele symbol.** A position whose SNP ALTs, with its reference base when
@@ -933,8 +932,8 @@ IDX-15 at once, and IDX-14 applies to existing indexes).
 ### Added
 - Support for longer PAMs and mismatches within PAMs (beta).
 
-[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.9.1...HEAD
-[2.10.0]: https://github.com/pinellolab/CRISPRitz/compare/v2.9.1...HEAD
+[Unreleased]: https://github.com/pinellolab/CRISPRitz/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.10.0
 [2.9.1]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.9.1
 [2.9.0]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.9.0
 [2.8.4]: https://github.com/pinellolab/CRISPRitz/releases/tag/v2.8.4
