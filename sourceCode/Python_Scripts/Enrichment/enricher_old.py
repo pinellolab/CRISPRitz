@@ -263,7 +263,7 @@ def indel_to_fasta(line, id_indel):
         sub_fasta = genomeList[start_position:end_position]
         #sub_fasta[25] = line[3] 
         sub_fasta = ''.join(sub_fasta)
-        sub_fasta = sub_fasta[0:25] + re.sub(line[2], line[3], sub_fasta[25:], 1, flags=re.IGNORECASE) 
+        sub_fasta = sub_fasta[0:25] + re.sub(line[2], line[3], sub_fasta[25:], count=1, flags=re.IGNORECASE) 
         with open(f'{output_dir_indels}/{currentChr}_{start_position}-{end_position}_{id_indel}.fa', 'w+') as fasta_out:
             fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
             fasta_out.write(sub_fasta+'\n')

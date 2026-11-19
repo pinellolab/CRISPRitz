@@ -35,10 +35,14 @@ jobs:
 
   enricher-ports:
     name: enricher.py and enricher.cpp agree (incl. multiallelic sites, split and joined)
-    # ubuntu-24.04 (Python 3.12), as every run before 2026-11-18. On ubuntu-26.04 (Python 3.14)
-    # enricher.py's positional re.sub count prints a DeprecationWarning to stderr, which this
-    # job compares; 2.10.1 passes it by keyword (CHANGELOG, 2.10.0, Known issues).
-    runs-on: ubuntu-24.04
+    # On both of GitHub's Ubuntu images: ubuntu-24.04 (Python 3.12) and ubuntu-26.04
+    # (Python 3.14; ubuntu-latest from November 2026). The steps compare enricher.py's
+    # stderr, so a warning that one Python prints fails that image's lane.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 

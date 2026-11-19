@@ -572,7 +572,7 @@ def indel_to_fasta(line, id_indel, start_fake_pos):
                         # gnomAD-converter --multiallelic) does not. Dropping the `break`
                         # in the carrier scan made it worse, by letting more alleles reach
                         # this gate.
-                        allele_fasta = sub_fasta[0:INDEL_LEFT] + re.sub(line[3], indel, sub_fasta[INDEL_LEFT:], 1, flags=re.IGNORECASE)
+                        allele_fasta = sub_fasta[0:INDEL_LEFT] + re.sub(line[3], indel, sub_fasta[INDEL_LEFT:], count=1, flags=re.IGNORECASE)
 
                         #fasta_out.write(f'>{currentChr}_{start_position}-{end_position}_{id_indel}\n')
                         list_fasta_indels.append(allele_fasta+'\n'+"N\n")
