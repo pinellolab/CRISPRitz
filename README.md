@@ -365,6 +365,13 @@ searched by CRISPRitz 2.9.1 or earlier: 2.9.1 refuses it with an error, earlier 
 abort with one. An index of an enriched genome may hold `Q`, the four-allele symbol; the
 files that do are flagged in their header (`index-info` reports `four_allele`).
 
+CRISPRme+ 2.10.0's precomputed indexes are built by CRISPRitz 2.10.0, so in index format 2
+(search them with CRISPRitz 2.10 or later), and published in the Hugging Face dataset
+[`lucapinello/crisprme_plus_indices`](https://huggingface.co/datasets/lucapinello/crisprme_plus_indices);
+those of CRISPRme+ 2.8.1, in format 1, stay unchanged in `lucapinello/crisprme-data` and
+`lucapinello/crisprme-data-general-index` (section 8 of
+[`docs/MULTIALLELIC_ENRICHMENT.md`](docs/MULTIALLELIC_ENRICHMENT.md)).
+
 
 **<a name="Search">3.3</a> CRISPRitz Search Tool**  
 This tool is created to search on a fasta genome or an index genome.

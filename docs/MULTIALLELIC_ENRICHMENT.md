@@ -1175,9 +1175,14 @@ its `genotypes_hg38_HGDP1kGP` (the same companion), and `SHA256SUMS`; in CRISPRm
 The set adds indexes of its own on the reference and HGDP + 1000 Genomes (SaCas9
 `22-NNGRRN_3_*`, Cas12a `TTTN-20_3_*` and `TTTN-23_3_*`), and CRISPRme 2.10.0 rebuilds the
 whole mega dataset, its registry and indel frequencies included, for reasons of its own (its
-METHODS, section 2). Its indexes of HGDP + 1000 Genomes hold, like its reference indexes, all
-455 contigs of hg38, for every PAM (2.8.1's NRG index of the panel held 24); its indexes of
-HPRC and mega hold chr1-22, X and Y, as 2.8.1's did.
+METHODS, section 2); and it builds HPRC from HPRC Release 2's Minigraph-Cactus graph v2.1,
+where 2.8.1's was built from v2.0 (the same 232 samples, 0.86 % more records), so HPRC's
+index, stores and logs differ from 2.8.1's by their data too, its kit
+`build-inputs/hg38_HPRC` holds v2.1's normalised VCFs, and this document's HPRC figures,
+measured on 2.8.1's v2.0 VCFs, are not those of the published panel. The set's indexes of
+HGDP + 1000 Genomes hold, like its reference indexes, all 455 contigs of hg38 (the Cas12a
+TTTN indexes 454: `chrUn_KI270539v1`, 993 bp, holds no TTTN site; 2.8.1's NRG index of the
+panel held 24); its indexes of HPRC and mega hold chr1-22, X and Y, as 2.8.1's did.
 
 Unchanged by the enricher (measured on chr22 or derived from the VCF directly):
 `indel_genotypes_<vcf>/`, `indel_af_hg38_mega/`, `samplesIDs/` and the source VCFs under
@@ -1189,11 +1194,12 @@ index; up to that change, the logs of HGDP + 1000 Genomes and mega were unchange
 merge and `Q`. HPRC's changed besides: a log's AF column changes wherever a record lists
 `INFO/AF` at another place than its VCF's first record, as each record's AF is now read by
 its key (section 2.5), and of the 24 HPRC VCFs (the normalised build input) chrY's has such
-records (96,853 of its 108,023 indel records), the 23 others none. With 2.10.0,
-`log_indels_hg38_HPRC/logchrY` gains the AF of 91,950 of its 102,665 rows (the published one
-leaves exactly those empty), every other column identical and each AF its record's (0
-mismatches against the VCF), and 47,911 of the chrY dictionary's 109,033 values change in
-their AF alone. None of the 23 HGDP + 1000 Genomes VCFs has such a record, and mega's VCF
+records (96,853 of its 108,023 indel records), the 23 others none. Enriched again by 2.10.0
+at 2.9.1's window, 2.8.1's v2.0 chrY VCF gives a `logchrY` that gains the AF of 91,950 of its
+102,665 rows (2.8.1's published log leaves exactly those empty), every other column identical
+and each AF its record's (0 mismatches against the VCF), and 47,911 of the chrY dictionary's
+109,033 values change in their AF alone; 2.10.0's published HPRC logs are of v2.1's records
+and 30/30 windows. None of the 23 HGDP + 1000 Genomes VCFs has such a record, and mega's VCF
 lists no `AF` key (chr22: only `AF_<panel>` and `AF_max`), so their logs keep their AF; on
 chr22 the logs of all three panels were byte-identical to 2.9.1's at its window. With REF
 and ALT read in upper case (section 2.9), HPRC's logs change besides at the rows of its

@@ -22,7 +22,9 @@ for the crispritz -> Bioconda -> CRISPRme chain).
 
 ## [2.10.0] - 2026-11-19
 
-Released together with rebuilt indexes and the CRISPRme release that requires it
+Released together with rebuilt indexes (CRISPRme 2.10.0's, in the Hugging Face dataset
+`lucapinello/crisprme_plus_indices`; 2.8.1's stay in `lucapinello/crisprme-data` and
+`lucapinello/crisprme-data-general-index`) and the CRISPRme release that requires it
 (CRISPRme 2.10.0): the IDX-13, IDX-4 and IDX-15 fixes below change what an index holds, and
 every allele of a split multi-allelic site, the four-allele symbol `Q`, the merged carriers,
 the split form of a record listing several ALTs and the wider fake-indel window change what
@@ -205,6 +207,14 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
   earlier CRISPRme: crisprme 2.8.1's build 1 pins `crispritz >=2.9.1,<2.10`, but its build
   0 and the 2.8.0 and 2.7.9 builds set no upper bound (2.8.1's build 0 and 2.8.0's:
   `crispritz >=2.9.0`).
+- **The Bioconda package installs the compiled `enricher`.** The 2.10.0 recipe's `build.sh`
+  copies it to `$PREFIX/bin/` and to `$PREFIX/opt/crispritz/Python_Scripts/Enrichment/`, and
+  its tests check both, so a Bioconda install's `add-variants` runs the compiled port, as a
+  source build and CRISPRme's Docker image do. The published 2.9.0 and 2.9.1 packages
+  installed `buildTST`, `searchTST` and `searchBruteForce` only, so their `add-variants` ran
+  `enricher.py`, 1.6-1.8x slower with the same outputs: 2.9.1's entry "The compiled
+  `enricher` is now installed" held for this repository's `conda/build.sh`, not for the
+  Bioconda recipe. CRISPRitz's own Docker image still runs `enricher.py`.
 - **New indexes are format 2, which CRISPRitz 2.9.1 and earlier cannot search** (2.9.1
   refuses one: `not a valid CRISPRitz index (.bin) file (numLeaves=-28747197)`). Indexes
   built by earlier versions keep working (see Fixed, IDX-14) but lack, until rebuilt, the
@@ -510,12 +520,14 @@ version (the brute-force scan gains IDX-15 at once, and IDX-14 applies to existi
 - **On Python 3.13 and later, `enricher.py` prints a `DeprecationWarning` to stderr**
   (`re.sub`'s `count` passed by position). `enricher.py` is the Python port of the enricher,
   which `add-variants` runs only when no compiled `enricher` is installed. Its outputs are
-  unchanged, and `add-variants` reads only the enricher's exit status. The Docker image and
-  the 2.10.0 Bioconda recipe, which installs the compiled enricher and pins Python 3.11, do
-  not run it. A later Python is to refuse `count` by position, which would make that port
-  fail: 2.10.1 passes it by keyword. Until then CI runs the job that compares the two ports
-  on ubuntu-24.04 (Python 3.12), as every run before 2026-11-18 did; that job compares their
-  stderr, so the warning fails it on ubuntu-26.04 (Python 3.14).
+  unchanged, and `add-variants` reads only the enricher's exit status. CRISPRme's Docker
+  image and the 2.10.0 Bioconda recipe (which pins Python 3.11) install the compiled
+  enricher and do not run it; CRISPRitz's own image, `pinellolab/crispritz`, builds no
+  compiled enricher and runs `enricher.py` on Python 3.11, which does not warn. A later
+  Python is to refuse `count` by position, which would make that port fail: 2.10.1 passes it
+  by keyword. Until then CI runs the job that compares the two ports on ubuntu-24.04
+  (Python 3.12), as every run before 2026-11-18 did; that job compares their stderr, so the
+  warning fails it on ubuntu-26.04 (Python 3.14).
 
 ## [2.9.1] - 2026-10-30
 
