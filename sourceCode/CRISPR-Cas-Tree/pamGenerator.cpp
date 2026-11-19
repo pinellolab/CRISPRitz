@@ -90,6 +90,18 @@ vector<bitset<4>> genome_bit_conversion(string genome) //converto il genoma dal 
 		{
 			genomeBit.push_back(bitset<4>(string("0111")));
 		}
+		else if (genome[i] == 'Q')
+		{
+			//all four bases: a SNP position whose ALTs, with an A/C/G/T reference base,
+			//cover A, C, G and T (the enricher writes Q there). Not N, which stays the 0000 gap.
+			genomeBit.push_back(bitset<4>(string("1111")));
+		}
+		else
+		{
+			//any other byte is a gap too. Until 2.9.1 nothing was pushed here, so the
+			//scan read every later position one base off per such byte.
+			genomeBit.push_back(bitset<4>(string("0000")));
+		}
 	}
 	return genomeBit;
 }
@@ -313,119 +325,135 @@ string reversenuc(string pam)
 // 	return res;
 // }
 
-vector<int> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges, int max_mismatches)
+// One site of an index (docs/INDEX_FORMAT.md): ws is the window start, the + strand
+// coordinate of the window's leftmost base, and is negative when the window's pad or
+// flank runs off the contig start; left says which end holds the flank:
+//   left  (PAM-left) : [flank K][guide G][pad mb]  -- 3' PAM - strand, 5' PAM + strand
+//   right (PAM-right): [pad mb][guide G][flank K]  -- 3' PAM + strand, 5' PAM - strand
+struct PamSite
 {
-	vector<int> indices; //to save indices for TST extraction
-	//a sequence shorter than one target window (pam_len + max_bulges) holds no
-	//target on either strand, so return before the scans. Their bounds below,
-	//genome_sequence.length() - pam_limit / - pam_len / - (pam_len + max_bulges),
-	//are unsigned and wrap on such a sequence -- an empty or header-only FASTA, as
-	//the enricher writes for a chromosome with no carried indel. For a constrained
-	//PAM the scan then read past the sequence and crashed; for an all-N PAM, whose
-	//scan reads nothing, it ran ~2^31 iterations pushing indices until the process
-	//was killed for memory. No target fits, so nothing reachable is lost.
-	if (genome_sequence.length() < (size_t)(pam_len + max_bulges))
-		return indices;
+	int ws;
+	bool left;
+};
+
+// whether every position of the PAM is N: such a PAM states no requirement, and an
+// index built with it stores a flank that --prune-pam filters at search time
+bool pamUnconstrained(const string &pam_sequence)
+{
+	vector<bitset<4>> pam_bit = pam_bit_conversion(pam_sequence);
+	for (size_t j = 0; j < pam_bit.size(); j++)
+		if (!pam_bit[j].all())
+			return false;
+	return true;
+}
+
+// The sites of a contig, in the order the 2.9.1 builder found them (by the start nt
+// of their K flank bases; at each nt the PAM read forward first, then reversed), so
+// that a contig of bases, IUPAC codes and N with no boundary site yields the same
+// leaves, tree and search output as in 2.9.1. A site is stored when its guide lies
+// inside the contig:
+//  - dedicated PAM: the K PAM bases match (a genomic N matches no PAM letter, not even
+//    N) and lie inside the contig; the scan reaches the last PAM that fits, nt =
+//    length() - K (until 2.9.1 it stopped one short on a 3' PAM, and on a 5' PAM
+//    bounded on pam_len, losing every reverse-strand PAM within a guide of the end);
+//  - all-N PAM: every window whose flank base next to the guide is on the contig; the
+//    rest of the flank may run off it (B4: --prune-pam tests only the L bases of the
+//    search PAM). A window whose flank is wholly off the contig could match no PAM.
+// The pad may run off the contig or into an N in both cases (B3): mainParallel.cpp
+// marks how much of it an alignment may consume. Until 2.9.1 the whole pad + guide +
+// flank window had to fit, so a site within max_bulges nt of a contig end was lost
+// even for a perfect match, and the sign of an index was its strand, so a window
+// starting at 0 was read as the other shape.
+vector<PamSite> searchPAMonGenome(string pam_sequence, int pam_len, string genome_sequence, int pam_limit, bool pam_at_start, int max_bulges, int max_mismatches)
+{
+	vector<PamSite> sites;
+	const int n = (int)genome_sequence.length();
+	const int K = pam_limit;
+	const int G = pam_len - pam_limit;
+	//a contig shorter than a guide plus one flank base holds no site on either strand
+	//(an empty or header-only FASTA is common: the enricher writes one for a
+	//chromosome with no carried indel)
+	if (G < 1 || K < 1 || n < G + 1)
+		return sites;
+	const bool unconstrained = pamUnconstrained(pam_sequence);
+
+	//a site's flank at nt: PAM-right when the flank lies right of the guide, i.e. the
+	//guide is [nt - G, nt); PAM-left when it lies left, the guide [nt + K, nt + K + G)
+	auto right_ok = [&](int nt) { return nt >= G && nt <= n - 1; };
+	auto left_ok = [&](int nt) { return nt + K - 1 >= 0 && nt + K + G <= n; };
+	auto push_right = [&](int nt) { sites.push_back(PamSite{nt - G - max_bulges, false}); };
+	auto push_left = [&](int nt) { sites.push_back(PamSite{nt, true}); };
+
+	if (unconstrained)
+	{
+		//every position is a PAM, read either way; the forward read is a PAM-right
+		//site for a 3' PAM and a PAM-left one for a 5' PAM
+		for (int nt = -(K - 1); nt <= n - 1; nt++)
+		{
+			if (!pam_at_start)
+			{
+				if (right_ok(nt))
+					push_right(nt);
+				if (left_ok(nt))
+					push_left(nt);
+			}
+			else
+			{
+				if (left_ok(nt))
+					push_left(nt);
+				if (right_ok(nt))
+					push_right(nt);
+			}
+		}
+		return sites;
+	}
+
+	if (n < K)
+		return sites;
 	vector<bitset<4>> pam_bit = pam_bit_conversion(pam_sequence);
 	vector<bitset<4>> pam_bit_reverse = pam_bit_conversion(reversenuc(pam_sequence));
 	vector<bitset<4>> genome_bit = genome_bit_conversion(genome_sequence);
-
-	//a PAM made only of 'N' states no sequence requirement at any position, so PAM
-	//content must not exclude a site: a genomic 'N' converts to 0000, which
-	//intersects nothing, and would otherwise drop sites that a shorter PAM over the
-	//same guide region keeps. PAMs with at least one real constraint are unaffected.
-	bool pam_unconstrained = true;
-	for (int j = 0; j < pam_bit.size(); j++)
-		if (!pam_bit[j].all())
-			pam_unconstrained = false;
-
-	if (!pam_at_start) //pam al 5' quindi in fondo alla sequenza
+	for (int nt = 0; nt <= n - K; nt++)
 	{
-		for (int nt = 0; nt < genome_sequence.length() - pam_limit; nt++)
-		{
-			bool found_positive = true;
-			bool found_negative = true;
-			int positive_mismatches = max_mismatches;
-			int negative_mismatches = max_mismatches;
-			bitset<4> bit_check = 0;
+		bool found_positive = true;
+		bool found_negative = true;
+		int positive_mismatches = max_mismatches;
+		int negative_mismatches = max_mismatches;
+		bitset<4> bit_check = 0;
 
-			for (int pam_nt = 0; !pam_unconstrained && pam_nt < pam_limit; pam_nt++)
+		for (int pam_nt = 0; pam_nt < pam_limit; pam_nt++)
+		{
+			bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
+			if (bit_check.none())
 			{
-				bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
-				if (bit_check.none())
-				{
-					positive_mismatches--;
-					if (positive_mismatches < 0)
-						found_positive = false;
-				}
-				bit_check = genome_bit[nt + pam_nt] & pam_bit_reverse[pam_nt];
-				if (bit_check.none())
-				{
-					negative_mismatches--;
-					if (negative_mismatches < 0)
-						found_negative = false;
-				}
+				positive_mismatches--;
+				if (positive_mismatches < 0)
+					found_positive = false;
 			}
-			if (found_positive)
+			bit_check = genome_bit[nt + pam_nt] & pam_bit_reverse[pam_nt];
+			if (bit_check.none())
 			{
-				if (((nt + pam_limit - 1) - (pam_len - 1 + max_bulges)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
-				{
-					indices.push_back(((nt + pam_limit - 1) - (pam_len - 1 + max_bulges)));
-				}
-			}
-			if (found_negative)
-			{
-				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges)))) //same as for positive pam(out of bound problem)
-				{
-					indices.push_back(-nt);
-				}
+				negative_mismatches--;
+				if (negative_mismatches < 0)
+					found_negative = false;
 			}
 		}
-	}
-	else //pam al 3' quindi in cima alla sequenza
-	{
-		for (int nt = 0; nt < genome_sequence.length() - pam_len; nt++)
+		if (!pam_at_start) //3' PAM: forward = + strand, PAM right of the guide
 		{
-			bool found_positive = true;
-			bool found_negative = true;
-			int positive_mismatches = max_mismatches;
-			int negative_mismatches = max_mismatches;
-			bitset<4> bit_check = 0;
-
-			for (int pam_nt = 0; !pam_unconstrained && pam_nt < pam_limit; pam_nt++)
-			{
-				bit_check = genome_bit[nt + pam_nt] & pam_bit[pam_nt];
-				if (bit_check.none())
-				{
-					positive_mismatches--;
-					if (positive_mismatches < 0)
-						found_positive = false;
-				}
-				bit_check = genome_bit[nt + pam_nt] & pam_bit_reverse[pam_nt];
-				if (bit_check.none())
-				{
-					negative_mismatches--;
-					if (negative_mismatches < 0)
-						found_negative = false;
-				}
-			}
-			if (found_positive)
-			{
-				if ((nt <= (genome_sequence.length() - (pam_len + max_bulges)))) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
-				{
-					indices.push_back(-nt);
-				}
-			}
-			if (found_negative)
-			{
-				if (((nt + pam_limit - 1) - (pam_len - 1 + max_bulges)) >= 0) //save the pam position only if possible for a guide to attach that position(avoid out of bound)
-				{
-					indices.push_back(((nt + pam_limit - 1) - (pam_len - 1 + max_bulges)));
-				}
-			}
+			if (found_positive && right_ok(nt))
+				push_right(nt);
+			if (found_negative && left_ok(nt))
+				push_left(nt);
+		}
+		else //5' PAM: forward = + strand, PAM left of the guide
+		{
+			if (found_positive && left_ok(nt))
+				push_left(nt);
+			if (found_negative && right_ok(nt))
+				push_right(nt);
 		}
 	}
-	return indices;
+	return sites;
 }
 // Given a pam and a automaton it fill the automaton with each pam possible
 // vector<string> generatePam(string pamInput)

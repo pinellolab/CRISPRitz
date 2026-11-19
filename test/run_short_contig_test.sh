@@ -10,9 +10,13 @@
 # killed for memory after taking tens of GB. Such contigs are ordinary: the enricher
 # writes a header-only fake<chr>.fa for every chromosome with no carried indel.
 #
-# A contig shorter than pam_len + max_bulges holds no target on either strand, so
-# buildTST must finish at once, exit 0 and write no .bin -- and a normal chromosome
-# beside it must still be indexed, through crispritz.py index-genome as well.
+# A contig shorter than one guide plus one PAM base holds no target on either strand
+# (index format 2 no longer needs the bulge pad to fit, docs/INDEX_FORMAT.md), so
+# buildTST must finish at once, exit 0 and write no .bin -- while a contig exactly one
+# target long, with no room for the pad, must now be indexed (until 2.9.1 the whole
+# pad + guide + PAM window had to fit, which lost such targets: IDX-13), and a normal
+# chromosome beside a header-only one must still be indexed, through crispritz.py
+# index-genome as well.
 #
 # Each run is under a timeout and, on Linux, a 4 GB address-space cap, so a
 # regression fails this test instead of exhausting the host's memory.
@@ -51,15 +55,13 @@ printf 'NNNNNNNNNNNNNNNNNNNNNNNNNNNN 8\n'   > "${WORK}/n8.txt"
 printf 'NNNNNNNNNNNNNNNNNNNNNNNN -4\n'      > "${WORK}/n4_5p.txt"
 printf 'NNNNNNNNNNNNNNNNNNNNNGG 3\n'        > "${WORK}/ngg.txt"
 
-# contigs: header-only, 10 bp, and one base short of the NGG/NNN window (23 + 3 - 1)
+# contigs: header-only, 10 bp, and one guide long (20 bp): one base short of the
+# smallest target, a guide plus one PAM base (an all-N PAM; a dedicated PAM needs
+# guide + PAM)
 mkdir -p "${WORK}/fa"
 printf '>chrE\n'                            > "${WORK}/fa/chrE.fa"
 printf '>chrS\nACGTACGTAC\n'                > "${WORK}/fa/chrS.fa"
-python3 - "${WORK}/fa/chrW.fa" <<'PY'
-import sys
-seq = ("ACGTTGCATCGATCGGATCCAGG" + "TT")[:25]   # 25 bp < 23 + 3
-open(sys.argv[1], "w").write(">chrW\n" + seq + "\n")
-PY
+printf '>chrW\nACGTTGCATCGATCGGATCC\n'      > "${WORK}/fa/chrW.fa"
 
 bt() {  # <out dir> <fasta> <pam file>; sets RC and NBIN
   local dir=$1 fa=$2 pam=$3
@@ -84,6 +86,22 @@ for fa in chrE chrS chrW; do
     [ "${NBIN}" = 0 ] || fail "${fa} / ${pam}: a contig with no room for a target produced ${NBIN} .bin file(s)"
     echo "  ok  ${fa} / ${pam}: exit 0 in ${dt}s, no .bin"
   done
+done
+
+# a contig exactly one target long has no room for the pad and is indexed all the
+# same: 23 bp holding guide + AGG for NGG, and for the all-N PAMs (any PAM fits) the
+# same 23 bp and a 21-bp guide + one base
+python3 - "${WORK}/fa/chrT.fa" "${WORK}/fa/chrU.fa" <<'PY'
+import sys
+open(sys.argv[1], "w").write(">chrT\nACGTTGCATCGATCGGATCCAGG\n")   # 23 bp: guide + AGG
+open(sys.argv[2], "w").write(">chrU\nACGTTGCATCGATCGGATCCA\n")     # 21 bp: guide + 1
+PY
+for spec in "chrT ngg" "chrT nnn" "chrT n8" "chrT n4_5p" "chrU nnn" "chrU n8"; do
+  set -- ${spec}
+  bt "${WORK}/one_$1_$2" "${WORK}/fa/$1.fa" "${WORK}/$2.txt"
+  [ "${RC}" = 0 ] || fail "$1 / $2: buildTST exited ${RC}"
+  [ "${NBIN}" -ge 1 ] || fail "$1 / $2: a contig exactly one target long produced no .bin (the pad must not have to fit)"
+  echo "  ok  $1 / $2: one-target contig indexed (${NBIN} .bin)"
 done
 
 # a real target still indexes: the same guard must not drop a window that fits

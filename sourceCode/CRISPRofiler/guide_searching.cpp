@@ -400,17 +400,16 @@ void guide_searching()
 			for (int guidecount = 0; guidecount < totalguides; guidecount++) //ciclo le guide, su tutti gli indici
 			{
 				int currentmissmatch = 0; //missmatch di ogni guida
+				bool gap = false;		  //an N (0000) in the guide region
 
-				for (int j = 0; j < guidelencorrected & (currentmissmatch <= inputmissmatch); j++) //confronto lettera-lettera, guida su genoma
+				for (int j = 0; j < guidelencorrected && !gap && currentmissmatch <= inputmissmatch; j++) //confronto lettera-lettera, guida su genoma
 				{
-					if ((genomebit[j + pamindices[i]] & guidesbit[guidecount][j]) == 0)
-					{
+					if (genomebit[j + pamindices[i]] == 0)
+						gap = true; //a gap: no target, whatever the mismatch budget, as in an index
+					else if ((genomebit[j + pamindices[i]] & guidesbit[guidecount][j]) == 0)
 						currentmissmatch++;
-						if (genomebit[j + pamindices[i]] == 0)
-							currentmissmatch += 100;
-					}
 				}
-				if (currentmissmatch <= inputmissmatch) //se rimango nella soglia, salvo dati, guida e pam che hanno generato target
+				if (!gap && currentmissmatch <= inputmissmatch) //se rimango nella soglia, salvo dati, guida e pam che hanno generato target
 				{
 					respos_private.push_back(pamindices[i]);
 					guidepos_private.push_back(guidecount);
@@ -425,17 +424,16 @@ void guide_searching()
 			for (int guidecount = 0; guidecount < totalguides; guidecount++)
 			{
 				int currentmissmatch = 0;
+				bool gap = false; //an N (0000) in the guide region
 
-				for (int j = 0; j < guidelencorrected & (currentmissmatch <= inputmissmatch); j++)
+				for (int j = 0; j < guidelencorrected && !gap && currentmissmatch <= inputmissmatch; j++)
 				{
-					if ((genomebit[j + pamlimit + pamindicesreverse[i]] & reverseguidesbit[guidecount][j]) == 0)
-					{
+					if (genomebit[j + pamlimit + pamindicesreverse[i]] == 0)
+						gap = true; //a gap: no target, whatever the mismatch budget, as in an index
+					else if ((genomebit[j + pamlimit + pamindicesreverse[i]] & reverseguidesbit[guidecount][j]) == 0)
 						currentmissmatch++;
-						if (genomebit[j + pamlimit + pamindicesreverse[i]] == 0)
-							currentmissmatch += 100;
-					}
 				}
-				if (currentmissmatch <= inputmissmatch)
+				if (!gap && currentmissmatch <= inputmissmatch)
 				{
 					resneg_private.push_back(pamindicesreverse[i]);
 					guideneg_private.push_back(guidecount);

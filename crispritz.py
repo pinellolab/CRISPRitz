@@ -17,7 +17,26 @@ origin_path = os.path.dirname(os.path.realpath(__file__))
 # conda path
 conda_path = "opt/crispritz/"
 
-VERSION = "2.9.1"
+VERSION = "2.10.0"
+# The search-time region hooks of this CRISPRitz (docs/INDEX_FORMAT.md section 13),
+# which `crispritz.py version` lists too: search --skip-bed, --keep-bed and --leaf-dump.
+# Read it from this file as CRISPRme reads VERSION. CRISPRitz before 2.10.0 has none.
+SEARCH_HOOKS = "skip-bed,keep-bed,leaf-dump"
+# The index format this CRISPRitz's buildTST writes: CZI_FORMAT_VERSION in
+# sourceCode/CRISPR-Cas-Tree/include/indexFormat.h (test/run_index_format_test.sh
+# checks they agree). An index's own format is read from its .bin files
+# (index-info); this is for an index this CRISPRitz has just built that holds no
+# .bin to read (docs/INDEX_FORMAT.md section 8). Read it from this file as CRISPRme
+# reads VERSION. CRISPRitz 2.9.1 and earlier have none and write format 1.
+INDEX_FORMAT = 2
+# The fake-indel window add-variants writes: INDEL_LEFT reference bases before each indel
+# record's REF and INDEL_RIGHT after it, one N between two windows (both enricher ports
+# define the same: test/test_enricher_multiallelic.py checks they write it). A window's own
+# width is read from its indel log row (left = POS - 1 - start); this is for an enrichment
+# not made yet (docs/INDEX_FORMAT.md section 8). Read them from this file as CRISPRme reads
+# VERSION. CRISPRitz 2.9.1 and earlier have none and write 25 and 27.
+INDEL_LEFT = 30
+INDEL_RIGHT = 30
 
 
 def _run_checked(argv, what):
@@ -37,6 +56,69 @@ def _run_checked(argv, what):
         sys.stderr.write(
             f"ERROR: {what} failed ({_exit_detail(rc)}). Its output is incomplete or "
             f"absent, so it must not be treated as an empty result.\n"
+        )
+        sys.exit(1)
+
+
+_HOOK_FLAGS = ("--skip-bed", "--keep-bed", "--leaf-dump")
+_HOOK_ENV = ("CRISPRITZ_SKIP_BED", "CRISPRITZ_KEEP_BED", "CRISPRITZ_LEAF_DUMP")
+
+
+def _search_hooks():
+    """The region hooks of a search (docs/INDEX_FORMAT.md section 13), from its flags:
+    {flag: absolute path} for each of --skip-bed <bed>, --keep-bed <bed> and --leaf-dump
+    <file> given. Exits 1, with the reason on stderr, on a flag given twice or without
+    its path, a BED that is not a file, a skip BED with a keep BED, or a leaf dump
+    without a skip BED; searchTST checks the BED's lines against the index."""
+    args = sys.argv[1:]
+    hooks = {}
+    for flag in _HOOK_FLAGS:
+        n = args.count(flag)
+        if n == 0:
+            continue
+        i = args.index(flag)
+        if n > 1 or i + 1 >= len(args) or args[i + 1] == "" or args[i + 1].startswith("-"):
+            sys.stderr.write("ERROR: %s takes one path, given once (%s).\n"
+                             % (flag, "given %d times" % n if n > 1 else "no path after it"))
+            sys.exit(1)
+        hooks[flag] = os.path.realpath(args[i + 1])
+    for flag in ("--skip-bed", "--keep-bed"):
+        if flag in hooks and not isfile(hooks[flag]):
+            sys.stderr.write("ERROR: %s %s: no such file.\n" % (flag, hooks[flag]))
+            sys.exit(1)
+    if "--skip-bed" in hooks and "--keep-bed" in hooks:
+        sys.stderr.write("ERROR: a search takes --skip-bed or --keep-bed, not both.\n")
+        sys.exit(1)
+    if "--leaf-dump" in hooks and "--skip-bed" not in hooks:
+        sys.stderr.write("ERROR: --leaf-dump writes the leaves a --skip-bed BED drops, and needs one.\n")
+        sys.exit(1)
+    return hooks
+
+
+def _run_search_with_hooks(argv, what):
+    """Run searchTST with a skip or keep BED: as _run_checked, streaming its stdout, and
+    FAIL unless it printed its SKIPPED LEAVES line. A searchTST without the hooks (before
+    2.10.0) ignores the arguments that name the BED and searches everything, which would
+    look like a skipped search that skipped nothing."""
+    proc = subprocess.Popen(argv, stdout=subprocess.PIPE, encoding="utf-8", errors="replace", bufsize=1)
+    reported = False
+    for line in proc.stdout:
+        sys.stdout.write(line)
+        if line.startswith("SKIPPED LEAVES\t"):
+            reported = True
+    sys.stdout.flush()
+    rc = proc.wait()
+    if rc != 0:
+        sys.stderr.write(
+            f"ERROR: {what} failed ({_exit_detail(rc)}). Its output is incomplete or "
+            f"absent, so it must not be treated as an empty result.\n"
+        )
+        sys.exit(1)
+    if not reported:
+        sys.stderr.write(
+            f"ERROR: {what} did not apply the region BED: it printed no SKIPPED LEAVES line, "
+            f"so it is a searchTST without the region hooks (CRISPRitz before 2.10.0); its "
+            f"output holds every site.\n"
         )
         sys.exit(1)
 
@@ -171,6 +253,7 @@ def searchTST():
         )
         sys.exit()
 
+    hooks = _search_hooks()
     nameGenome = os.path.realpath(sys.argv[2])
     PAM = os.path.realpath(sys.argv[3])  # save PAM
     fileGuide = os.path.realpath(sys.argv[4])
@@ -312,24 +395,32 @@ def searchTST():
     # a hard error (the index never stored those extra flank bases). See README
     # section 3.3.3.
     prune_pam = 1 if "--prune-pam" in sys.argv[1:] else 0
-    _run_checked(
-        [
-            corrected_origin_path + "searchTST",
-            str(dirTSTgenome),
-            str(fileGuide),
-            str(mm),
-            str(bDNA),
-            str(bRNA),
-            str(PAM),
-            str(nameResult),
-            str(r),
-            str(th),
-            max_bulges,
-            str(max_edits),
-            str(prune_pam),
-        ],
-        "searchTST (index search)",
-    )
+    argv = [
+        corrected_origin_path + "searchTST",
+        str(dirTSTgenome),
+        str(fileGuide),
+        str(mm),
+        str(bDNA),
+        str(bRNA),
+        str(PAM),
+        str(nameResult),
+        str(r),
+        str(th),
+        max_bulges,
+        str(max_edits),
+        str(prune_pam),
+    ]
+    # the region hooks (docs/INDEX_FORMAT.md section 13), taken from the flags only:
+    # searchTST also reads them from CRISPRITZ_SKIP_BED, CRISPRITZ_KEEP_BED and
+    # CRISPRITZ_LEAF_DUMP, which are not passed on, so a search given none of the flags
+    # is the search without the hooks whatever the environment holds
+    for var in _HOOK_ENV:
+        os.environ.pop(var, None)
+    if hooks:
+        argv += [hooks.get(flag, "") for flag in _HOOK_FLAGS]
+        _run_search_with_hooks(argv, "searchTST (index search)")
+    else:
+        _run_checked(argv, "searchTST (index search)")
     print("Search END")
     print("Search runtime: %s seconds" % (time.time() - start_time))
 
@@ -350,9 +441,19 @@ def searchBruteForce():
             "\n-th < num_thread >: (Optional) Number of threads to use. Default uses all of the available threads (ONE for bulge search)",
             "\n--max-edits <n>: (Optional, indexed search) Cap the TOTAL number of edits (mismatches + DNA bulges + RNA bulges) per off-target. Omitted/negative disables the cap.",
             "\n--prune-pam: (Optional, indexed search) On-the-fly PAM filter. Lets ONE generous-flank PAM-less index (built with an all-N 3' PAM of flank width K, e.g. 8) serve any 3' search PAM of length L <= K (e.g. NGG/NRG/NRR/NGA/NNGRRT): candidates whose concrete flanking PAM does not match the search PAM are skipped before they are emitted, giving the same off-target loci as a dedicated per-PAM index. A shorter 3' PAM is N-padded at its end up to the stored width K. A 5' PAM (e.g. TTTV) needs an index of exactly its width: a shorter 5' PAM is refused, and so is L > K. OFF by default (byte-identical to upstream). See README section 3.3.3.",
+            "\n--skip-bed <bed>: (Optional, indexed search) Skip every site whose core (the search guide and PAM, bulge-free) meets an interval of the BED (contig, 0-based start, end; contigs of the index only): the search returns exactly the lines it returns without the BED whose core meets no interval. Prints SKIPPED LEAVES <n> KEPT LEAVES <n>. See README section 3.3.4 and docs/INDEX_FORMAT.md section 13.",
+            "\n--keep-bed <bed>: (Optional, indexed search) The inverse of --skip-bed: search only the sites whose core meets an interval. Not with --skip-bed.",
+            "\n--leaf-dump <file>: (Optional, with --skip-bed) Write the stored letters of every site the skip drops: contig, window start, the window on the + strand ('-' where no alignment may read), L or R.",
             "\n{-r,-p,-t}: Output type (-r off-targets list only, -p profile only, -t off-targets AND profile)\n",
         )
         sys.exit()
+    if any(flag in sys.argv[1:] for flag in _HOOK_FLAGS):
+        sys.stderr.write(
+            "ERROR: --skip-bed, --keep-bed and --leaf-dump act on an indexed search (give "
+            "-bDNA and/or -bRNA, 0 allowed, and an index directory); this one is a "
+            "brute-force search of a FASTA directory.\n"
+        )
+        sys.exit(1)
 
     genomeDir = os.path.realpath(sys.argv[2]) + "/"
     filePAM = os.path.realpath(sys.argv[3])
@@ -459,6 +560,24 @@ def _enricher_command():
     return [sys.executable, corrected_origin_path + "Python_Scripts/Enrichment/enricher.py"]
 
 
+def _first_q(fasta):
+    """The 1-based position of the first 'Q' (either case) in the sequence of the
+    one-sequence FASTA ``fasta``, else 0. The enricher writes Q where a position's SNP
+    ALTs, with its reference base when that is A, C, G or T, cover all four bases, and
+    the search reads it as any base, so a reference must not hold one: the enricher
+    refuses it in the chromosomes it enriches, and add-variants in those it copies."""
+    seen = 0
+    with open(fasta, "rb") as fh:
+        fh.readline()  # the header
+        for line in fh:
+            line = line.rstrip(b"\r\n")
+            hits = [k for k in (line.find(b"Q"), line.find(b"q")) if k >= 0]
+            if hits:
+                return seen + min(hits) + 1
+            seen += len(line)
+    return 0
+
+
 def genomeEnrichment_subprocess_VCF(altfile, genfile, dirGenome, doit, dirVCFFiles):
     """Enrich one chromosome; return the enricher's exit status for the parent to
     check. This runs in a Pool worker, so it must not exit the way _run_checked
@@ -543,7 +662,21 @@ def genomeEnrichment():
         for x in vcf_chr.split("."):
             if "chr" in x:
                 chr_with_vcf.add(x)
-    list_file_ends = [f for f in listdir(dirGenome) if isfile(join(dirGenome, f))]
+    # the chromosome FASTA files: any other file beside them (a README, a .DS_Store, a
+    # .fai, the AppleDouble ._<name>.fa of macOS tar) is no chromosome. Taken for one, a
+    # README was copied as one ('cp: cannot stat' on stderr), a ._<name>.fa into the
+    # enriched genome, and a README, .DS_Store or .fai listed first gave its extension
+    # to the chromosomes copied below, none of which was
+    list_file_ends = [
+        f
+        for f in listdir(dirGenome)
+        if isfile(join(dirGenome, f))
+        and f.endswith((".fa", ".fasta"))
+        and not f.startswith(".")
+    ]
+    if not list_file_ends:
+        sys.stderr.write("ERROR: %s holds no .fa or .fasta file\n" % dirGenome)
+        sys.exit(1)
     file_ends = list_file_ends[0].split(".")[-1]  # For .fa or .fasta
     contains_enr = ""
     if ".enriched." in list_file_ends[0]:
@@ -554,12 +687,22 @@ def genomeEnrichment():
         set(
             [
                 f.split(contains_enr + ".fa")[0]
-                for f in listdir(dirGenome)
-                if isfile(join(dirGenome, f))
+                for f in list_file_ends
             ]
         )
         - chr_with_vcf
     )
+    # the chromosomes without a VCF are copied as they are (below): refuse a 'Q' in them
+    # as the enricher does in the others, before any work is done
+    for f in sorted(list_file_ends):
+        chrom = f.split(contains_enr + ".fa")[0]
+        q = _first_q(join(dirGenome, f)) if chrom in chr_wihtout_vcf else 0
+        if q:
+            sys.stderr.write(
+                "ERROR: %s holds 'Q' at %d: a reference FASTA must not hold Q, which is reserved "
+                "for four-allele SNP positions\n" % (chrom, q)
+            )
+            sys.exit(1)
 
     # read number of mismatches
     th = 1
@@ -686,6 +829,163 @@ def genomeEnrichment():
     print("Runtime: %s seconds" % (time.time() - start_time))
 
 
+# The first and last 4 bytes of an index (.bin) of format 2 (CRISPRitz 2.10.0 on). See
+# docs/INDEX_FORMAT.md: format 1 (CRISPRitz <= 2.9.1) has no header, its first int is
+# the leaf count.
+CZI_MAGIC = b"CZI\xfe"
+
+
+def read_index_header(path):
+    """The index format and build parameters of the CRISPRitz .bin ``path``, read from
+    its header, the two ints that open its body and its last 4 bytes, without loading
+    the tree (docs/INDEX_FORMAT.md section 7). An "error" entry says why searchTST
+    refuses the file: every check searchTST makes on a file's own bytes and name
+    before it reads its leaves is made here, in the same order. A format-1 file has no
+    end marker, so one cut short after its first 8 bytes is not seen here."""
+    import os
+    import struct
+
+    def refused(info, why):
+        info["error"] = why
+        return info
+
+    def damaged(info, header_len, width, size):
+        # a leaf record takes at least 4 + ceil(K/2) + 1 bytes (window start, flank
+        # nibbles, marker or flags byte), so a leaf count the file cannot hold is damage
+        need = header_len + 12 + info["num_leaves"] * (4 + (width + 1) // 2 + 1)
+        if need > size:
+            return refused(info, "damaged: its %d leaves need at least %d bytes, the file holds %d"
+                           % (info["num_leaves"], need, size))
+        return info
+
+    # the PAM the file is named for, <PAM>_<contig>_<part>.bin: searchTST reads every
+    # .bin of a directory at the width of that PAM
+    named = os.fsencode(os.path.basename(path)).split(b"_", 1)[0]
+    try:
+        fh = open(path, "rb")
+    except OSError as exc:
+        return refused({"format": None}, "cannot be opened (%s)" % exc.strerror)
+    with fh:
+        size = os.fstat(fh.fileno()).st_size
+        head = fh.read(28)
+        if head[:4] != CZI_MAGIC:
+            # format 1 (CRISPRitz <= 2.9.1): no header, the file opens with numLeaves
+            # and len_guide
+            if len(head) < 8:
+                return refused({"format": None}, "too short to be a CRISPRitz index (.bin) file")
+            leaves, guide = struct.unpack("=ii", head[:8])
+            info = {"format": 1, "num_leaves": leaves, "guide_len": guide}
+            if leaves <= 0:
+                return refused(info, "not a valid CRISPRitz index (.bin) file (numLeaves=%d)" % leaves)
+            return damaged(info, 0, len(named), size)
+        if len(head) < 28:
+            return refused({"format": None}, "cut-short index header")
+        version, header_len, flags, guide, pam_len, mb = struct.unpack("=6i", head[4:28])
+        info = {
+            "format": version if version >= 2 else None,
+            "pam_at_start": bool(flags & 1),
+            "pamless": bool(flags & 2),
+            "four_allele": bool(flags & 4),
+            "guide_len": guide,
+            "pam_len": pam_len,
+            "max_bulges": mb,
+        }
+        if version > 2:
+            return refused(info, "index format %d, newer than this CRISPRitz reads (formats 1 and "
+                                 "2): update CRISPRitz, or rebuild the index with this one" % version)
+        # bit 0: PAM at the 5' end, bit 1: PAM-less, bit 2: holds Q, the four-allele
+        # symbol; max_bulges fits pad_valid's 5 bits
+        if (version != 2 or flags & ~7 or not 1 <= pam_len <= 1000 or header_len != 28 + pam_len
+                or guide < 1 or not 0 <= mb <= 31):
+            return refused(info, "malformed index header (version %d, flags %d, PAM length %d, "
+                                 "header length %d, guide length %d, max bulges %d)"
+                           % (version, flags, pam_len, header_len, guide, mb))
+        pam = fh.read(pam_len)
+        info["pam"] = pam.decode("ascii", "replace")
+        if len(pam) < pam_len:
+            return refused(info, "cut-short index header")
+        fh.seek(-4, os.SEEK_END)
+        info["complete"] = fh.read(4) == CZI_MAGIC
+        if not info["complete"]:
+            return refused(info, "cut short: it does not end in the end-of-index marker")
+        fh.seek(header_len)
+        body = fh.read(8)
+    if len(body) < 8:
+        return refused(info, "cut short: no leaf count and guide length after its header")
+    leaves, body_guide = struct.unpack("=ii", body)
+    info["num_leaves"] = leaves
+    if body_guide != guide:
+        return refused(info, "malformed index: its header gives guide length %d, its body %d"
+                       % (guide, body_guide))
+    # searchTST reads a format-2 file only if its header PAM is its name's prefix
+    if pam != named:
+        return refused(info, "holds the PAM/flank region '%s' but is named for '%s'"
+                       % (info["pam"], os.fsdecode(named)))
+    if leaves <= 0:
+        return refused(info, "not a valid CRISPRitz index (.bin) file (numLeaves=%d)" % leaves)
+    return damaged(info, header_len, pam_len, size)
+
+
+def indexInfo():
+    """crispritz.py index-info <index_dir>: the format of every .bin of an index, and
+    the index format this CRISPRitz writes, as JSON on stdout. Exits 1 when the
+    directory holds no .bin, a .bin that searchTST refuses whatever the search
+    (read_index_header gives it an "error" entry), or .bin files named for more than
+    one PAM."""
+    import json
+
+    if len(sys.argv) < 3 or "help" in sys.argv[2:]:
+        print(
+            "crispritz.py index-info <index_dir>\n"
+            "\nPrints, as JSON, the index format of each .bin of a TST index (1: built by "
+            "CRISPRitz <= 2.9.1; 2: built by 2.10.0 or later, see docs/INDEX_FORMAT.md), "
+            "for format 2 the parameters it was built with and whether it holds Q, the "
+            "four-allele symbol (four_allele), as contigs the contigs it holds a tree for "
+            "(those a search's --skip-bed or --keep-bed BED may name), and, as "
+            "writes_format, the format this CRISPRitz builds. Reads only each file's first "
+            "bytes, its last bytes and its "
+            "size. Exits 1 if the directory holds no .bin, a .bin that searchTST refuses "
+            "whatever the search for what those show (its \"error\" entry says why), or .bin "
+            "files named for more than one PAM (pams)."
+        )
+        sys.exit()
+    index_dir = os.path.realpath(sys.argv[2])
+    checkExistance(index_dir, "d")
+    files = {}
+    for name in sorted(listdir(index_dir)):
+        path = join(index_dir, name)
+        # the files searchTST takes for trees: regular files named <name>.bin
+        if len(name) > 4 and name.endswith(".bin") and isfile(path):
+            files[name] = read_index_header(path)
+    formats = sorted({str(i["format"]) for i in files.values()})
+    # searchTST reads every .bin of a directory as an index of the PAM that names the
+    # first one it lists (its width; for format 1, its PAM), so files named for more
+    # than one PAM are not one index: macOS "._" AppleDouble files copied along with
+    # an index, named for ".", make searchTST refuse the search
+    pams = sorted({n.split("_", 1)[0] for n in files})
+    # the contigs the index holds a tree for, <PAM>_<contig>_<part>.bin, as searchTST
+    # reads them: a region BED (search --skip-bed, --keep-bed) may name only these
+    # (docs/INDEX_FORMAT.md section 13); a contig with no site has no .bin
+    contigs = sorted({n[n.find("_") + 1:n.rfind("_")] for n in files if 0 <= n.find("_") < n.rfind("_")})
+    bad = [n for n, i in files.items() if "error" in i]
+    print(json.dumps({"index": index_dir, "formats": formats, "pams": pams,
+                      "writes_format": INDEX_FORMAT, "contigs": contigs, "files": files}, indent=1))
+    why = []
+    if not files:
+        why.append("no .bin index files in " + index_dir)
+    if bad:
+        why.append("searchTST would refuse " + "; ".join(
+            ["%s: %s" % (n, files[n]["error"]) for n in bad[:5]]
+            + (["and %d more" % (len(bad) - 5)] if len(bad) > 5 else [])))
+    if len(pams) > 1:
+        why.append("the .bin files are named for more than one PAM (%s), which searchTST "
+                   "refuses: an index directory holds the .bin files of one index only"
+                   % ", ".join("'%s'" % p for p in pams))
+    if why:
+        sys.stderr.write("ERROR: %s\n" % "; ".join(why))
+        sys.exit(1)
+
+
 def removeFile(to_remove):
     """
     Remove file given his path in input
@@ -701,6 +1001,8 @@ def removeFile(to_remove):
 
 def version():
     print("CRISPRitz v", VERSION)
+    # the search-time region hooks, for a reader that checks for them (CRISPRme)
+    print("search hooks:", " ".join(SEARCH_HOOKS.split(",")))
 
 
 # HELP FUNCTION
@@ -713,6 +1015,7 @@ def callHelp():
         "\ncrispritz.py add-variants FUNCTION TO ADD VARIANTS DATA TO A FASTA GENOME",
         "\ncrispritz.py index-genome FUNCTION TO CREATE GENOME INDEX TO PERFORM FAST SEARCHES WITH BULGES",
         "\ncrispritz.py search FUNCTION TO PERFORM SEARCHES ON A GENOME (INDEXED OR PLAIN FASTA)",
+        "\ncrispritz.py index-info FUNCTION TO PRINT THE FORMAT AND BUILD PARAMETERS OF A GENOME INDEX",
         "\n",
         "\nADD help TO ANY FUNCTION TO VISUALIZE A BRIEF HELP PAGE (example: crispritz.py index-genome help)\n",
     )
@@ -728,6 +1031,8 @@ elif sys.argv[1] == "search" and ("-bDNA" in sys.argv[1:] or "-bRNA" in sys.argv
     searchTST()
 elif sys.argv[1] == "search":
     searchBruteForce()
+elif sys.argv[1] == "index-info":
+    indexInfo()
 elif sys.argv[1] == "add-variants":
     genomeEnrichment()
 else:
