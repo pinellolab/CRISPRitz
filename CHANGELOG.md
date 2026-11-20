@@ -20,6 +20,21 @@ for the crispritz -> Bioconda -> CRISPRme chain).
 
 ## [Unreleased]
 
+### Changed
+- **CI runs the job that compares the two enricher ports on ubuntu-24.04 and ubuntu-26.04.**
+  The `enricher-ports` job of `.github/workflows/ci.yml` is a matrix of both of GitHub's
+  Ubuntu images (Python 3.12 and 3.14); 2.10.0 ran it on ubuntu-24.04 alone. Its steps
+  compare `enricher.py`'s stderr, so a warning that either Python prints fails its lane.
+
+### Fixed
+- **`enricher.py` prints no `DeprecationWarning` on Python 3.13 and later** (2.10.0, Known
+  issues): it passes `re.sub`'s `count` by keyword, not by position, which Python 3.13
+  deprecates and a later Python is to refuse. Its outputs are unchanged: on Python 3.12 and
+  3.14, on `verify_enricher.sh`'s inputs, this `enricher.py` and 2.10.0's write
+  byte-identical enriched genomes, SNP dictionaries, indel logs and fake-indel contigs.
+  `enricher_old.py`, which no command runs, gets the same change; no other `re.sub`,
+  `re.subn` or `re.split` call in the repository passes an optional argument by position.
+
 ## [2.10.0] - 2026-11-19
 
 Released together with rebuilt indexes (CRISPRme 2.10.0's, in the Hugging Face dataset
